@@ -1,0 +1,129 @@
+:root {
+  /* Style 1 — light, soft, pastel */
+  --bg: #f4f3f9;
+  --panel: #ffffff;
+  --panel-alt: #f7f6fc;
+  --panel-hover: #eef0fb;
+  --border: #e9e7f2;
+  --border-soft: #f0eef7;
+
+  --text: #2b2a3a;
+  --text-muted: #6b697c;
+  --text-faint: #7e7d8e;
+  --text-dim: #8a8898;
+  --text-subtle: #38374a;
+
+  --accent: #6366f1;
+  --accent-2: #8b5cf6;
+  --accent-active: #eceafd;
+  --accent-hover: #f1f0fb;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --font-body: 'Inter', 'Helvetica Neue', 'Noto Sans TC', sans-serif;
+  --font-heading: 'Inter', 'Helvetica Neue', 'Noto Sans TC', sans-serif;
+
+  --card-shadow: 0 2px 12px rgba(40, 36, 80, 0.07);
+  --glow-border: none;
+  --glow-shadow: none;
+  --bg-pattern: none;
+
+  --page-bg: var(--bg);
+  --panel-blur: none;
+  --shell-bg: var(--bg);
+  --shell-blur: none;
+  --shell-margin: 0px;
+  --shell-radius: 0px;
+  --shell-shadow: none;
+}
+
+html[data-theme="neon"] {
+  /* Style 2 — dark cyberpunk / neon */
+  --bg: #090812;
+  --panel: #100f1c;
+  --panel-alt: #0b0a16;
+  --panel-hover: #191830;
+  --border: #241f3d;
+  --border-soft: #1a1830;
+
+  --text: #eceaf9;
+  --text-muted: #9c98bd;
+  --text-faint: #a09cbb;
+  --text-dim: #8882a8;
+  --text-subtle: #c9c5ec;
+
+  --accent: #22d3ee;
+  --accent-2: #ec4899;
+  --accent-active: #1e1b38;
+  --accent-hover: #191733;
+
+  --card-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+  --glow-border: linear-gradient(135deg, #22d3ee, #ec4899);
+  --glow-shadow: 0 0 12px rgba(34, 211, 238, 0.35), 0 0 20px rgba(236, 72, 153, 0.25);
+  --bg-pattern:
+    repeating-linear-gradient(0deg, rgba(34, 211, 238, 0.05) 0, rgba(34, 211, 238, 0.05) 1px, transparent 1px, transparent 48px),
+    repeating-linear-gradient(90deg, rgba(34, 211, 238, 0.05) 0, rgba(34, 211, 238, 0.05) 1px, transparent 1px, transparent 48px);
+}
+
+html[data-theme="neon"] body {
+  background-image: var(--bg-pattern);
+}
+
+html[data-theme="glass"] {
+  /* Style 3 — glassmorphism, frosted glass on a warm gradient */
+  --bg: #eef1f7;
+  --panel: rgba(255, 255, 255, 0.55);
+  --panel-alt: rgba(255, 255, 255, 0.35);
+  --panel-hover: rgba(255, 255, 255, 0.75);
+  --border: rgba(255, 255, 255, 0.75);
+  --border-soft: rgba(255, 255, 255, 0.45);
+
+  --text: #334155;
+  --text-muted: #94a3b8;
+  --text-faint: #7a8899;
+  --text-dim: #7a8899;
+  --text-subtle: #1e293b;
+
+  --accent: #d97706;
+  --accent-2: #f59e0b;
+  --accent-active: linear-gradient(90deg, rgba(253, 230, 138, 0.45) 0%, rgba(255, 255, 255, 0.65) 100%);
+  --accent-hover: rgba(255, 255, 255, 0.55);
+
+  --card-shadow: 0 10px 25px rgba(0, 0, 0, 0.05), inset 0 0 15px rgba(255, 255, 255, 0.5);
+  --glow-border: none;
+  --glow-shadow: 0 8px 20px rgba(251, 191, 36, 0.15);
+  --bg-pattern: none;
+
+  --page-bg:
+    radial-gradient(circle at 15% 20%, rgba(147, 197, 253, 0.45), transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(253, 186, 116, 0.45), transparent 45%),
+    linear-gradient(135deg, #d8e3f7 0%, #fbe0c4 50%, #d6e0f5 100%);
+  --panel-blur: blur(16px);
+  --shell-bg: rgba(255, 255, 255, 0.28);
+  --shell-blur: blur(24px);
+  --shell-margin: 30px;
+  --shell-radius: 32px;
+  --shell-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="glass"] body {
+  background-attachment: fixed;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+html[data-theme="neon"] .glow-frame {
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  background-image: linear-gradient(var(--panel), var(--panel)), var(--glow-border);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: var(--glow-shadow);
+}
