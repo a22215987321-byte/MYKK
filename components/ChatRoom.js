@@ -13,6 +13,7 @@ import FrenchPronunciation from "./FrenchPronunciation";
 import FrenchA1Unit1 from "./FrenchA1Unit1";
 import FrenchGrammar from "./FrenchGrammar";
 import FrenchHome from "./FrenchHome";
+import FrenchA1ExamScope from "./FrenchA1ExamScope";
 import SpanishPronunciation from "./SpanishPronunciation";
 import SpanishGrammar from "./SpanishGrammar";
 import EnglishPronunciation from "./EnglishPronunciation";
@@ -1389,13 +1390,23 @@ export default function ChatApp({ user }) {
               </div>
             </button>
           </div>
-          <div style={{ padding: "0 10px 6px" }}>
+          <div style={{ padding: "0 10px 2px" }}>
             <button onClick={() => { setFrenchView('grammar'); setShowSpanishCourse(false); setShowSpanish(false); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowCustomVocab(false); setShowDict(false); setShowEnglishPron(false); }} className={`fb ${frenchView === 'grammar' ? "act" : ""}`}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: frenchView === 'grammar' ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
               <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#064e3b,#059669)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📐</div>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>基礎文法</div>
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>代詞 · être · 冠詞</div>
+              </div>
+            </button>
+          </div>
+          <div style={{ padding: "0 10px 6px" }}>
+            <button onClick={() => { setFrenchView('a1exam'); setShowSpanishCourse(false); setShowSpanish(false); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowCustomVocab(false); setShowDict(false); setShowEnglishPron(false); }} className={`fb ${frenchView === 'a1exam' ? "act" : ""}`}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: frenchView === 'a1exam' ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
+              <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#1e1b4b,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📋</div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>法語學習 2</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>A1 考試範圍</div>
               </div>
             </button>
           </div>
@@ -1728,6 +1739,9 @@ export default function ChatApp({ user }) {
           )}
           {frenchView === 'grammar' && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showSpanishPron && !showSpanishGrammar && (
             <div style={{ flex: 1, overflow: "hidden" }}><FrenchGrammar user={user} db={db} onNav={(t) => setFrenchView(t === 'home' ? 'route' : t)} /></div>
+          )}
+          {frenchView === 'a1exam' && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showSpanishPron && !showSpanishGrammar && (
+            <div style={{ flex: 1, overflow: "hidden" }}><FrenchA1ExamScope /></div>
           )}
 
           {/* Spanish Pronunciation view */}
