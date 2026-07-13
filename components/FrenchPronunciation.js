@@ -1101,79 +1101,166 @@ function BeginnerDetailPanel({ lesson, color, completedIds, onComplete, onClose 
   if (!lesson) return null;
   const guide = guideFor(lesson);
   const done = completedIds.has(lesson.id);
-  const phonemeReady = Boolean(lesson.audio?.phonemeUrl);
-  const repeatReady = Boolean(lesson.audio?.phonemeRepeatUrl);
-  const firstSyllable = guide.syllables.find(([, speakText, allowed = true]) => allowed && speakText);
+
+  // Best available audio for "single sound" practice
+  const phonemeAudioUrl = lesson.audio?.phonemeUrl || null;
+  const firstSyllable = guide.syllables.find(([, speakText, allowed = true]) => allowed !== false && speakText);
   const firstWord = guide.words[0];
+  const phonemeFallback = firstSyllable ? firstSyllable[1] : firstWord;
+  const canPlayPhoneme = lesson.type === "phoneme" || lesson.type === "combo";
+
   return (
     <div className="fp-detail-shell" style={{ "--lesson-color": color }}>
+      {/* Header */}
       <div className="fp-detail-header">
         <div><span>完整發音訓練</span><h2>{lesson.symbol} {lesson.titleZh}</h2></div>
         <button type="button" onClick={onClose}>✕</button>
       </div>
+
       <div className="fp-detail-scroll fp-body">
-        <section className="fp-purpose" style={{ borderColor: `${color}55` }}>
-          <div><small>1 · 這個音是什麼？</small><p>{guide.what}</p></div>
-          <div><small>我什麼時候用它？</small><p>{guide.when}</p></div>
-          <div><small>之後你會在這些詞遇到</small><div className="fp-chip-row">{guide.future.map(word => <span key={word}>{word}</span>)}</div></div>
-        </section>
 
-        <section className="fp-training-block">
-          <h3>依序練習 · 不要跳步</h3>
-          <div className="fp-audio-order">
-            <TeacherButton lesson={lesson} contentLanguage="fr-FR" narratorLanguage="zh-CN" label="1. 老師講解" color="#0891b2" />
-            {phonemeReady ? <AudioButton audioUrl={lesson.audio.phonemeUrl} lang="fr-FR" label="2. 聽單音" color={color} /> : <span className="fp-audio-note">2–3. 單音音訊準備中；目前不會用 TTS 直接朗讀 IPA</span>}
-            {repeatReady && <RepeatBtn audioUrl={lesson.audio.phonemeRepeatUrl} lang="fr-FR" label="3. 跟讀單音" color="#10b981" />}
-            {firstSyllable && <AudioButton fallbackText={firstSyllable[1]} lang="fr-FR" ttsRate={0.72} label="4. 聽音節" color={color} />}
-            {firstSyllable && <RepeatBtn fallbackText={firstSyllable[1]} lang="fr-FR" label="5. 跟讀音節" color="#10b981" />}
-            {firstWord && <AudioButton fallbackText={firstWord} lang="fr-FR" ttsRate={0.82} label="6. 聽單字" color={color} />}
-            {firstWord && <AudioButton fallbackText={firstWord} lang="fr-FR" ttsRate={0.62} label="7. 慢速單字" color="#8b5cf6" />}
-            <AudioButton fallbackText={guide.sentence} lang="fr-FR" ttsRate={0.8} label="8. 聽短句" color="#0f766e" />
+        {/* Hero — big symbol + one-sentence hook */}
+        <div className="fpb-hero" style={{ borderColor: `${color}40` }}>
+          <div className="fpb-hero-symbol" style={{ color }}>{lesson.symbol}</div>
+          <p>{guide.what}</p>
+        </div>
+
+        {/* ── 1. 先聽老師怎麼教 ── */}
+        <section className="fpb-section">
+          <div className="fpb-step-label" style={{ color }}>1. 先聽老師怎麼教</div>
+          <p className="fpb-step-text">
+            {lesson.teacherAudioText || lesson.teacherScriptZh || lesson.teachingScriptZh || ""}
+          </p>
+          <div style={{ marginTop: 14 }}>
+            <TeacherButton lesson={lesson} contentLanguage="fr-FR" narratorLanguage="zh-CN"
+              label="▶ 聽老師講解" color="#0891b2" />
           </div>
         </section>
 
-        <section className="fp-mouth-grid">
-          <InfoBlock icon="👄" label="嘴巴怎麼做？" color="#a78bfa">{lesson.mouthTipZh || "嘴巴保持自然，先慢慢做出清楚位置。"}</InfoBlock>
-          <InfoBlock icon="👅" label="舌頭在哪裡？" color="#34d399">{lesson.tongueTipZh || "保持舌頭放鬆，留意接觸和高度。"}</InfoBlock>
-          <InfoBlock icon="💨" label="氣流與聲帶" color="#60a5fa">{lesson.airflowTipZh || "慢慢送氣，留意聲帶是否振動。"} {voicingTipFor(lesson)}</InfoBlock>
-        </section>
-
-        <section className="fp-training-block">
-          <h3>4 · 音標 → 字母 → 音節 → 單字 → 短句</h3>
-          <FlowStrip lesson={lesson} guide={guide} color={color} />
-        </section>
-
-        <section className="fp-two-column">
-          <div className="fp-training-block">
-            <h3>5 · 常見字母／字母組合</h3>
-            <div className="fp-spelling-list">
-              {guide.spellings.map(([letters, word]) => <div className="fp-spelling-row" key={`${letters}-${word}`}><strong>{letters}</strong><span>例如 {word}</span><AudioButton fallbackText={word} lang="fr-FR" ttsRate={0.8} label={`聽 ${word}`} color={color} sm /></div>)}
+        {/* ── 2. 先做嘴形 ── */}
+        <section className="fpb-section">
+          <div className="fpb-step-label" style={{ color }}>2. 先做嘴形</div>
+          <div className="fpb-mouth-row">
+            <div className="fpb-mouth-chip">
+              <span>👄</span><b>嘴巴</b>
+              <p>{lesson.mouthTipZh || "嘴巴保持自然，先慢慢做出清楚位置。"}</p>
             </div>
-          </div>
-          <div className="fp-training-block">
-            <h3>6 · 音節練習</h3>
-            <div className="fp-syllable-grid">
-              {guide.syllables.length ? guide.syllables.map(([display, speakText, allowed = true]) => (
-                <div className="fp-syllable-row" key={display}><b>{display}</b>{allowed && speakText ? <><AudioButton fallbackText={speakText} lang="fr-FR" ttsRate={0.72} label="聽音節" color={color} sm /><RepeatBtn fallbackText={speakText} lang="fr-FR" label="跟讀" color="#10b981" sm /></> : <small>需專用音檔，暫不播放</small>}</div>
-              )) : <p className="fp-muted">這一課先理解規則，再進入單字練習。</p>}
+            <div className="fpb-mouth-chip">
+              <span>👅</span><b>舌頭</b>
+              <p>{lesson.tongueTipZh || "舌頭放鬆，留意接觸位置和高度。"}</p>
+            </div>
+            <div className="fpb-mouth-chip">
+              <span>💨</span><b>聲音</b>
+              <p>{(lesson.airflowTipZh ? lesson.airflowTipZh + " " : "") + voicingTipFor(lesson)}</p>
             </div>
           </div>
         </section>
 
-        <section className="fp-training-block">
-          <h3>7 · 放進真實單字</h3>
-          <div className="fp-word-grid">
-            {guide.words.map(word => <div className="fp-word-row" key={word}><strong><HighlightSound word={word} spellings={guide.spellings} /></strong><AudioButton fallbackText={word} lang="fr-FR" ttsRate={0.82} label="聽單字" color={color} sm /><AudioButton fallbackText={word} lang="fr-FR" ttsRate={0.62} label="慢速" color="#8b5cf6" sm /></div>)}
+        {/* ── 3. 只練這一個音 ── */}
+        {canPlayPhoneme && (phonemeAudioUrl || phonemeFallback) && (
+          <section className="fpb-section">
+            <div className="fpb-step-label" style={{ color }}>3. 只練這一個音</div>
+            <div className="fpb-big-btns">
+              <AudioButton audioUrl={phonemeAudioUrl} fallbackText={phonemeFallback}
+                lang="fr-FR" ttsRate={0.85} label={`▶ 聽 ${lesson.symbol}`} color={color} />
+              <AudioButton audioUrl={phonemeAudioUrl} fallbackText={phonemeFallback}
+                lang="fr-FR" ttsRate={0.5} label={`▶ 慢速 ${lesson.symbol}`} color="#8b5cf6" />
+              <RepeatBtn audioUrl={phonemeAudioUrl} fallbackText={phonemeFallback}
+                lang="fr-FR" color="#10b981" />
+            </div>
+          </section>
+        )}
+
+        {/* ── 4. 音標 → 字母 → 音節 → 單字 → 短句 ── */}
+        <section className="fpb-section">
+          <div className="fpb-step-label" style={{ color }}>4. 音標 → 字母 → 音節 → 單字 → 短句</div>
+          <div className="fpb-flow-list">
+
+            {/* 音標 row */}
+            <div className="fpb-flow-row">
+              <span className="fpb-flow-tag">音標</span>
+              <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 20, color }}>{lesson.symbol}</span>
+            </div>
+
+            {/* 字母 rows */}
+            {guide.spellings.slice(0, 3).map(([letters, word]) => (
+              <div className="fpb-flow-row" key={letters}>
+                <span className="fpb-flow-tag">字母</span>
+                <span className="fpb-flow-content">
+                  <b style={{ color, fontFamily: "monospace", fontSize: 15 }}>{letters}</b>
+                  <span style={{ color: "var(--text-muted)", marginLeft: 6 }}>例如 <i>{word}</i></span>
+                </span>
+                <AudioButton fallbackText={word} lang="fr-FR" ttsRate={0.8} label={`聽 ${word}`} color={color} sm />
+              </div>
+            ))}
+
+            {/* 音節 rows */}
+            {guide.syllables.slice(0, 5).filter(([, speakText, allowed = true]) => allowed !== false && speakText).map(([display, speakText]) => (
+              <div className="fpb-flow-row" key={display}>
+                <span className="fpb-flow-tag">音節</span>
+                <span className="fpb-flow-content" style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15 }}>{display}</span>
+                <AudioButton fallbackText={speakText} lang="fr-FR" ttsRate={0.72} label={`聽 ${display}`} color={color} sm />
+                <RepeatBtn fallbackText={speakText} lang="fr-FR" color="#10b981" sm />
+              </div>
+            ))}
+
+            {/* 單字 rows */}
+            {guide.words.slice(0, 5).map(word => (
+              <div className="fpb-flow-row" key={word}>
+                <span className="fpb-flow-tag">單字</span>
+                <span className="fpb-flow-content"><HighlightSound word={word} spellings={guide.spellings} /></span>
+                <AudioButton fallbackText={word} lang="fr-FR" ttsRate={0.82} label={`聽 ${word}`} color={color} sm />
+                <AudioButton fallbackText={word} lang="fr-FR" ttsRate={0.55} label="慢" color="#8b5cf6" sm />
+              </div>
+            ))}
+
+            {/* 短句 row */}
+            <div className="fpb-flow-row fpb-flow-sentence">
+              <span className="fpb-flow-tag">短句</span>
+              <span className="fpb-flow-content" style={{ fontStyle: "italic", color: "#5eead4" }}>{guide.sentence}</span>
+              <AudioButton fallbackText={guide.sentence} lang="fr-FR" ttsRate={0.8} label="聽短句" color="#0f766e" sm />
+              <RepeatBtn fallbackText={guide.sentence} lang="fr-FR" color="#10b981" sm />
+            </div>
           </div>
         </section>
 
-        <section className="fp-training-block fp-sentence-block">
-          <h3>8 · 練短句</h3><p>{guide.sentence}</p>
-          <div className="fp-sentence-actions"><AudioButton fallbackText={guide.sentence} lang="fr-FR" ttsRate={0.8} label="聽短句" color="#0f766e" /><RepeatBtn fallbackText={guide.sentence} lang="fr-FR" label="跟讀短句" color="#10b981" /></div>
-        </section>
+        {/* ── 5. 接下來看看這些詞 ── */}
+        {lesson.examples?.length > 0 && (
+          <section className="fpb-section">
+            <div className="fpb-step-label" style={{ color }}>5. 接下來看看這些詞</div>
+            {lesson.examples.map((ex, i) => (
+              <div className="fpb-vocab-card" key={i} style={{ borderColor: `${color}25` }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color, fontStyle: "italic", marginBottom: 2 }}>{ex.word}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{ex.meaningZh}</div>
+                </div>
+                <div className="fpb-vocab-btns">
+                  <AudioButton fallbackText={ex.tts || ex.word} lang="fr-FR" ttsRate={0.82} label="▶ 正常" color={color} sm />
+                  <AudioButton fallbackText={ex.tts || ex.word} lang="fr-FR" ttsRate={0.55} label="🐢 慢速" color="#8b5cf6" sm />
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
 
-        <section className="fp-error-block"><h3>9 · 常見錯誤提醒</h3><p>{guide.mistake}</p></section>
-        <LearningCheck done={done} onComplete={() => onComplete(lesson.id)} color={color} />
+        {/* 常見錯誤 */}
+        {guide.mistake && (
+          <div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(245,158,11,0.08)",
+            border: "1px solid rgba(245,158,11,0.22)", marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#f59e0b", marginBottom: 5 }}>⚠️ 常見錯誤提醒</div>
+            <div style={{ fontSize: 13, color: "#fbbf24", lineHeight: 1.7 }}>{guide.mistake}</div>
+          </div>
+        )}
+
+        {/* ── 6. 完成 ── */}
+        <button type="button" onClick={() => onComplete(lesson.id)}
+          style={{ width: "100%", padding: "14px 0", borderRadius: 14, border: "none", cursor: "pointer",
+            fontWeight: 800, fontSize: 15,
+            background: done ? "rgba(16,185,129,0.15)" : `linear-gradient(135deg, ${color}cc, ${color})`,
+            color: done ? "#10b981" : "#fff" }}>
+          {done ? "✓ 已完成這個音" : `完成 ${lesson.symbol}，學下一個音 →`}
+        </button>
+
       </div>
     </div>
   );
@@ -1320,6 +1407,13 @@ export default function FrenchPronunciation({ user, db, onNav }) {
         .fp-ready-check{padding:16px;border-radius:16px;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.22)}.fp-ready-check h4{margin:0 0 8px;font-size:12px;color:#34d399}.fp-ready-check ul{display:grid;grid-template-columns:1fr 1fr;gap:5px 18px;padding-left:18px;font-size:11px;line-height:1.6}.fp-ready-check p{font-size:10px;color:#fbbf24}.fp-ready-check button{width:100%;border:0;border-radius:11px;padding:10px;font-weight:800;cursor:pointer}
         @media(max-width:900px){.fp-mouth-grid{grid-template-columns:1fr}.fp-two-column{grid-template-columns:1fr}.fp-stage-intro{padding:17px}.fp-stage-title{font-size:19px}.fp-unit-nav{overflow-x:auto;display:flex}.fp-unit-button{min-width:175px}}
         @media(max-width:680px){.fp-track-switch button{padding:7px 9px}.fp-unit-nav{padding:9px 12px}.fp-unit-button{min-width:164px}.fp-stage-intro{flex-direction:column;gap:10px}.fp-stage-count{align-self:stretch}.fp-card-top{align-items:flex-start;padding:16px 15px 8px}.fp-symbol{font-size:25px;min-width:44px}.fp-status{display:none}.fp-card-what,.fp-when{margin-left:15px;margin-right:15px}.fp-course-card .fp-flow{margin-left:11px;margin-right:11px}.fp-flow-step{min-width:115px}.fp-card-footer{padding:12px 15px}.fp-card-footer span{display:none}.fp-detail-scroll{padding:14px}.fp-syllable-grid,.fp-ready-check ul{grid-template-columns:1fr}.fp-detail-header{padding:14px}.fp-detail-header h2{font-size:19px}}
+        .fpb-hero{display:flex;gap:16px;align-items:center;padding:18px;border-radius:18px;border:1px solid;margin-bottom:16px;background:rgba(0,0,0,0.06)}.fpb-hero-symbol{font-family:monospace;font-size:44px;font-weight:900;flex-shrink:0;min-width:64px;text-align:center;line-height:1}.fpb-hero p{margin:0;font-size:14px;line-height:1.7;color:var(--text-muted)}
+        .fpb-section{padding:16px 18px;border-radius:16px;border:1px solid var(--border);background:var(--panel-alt);margin-bottom:14px}.fpb-step-label{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:12px}.fpb-step-text{font-size:13px;line-height:1.85;color:var(--text-muted);margin:0}
+        .fpb-mouth-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.fpb-mouth-chip{padding:13px 11px;border-radius:12px;background:rgba(255,255,255,0.04);text-align:center}.fpb-mouth-chip span{font-size:22px;display:block;margin-bottom:6px}.fpb-mouth-chip b{font-size:12px;display:block;margin-bottom:5px;color:var(--text);font-weight:800}.fpb-mouth-chip p{font-size:11px;color:var(--text-muted);margin:0;line-height:1.55}
+        .fpb-big-btns{display:flex;gap:9px;flex-wrap:wrap}
+        .fpb-flow-list{display:flex;flex-direction:column;gap:7px}.fpb-flow-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,0.03)}.fpb-flow-tag{font-size:9px;font-weight:800;color:var(--text-faint);min-width:28px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.4px}.fpb-flow-content{flex:1;font-size:14px;color:var(--text);min-width:60px}.fpb-flow-sentence{background:rgba(15,118,110,0.08);border:1px solid rgba(15,118,110,0.2)}
+        .fpb-vocab-card{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;background:var(--panel);border:1px solid;margin-bottom:8px}.fpb-vocab-btns{display:flex;gap:6px;flex-shrink:0}
+        @media(max-width:680px){.fpb-hero{flex-direction:column;text-align:center;padding:14px}.fpb-mouth-row{grid-template-columns:1fr}.fpb-vocab-card{flex-wrap:wrap}.fpb-vocab-btns{width:100%;justify-content:flex-start}}
       `}</style>
 
       {/* ── Header ── */}
