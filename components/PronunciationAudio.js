@@ -66,7 +66,7 @@ export function playSpeech({ text, language, rate = 0.85, type = "word", token =
     if (type === "ipa" || isIpaText(text)) {
       return reject(new Error("IPA 禁止使用瀏覽器語音，必須使用已確認的獨立音標音訊。"));
     }
-    if (!new Set(["fr-FR", "en-GB", "zh-HK"]).has(language)) {
+    if (!new Set(["fr-FR", "en-GB", "zh-HK", "zh-CN"]).has(language)) {
       return reject(new Error("播放語言未明確指定，已停止播放以避免使用錯誤語音。"));
     }
     if (typeof window === "undefined" || !("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
@@ -77,6 +77,9 @@ export function playSpeech({ text, language, rate = 0.85, type = "word", token =
 
     const selectedVoice = selectVoice(language);
     if (!selectedVoice) {
+      if (language === "zh-CN") {
+        return reject(new Error("此裝置暫時沒有可用的普通話語音，請安裝中文語音，或使用 Chrome／Edge 瀏覽器。"));
+      }
       return reject(new Error(`裝置沒有可用的 ${language} 語音，已停止播放以避免回退成英文 voice。`));
     }
 
@@ -114,22 +117,22 @@ function teacherTextWithoutIpa(text) {
     .trim();
 }
 
-function splitTeacherSegments(text, contentLanguage) {
+function splitTeacherSegments(text, contentLanguage, narratorLanguage = "zh-HK") {
   const cleanText = teacherTextWithoutIpa(text);
   const segments = [];
-  const foreignText = /[\p{Script=Latin}][\p{Script=Latin}\p{M}'’.-]*(?:\s+[\p{Script=Latin}][\p{Script=Latin}\p{M}'’.-]*)*/gu;
+  const foreignText = /[\p{Script=Latin}][\p{Script=Latin}\p{M}’’.-]*(?:\s+[\p{Script=Latin}][\p{Script=Latin}\p{M}’’.-]*)*/gu;
   let cursor = 0;
   for (const match of cleanText.matchAll(foreignText)) {
     if (match.index > cursor) {
       const narratorText = cleanText.slice(cursor, match.index).trim();
-      if (narratorText) segments.push({ text: narratorText, language: "zh-HK", type: "teacher" });
+      if (narratorText) segments.push({ text: narratorText, language: narratorLanguage, type: "teacher" });
     }
     segments.push({ text: match[0], language: contentLanguage, type: "word" });
     cursor = match.index + match[0].length;
   }
   if (cursor < cleanText.length) {
     const narratorText = cleanText.slice(cursor).trim();
-    if (narratorText) segments.push({ text: narratorText, language: "zh-HK", type: "teacher" });
+    if (narratorText) segments.push({ text: narratorText, language: narratorLanguage, type: "teacher" });
   }
   return segments;
 }
@@ -186,13 +189,13 @@ export function AudioButton({ audioUrl, fallbackText, lang = "en-GB", ttsRate = 
   </span>;
 }
 
-export function TeacherButton({ lesson, contentLanguage, label = "老師講解", color = "#0891b2", sm = false }) {
+export function TeacherButton({ lesson, contentLanguage, narratorLanguage = "zh-HK", label = "老師講解", color = "#0891b2", sm = false }) {
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState("");
   const id = useRef(`teacher-${Math.random()}`);
   useGlobalStop(id, setPlaying);
   const rawText = lesson?.teacherAudioText || lesson?.teacherScriptZh || lesson?.teachingScriptZh || "";
-  const segments = splitTeacherSegments(rawText, contentLanguage);
+  const segments = splitTeacherSegments(rawText, contentLanguage, narratorLanguage);
   const available = Boolean(segments.length && contentLanguage);
 
   async function handleClick(event) {

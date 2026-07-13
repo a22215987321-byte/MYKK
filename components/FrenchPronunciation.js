@@ -825,7 +825,7 @@ function LessonCard({ lesson, color, isCompleted, isSelected, onSelect, onComple
         style={{ padding: "6px 14px 12px", display: "flex", flexDirection: "column", gap: 5, marginTop: "auto" }}>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
           <span style={{ fontSize: 9, color: "var(--text-faint)", minWidth: 26, flexShrink: 0 }}>講解</span>
-          <TeacherButton lesson={lesson} contentLanguage="fr-FR" color="#0891b2" sm />
+          <TeacherButton lesson={lesson} contentLanguage="fr-FR" narratorLanguage="zh-CN" color="#0891b2" sm />
         </div>
         {/* 音標行 — 只對有獨立音素的課程顯示 */}
         {lesson.type === "phoneme" && (
@@ -921,7 +921,7 @@ function DetailPanel({ lesson, color, completedIds, onComplete, onClose }) {
               <div style={{ fontSize: 10, fontWeight: 800, color: "#0891b2", textTransform: "uppercase", letterSpacing: 0.5 }}>
                 1. 🎓 老師中文講解
               </div>
-              <TeacherButton lesson={lesson} contentLanguage="fr-FR" label="播放" color="#0891b2" sm />
+              <TeacherButton lesson={lesson} contentLanguage="fr-FR" narratorLanguage="zh-CN" label="播放" color="#0891b2" sm />
             </div>
             <div style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.8 }}>{lesson.teacherScriptZh}</div>
           </div>
@@ -1121,7 +1121,7 @@ function BeginnerDetailPanel({ lesson, color, completedIds, onComplete, onClose 
         <section className="fp-training-block">
           <h3>依序練習 · 不要跳步</h3>
           <div className="fp-audio-order">
-            <TeacherButton lesson={lesson} contentLanguage="fr-FR" label="1. 老師講解" color="#0891b2" />
+            <TeacherButton lesson={lesson} contentLanguage="fr-FR" narratorLanguage="zh-CN" label="1. 老師講解" color="#0891b2" />
             {phonemeReady ? <AudioButton audioUrl={lesson.audio.phonemeUrl} lang="fr-FR" label="2. 聽單音" color={color} /> : <span className="fp-audio-note">2–3. 單音音訊準備中；目前不會用 TTS 直接朗讀 IPA</span>}
             {repeatReady && <RepeatBtn audioUrl={lesson.audio.phonemeRepeatUrl} lang="fr-FR" label="3. 跟讀單音" color="#10b981" />}
             {firstSyllable && <AudioButton fallbackText={firstSyllable[1]} lang="fr-FR" ttsRate={0.72} label="4. 聽音節" color={color} />}
