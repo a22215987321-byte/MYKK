@@ -1406,7 +1406,7 @@ export default function ChatApp({ user }) {
               <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#1e1b4b,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📋</div>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>法語學習 2</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>A1 考試範圍</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>A1 常用單詞</div>
               </div>
             </button>
           </div>
