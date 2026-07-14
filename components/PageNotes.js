@@ -35,7 +35,7 @@ function saveNotes(noteKey, notes) {
 
 function NoteCard({ note, placeholder, onChange, onExpand }) {
   return (
-    <div style={{ background: "var(--panel)", border: "1px solid rgba(167,139,250,0.35)", borderRadius: 10, padding: "7px 9px", display: "flex", flexDirection: "column", gap: 3 }}>
+    <div style={{ background: "var(--panel)", border: "1px solid rgba(167,139,250,0.35)", borderRadius: 10, padding: "7px 9px", minHeight: 92, maxHeight: 110, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 3, flexShrink: 0 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <input value={note.title} onChange={e => onChange({ ...note, title: e.target.value })} placeholder="標題"
           style={{ flex: 1, minWidth: 0, background: "none", border: "none", outline: "none", color: "var(--text)", fontSize: 12, fontWeight: 700, padding: 0 }} />
@@ -176,7 +176,7 @@ export default function PageNotes({ noteKey, pageTitle }) {
   const pathLabel = (typeof window !== "undefined" ? window.location.pathname : "") + "#" + noteKey;
 
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 10px 12px", borderTop: "1px solid var(--panel)" }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "18px 10px 12px", borderTop: "1px solid var(--panel)" }}>
       <style>{`.pn-hide-scrollbar::-webkit-scrollbar{width:0;height:0}.pn-hide-scrollbar{scrollbar-width:none}`}</style>
       <div style={{ fontSize: 12, fontWeight: 800, color: "var(--text)", marginBottom: 1 }}>本頁筆記</div>
       <div style={{ fontSize: 10, color: "var(--text-faint)", marginBottom: 8 }}>記低今頁問題 / 修改想法</div>

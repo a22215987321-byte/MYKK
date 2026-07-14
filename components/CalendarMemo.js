@@ -171,24 +171,24 @@ export default function CalendarMemo({ uid }) {
         </div>
       )}
 
-      {!selected && (
-        <div style={{ flex: 1, minHeight: 90, maxHeight: 220, padding: "12px 10px", overflowY: "auto" }}>
-          {/* Show memos for this month */}
-          {Object.entries(memos)
-            .filter(([date, text]) => date.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`) && text.trim())
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([date, text]) => (
-              <div key={date} onClick={() => setSelected(date)} style={{ marginBottom: 8, padding: "8px 10px", background: "var(--panel)", borderRadius: 8, border: "1px solid var(--border)", cursor: "pointer" }}>
-                <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, marginBottom: 3 }}>{date.slice(5)}</div>
+      {!selected && (() => {
+        const monthMemos = Object.entries(memos)
+          .filter(([date, text]) => date.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`) && text.trim())
+          .sort(([a], [b]) => a.localeCompare(b));
+        // 只有本月真的有備忘錄時才顯示這塊，沒有的話完全不佔空間，
+        // 讓「本頁筆記」可以緊接在日曆下面，不留大片空白。
+        if (monthMemos.length === 0) return null;
+        return (
+          <div style={{ flexShrink: 0, maxHeight: 110, padding: "0 10px 10px", overflowY: "auto" }}>
+            {monthMemos.map(([date, text]) => (
+              <div key={date} onClick={() => setSelected(date)} style={{ marginBottom: 6, padding: "7px 10px", background: "var(--panel)", borderRadius: 8, border: "1px solid var(--border)", cursor: "pointer" }}>
+                <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, marginBottom: 2 }}>{date.slice(5)}</div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{text}</div>
               </div>
-            ))
-          }
-          {Object.entries(memos).filter(([d, t]) => d.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`) && t.trim()).length === 0 && (
-            <div style={{ textAlign: "center", color: "var(--border)", fontSize: 12, marginTop: 20 }}>點擊日期新增備忘</div>
-          )}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
