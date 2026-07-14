@@ -23,9 +23,14 @@ export function stopPronunciationAudio(owner = null) {
   }
   activeUtterance = null;
   emitStop(owner);
+  return generation;
 }
 
-function wait(ms, token) {
+export function currentToken() {
+  return generation;
+}
+
+export function wait(ms, token) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => token === generation ? resolve() : reject(new Error("cancelled")), ms);
     if (token !== generation) {
@@ -35,7 +40,7 @@ function wait(ms, token) {
   });
 }
 
-function playUrl(url, token) {
+export function playUrl(url, token) {
   return new Promise((resolve, reject) => {
     if (token !== generation) return reject(new Error("cancelled"));
     const audio = new Audio(url);
@@ -103,7 +108,7 @@ export function playSpeech({ text, language, rate = 0.85, type = "word", token =
   });
 }
 
-function isIpaText(text) {
+export function isIpaText(text) {
   const value = String(text || "").trim();
   return /^\s*[\/\[].+[\/\]]\s*$/u.test(value) || /[\u0250-\u02AF\u1D00-\u1DBF]/u.test(value);
 }
@@ -137,7 +142,7 @@ function splitTeacherSegments(text, contentLanguage, narratorLanguage = "zh-HK")
   return segments;
 }
 
-function useGlobalStop(id, setPlaying) {
+export function useGlobalStop(id, setPlaying) {
   useEffect(() => {
     const stop = event => {
       if (event.detail?.owner !== id.current) setPlaying(false);
