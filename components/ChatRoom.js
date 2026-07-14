@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth, db } from "../lib/firebase";
 import AvatarCreator from "./AvatarCreator";
 import CalendarMemo from "./CalendarMemo";
+import PageNotes from "./PageNotes";
 import ThemeToggle from "./ThemeToggle";
 import VocabRoom from "./VocabRoom";
 import SpanishRoom from "./SpanishRoom";
@@ -649,6 +650,7 @@ export default function ChatApp({ user }) {
   const [showSpanishPron,    setShowSpanishPron]    = useState(false);
   const [showSpanishGrammar, setShowSpanishGrammar] = useState(false);
   const [showSpanishVerbs,   setShowSpanishVerbs]   = useState(false);
+  const [spanishCourseNoteContext, setSpanishCourseNoteContext] = useState(null); // {key, title} reported by SpanishCourseRoom's current lesson
   const [showEnglishPron,    setShowEnglishPron]    = useState(false);
   const [showIeltsBand4,     setShowIeltsBand4]     = useState(false);
 
@@ -1082,6 +1084,16 @@ export default function ChatApp({ user }) {
       return acc;
     }, {})
   ).sort((a, b) => b.total - a.total);
+
+  // 本頁筆記：右側日曆下方的筆記格，依目前顯示的西語頁面決定 key/標題。
+  // SpanishCourseRoom 會用 onContextChange 回報目前的關卡，取得更細的 key。
+  let activeSpanishNotes = null;
+  if (showSpanishCourse) activeSpanishNotes = spanishCourseNoteContext || { key: "spanish-course-home", title: "西語 A1 路線" };
+  else if (showSpanishPron) activeSpanishNotes = { key: "spanish-pron", title: "西語發音" };
+  else if (showSpanishGrammar) activeSpanishNotes = { key: "spanish-grammar", title: "西語文法" };
+  else if (showSpanishVerbs) activeSpanishNotes = { key: "spanish-verbs", title: "西語動詞變位表" };
+  else if (showDict) activeSpanishNotes = { key: "spanish-dict", title: "西語字典" };
+  else if (showSpanish) activeSpanishNotes = { key: "spanish-home", title: "西班牙語學習" };
 
   return (
     <>
@@ -1672,7 +1684,7 @@ export default function ChatApp({ user }) {
 
           {/* Spanish Course view */}
           {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && (
-            <SpanishCourseRoom user={user} db={db} />
+            <SpanishCourseRoom user={user} db={db} onContextChange={setSpanishCourseNoteContext} />
           )}
 
           {/* Spanish Pronunciation view */}
@@ -1855,8 +1867,11 @@ export default function ChatApp({ user }) {
           )}
         </div>
 
-        {/* Right calendar panel */}
-        <CalendarMemo uid={uid} />
+        {/* Right calendar panel + per-page notes (西語頁面專用) */}
+        <div style={{ width: 252, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", borderLeft: "1px solid var(--panel)" }}>
+          <CalendarMemo uid={uid} />
+          {activeSpanishNotes && <PageNotes noteKey={activeSpanishNotes.key} pageTitle={activeSpanishNotes.title} />}
+        </div>
       </div>
     </>
   );

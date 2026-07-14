@@ -871,13 +871,24 @@ function BigStat({ emoji, value, label, color }) {
 }
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────
-export default function SpanishCourseRoom({ user, db }) {
+export default function SpanishCourseRoom({ user, db, onContextChange }) {
   const [view, setView] = useState("home"); // home | lesson | review | progress
   const [activeLesson, setActiveLesson] = useState(null);
   const [completed, setCompleted] = useState([]);
   const [streak, setStreak] = useState(0);
   const [wordData, setWordData] = useState({});
   const [loaded, setLoaded] = useState(false);
+
+  // 回報目前關卡給上層（右側「本頁筆記」用來區分不同課程的筆記）。
+  useEffect(() => {
+    if (!onContextChange) return;
+    if (view === "lesson" && activeLesson) {
+      onContextChange({ key: `spanish-course-${activeLesson.id}`, title: `西語 A1 路線 / ${activeLesson.title}` });
+    } else {
+      const viewLabel = view === "review" ? "單字複習" : view === "progress" ? "學習進度" : "總覽";
+      onContextChange({ key: `spanish-course-${view}`, title: `西語 A1 路線 / ${viewLabel}` });
+    }
+  }, [view, activeLesson, onContextChange]);
 
   useEffect(() => {
     if (!user?.uid || !db) { setLoaded(true); return; }

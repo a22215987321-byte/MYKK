@@ -90,9 +90,8 @@ export default function CalendarMemo({ uid }) {
 
   return (
     <div style={{
-      width: 252, flexShrink: 0, background: "var(--panel-alt)",
-      borderLeft: "1px solid var(--panel)", display: "flex",
-      flexDirection: "column", height: "100%", overflow: "hidden",
+      background: "var(--panel-alt)", display: "flex",
+      flexDirection: "column", flexShrink: 0, overflow: "hidden",
     }}>
       {/* Header */}
       <div style={{ padding: "14px 12px 10px", borderBottom: "1px solid var(--panel)", flexShrink: 0 }}>
@@ -144,7 +143,7 @@ export default function CalendarMemo({ uid }) {
 
       {/* Memo editor */}
       {selected && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "0 10px 12px", overflow: "hidden" }}>
+        <div style={{ flex: 1, minHeight: 130, display: "flex", flexDirection: "column", padding: "0 10px 12px", overflow: "hidden" }}>
           <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6, fontWeight: 600 }}>
             📝 {selected} 備忘錄
           </div>
@@ -173,7 +172,7 @@ export default function CalendarMemo({ uid }) {
       )}
 
       {!selected && (
-        <div style={{ flex: 1, padding: "12px 10px", overflowY: "auto" }}>
+        <div style={{ flex: 1, minHeight: 90, maxHeight: 220, padding: "12px 10px", overflowY: "auto" }}>
           {/* Show memos for this month */}
           {Object.entries(memos)
             .filter(([date, text]) => date.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`) && text.trim())
