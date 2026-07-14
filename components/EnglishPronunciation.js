@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
-import { AudioButton, RepeatButton as RepeatBtn, TeacherButton, stopPronunciationAudio } from "./PronunciationAudio";
+import { useState, useEffect } from "react";
+import { stopPronunciationAudio } from "./PronunciationAudio";
+import EnglishPhonemeCard from "./EnglishPhonemeCard";
 
 const LEVELS = [
   { id: "basics",    title: "基本概念",    emoji: "📌", color: "#64748b" },
@@ -603,427 +604,93 @@ const LESSONS = [
 ];
 
 // ═══════════════════════════════════════════════════
-//  LessonCard
-// ═══════════════════════════════════════════════════
-
-function LessonCard({ lesson, color, isCompleted, isSelected, onSelect, onComplete }) {
-  return (
-    <div onClick={() => onSelect(lesson)}
-      style={{ background: "var(--panel)", border: `1px solid ${isSelected ? color + "70" : "var(--border)"}`,
-        borderRadius: 14, overflow: "hidden", cursor: "pointer", transition: "box-shadow .15s",
-        boxShadow: isSelected ? `0 0 0 2px ${color}40` : "none", display: "flex", flexDirection: "column" }}>
-
-      <div style={{ padding: "11px 14px 8px", background: color + "0c", borderBottom: `1px solid ${color}20`,
-        display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 17, fontWeight: 900, color, fontFamily: "monospace", lineHeight: 1.2, wordBreak: "break-all" }}>
-            {lesson.symbol}
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", marginTop: 3 }}>{lesson.titleZh}</div>
-        </div>
-        {isCompleted && (
-          <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#10b98120", color: "#10b981",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0, fontWeight: 700 }}>✓</span>
-        )}
-      </div>
-
-      <div style={{ padding: "7px 14px 5px", display: "flex", alignItems: "baseline", gap: 6 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa", fontStyle: "italic", flexShrink: 0 }}>
-          {lesson.exampleWord}
-        </span>
-        <span style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          — {lesson.exampleMeaningZh}
-        </span>
-      </div>
-
-      <div style={{ padding: "0 14px 6px", fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>
-        👄 {lesson.mouthTipZh}
-      </div>
-
-      {lesson.commonMistakeZh && (
-        <div style={{ margin: "0 14px 10px", padding: "5px 8px", background: "rgba(245,158,11,0.07)",
-          borderRadius: 7, border: "1px solid rgba(245,158,11,0.18)", fontSize: 10, color: "#d97706", lineHeight: 1.4 }}>
-          ⚠️ {lesson.commonMistakeZh}
-        </div>
-      )}
-
-      <div onClick={e => e.stopPropagation()}
-        style={{ padding: "6px 14px 12px", display: "flex", flexDirection: "column", gap: 5, marginTop: "auto" }}>
-        {/* 音標行 — 只對有獨立音素的課程顯示 */}
-        {lesson.type === "phoneme" && (
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <span style={{ fontSize: 9, color: "var(--text-faint)", minWidth: 26, flexShrink: 0 }}>音標</span>
-            <AudioButton audioUrl={lesson.audio?.phonemeUrl}
-              lang="en-GB" ttsRate={0.85} label="聽音標" color={color} sm />
-            <AudioButton audioUrl={lesson.audio?.phonemeRepeatUrl}
-              lang="en-GB" ttsRate={0.5} label="慢速" color="#8b5cf6" sm />
-          </div>
-        )}
-        {/* 例字行 */}
-        {(() => {
-          const wt = lesson.examples?.[0]?.tts || lesson.exampleWord.split(" / ")[0].trim();
-          const wl = wt.length > 7 ? wt.slice(0, 7) + "…" : wt;
-          return (
-            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-              <span style={{ fontSize: 9, color: "var(--text-faint)", minWidth: 26, flexShrink: 0 }}>例字</span>
-              <AudioButton audioUrl={lesson.audio?.wordNormalUrl} fallbackText={wt}
-                lang="en-GB" ttsRate={0.85} label={`正常單字 ${wl}`} color={color} sm />
-              <AudioButton audioUrl={lesson.audio?.wordSlowUrl} fallbackText={wt}
-                lang="en-GB" ttsRate={0.5} label="慢速單字" color="#8b5cf6" sm />
-            </div>
-          );
-        })()}
-        {/* 老師 + 完成 */}
-        <div style={{ display: "flex", gap: 4 }}>
-          <TeacherButton lesson={lesson} contentLanguage="en-GB" color="#0891b2" sm />
-          <button onClick={e => { e.stopPropagation(); onComplete(lesson.id); }}
-            style={{ padding: "4px 9px", borderRadius: 8, marginLeft: "auto",
-              border: isCompleted ? "1px solid #10b981" : "1px solid var(--border)",
-              background: isCompleted ? "#10b98112" : "var(--panel-alt)",
-              color: isCompleted ? "#10b981" : "var(--text-faint)",
-              cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
-            {isCompleted ? "✓ 完成" : "標記完成"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════
-//  DetailPanel
-// ═══════════════════════════════════════════════════
-
-function InfoBlock({ icon, label, color, children }) {
-  return (
-    <div style={{ marginBottom: 10, padding: "9px 12px", background: color + "08", borderRadius: 10, border: `1px solid ${color}22` }}>
-      <div style={{ fontSize: 10, fontWeight: 800, color, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 5 }}>{icon} {label}</div>
-      <div style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.7 }}>{children}</div>
-    </div>
-  );
-}
-
-function DetailPanel({ lesson, color, completedIds, onComplete, onClose }) {
-  if (!lesson) return null;
-  const done = completedIds.has(lesson.id);
-  const ttsWord = lesson.examples?.[0]?.tts || lesson.exampleWord;
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--panel)" }}>
-      <div style={{ padding: "13px 16px", borderBottom: "1px solid var(--border)", flexShrink: 0,
-        display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 900, color, fontFamily: "monospace", lineHeight: 1.2 }}>{lesson.symbol}</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginTop: 2 }}>{lesson.titleZh}</div>
-        </div>
-        <button onClick={onClose} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8,
-          padding: "4px 10px", cursor: "pointer", color: "var(--text-faint)", fontSize: 12, flexShrink: 0 }}>✕</button>
-      </div>
-
-      <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px" }} className="ep-body">
-        {/* 音標區塊 — 只對有獨立音素的課程顯示 */}
-        {lesson.type === "phoneme" && (
-          <div style={{ marginBottom: 10, padding: "10px 14px", background: color + "08", borderRadius: 12, border: `1px solid ${color}20` }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>🔤 音標發音</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color, fontFamily: "monospace", marginBottom: 8 }}>{lesson.symbol}</div>
-            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-              <AudioButton audioUrl={lesson.audio?.phonemeUrl}
-                lang="en-GB" ttsRate={0.85} label="聽音標" color={color} />
-              <AudioButton audioUrl={lesson.audio?.phonemeRepeatUrl}
-                lang="en-GB" ttsRate={0.5} label="慢速音標" color="#8b5cf6" />
-            </div>
-          </div>
-        )}
-        <div style={{ marginBottom: 14, padding: "12px 14px", background: color + "0a", borderRadius: 12, border: `1px solid ${color}25` }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>📖 例字</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: "#a78bfa", fontStyle: "italic", marginBottom: 3 }}>{lesson.exampleWord}</div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>{lesson.exampleMeaningZh}</div>
-          <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-            <AudioButton fallbackText={ttsWord} lang="en-GB" ttsRate={0.85} audioUrl={lesson.audio?.wordNormalUrl} label="正常單字" color={color} />
-            <AudioButton fallbackText={ttsWord} lang="en-GB" ttsRate={0.5} audioUrl={lesson.audio?.wordSlowUrl} label="慢速單字" color="#8b5cf6" />
-            <RepeatBtn audioUrl={lesson.audio?.repeatAudioUrl} fallbackText={ttsWord} lang="en-GB" color={color} />
-          </div>
-        </div>
-
-        {lesson.mouthTipZh && <InfoBlock icon="👄" label="嘴形" color="#a78bfa">{lesson.mouthTipZh}</InfoBlock>}
-        {lesson.tongueTipZh && <InfoBlock icon="👅" label="舌頭位置" color="#34d399">{lesson.tongueTipZh}</InfoBlock>}
-        {lesson.airflowTipZh && <InfoBlock icon="💨" label="氣流" color="#60a5fa">{lesson.airflowTipZh}</InfoBlock>}
-        {lesson.commonMistakeZh && (
-          <InfoBlock icon="⚠️" label="常見錯誤" color="#f59e0b">
-            <span style={{ color: "#f59e0b" }}>{lesson.commonMistakeZh}</span>
-          </InfoBlock>
-        )}
-
-        {lesson.teacherScriptZh && (
-          <div style={{ marginBottom: 14, padding: "10px 13px", background: "#0891b208", borderRadius: 10, border: "1px solid #0891b222" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: "#0891b2", textTransform: "uppercase", letterSpacing: 0.5 }}>🎓 老師講解</div>
-              <TeacherButton lesson={lesson} contentLanguage="en-GB" label="播放" color="#0891b2" sm />
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.8 }}>{lesson.teacherScriptZh}</div>
-          </div>
-        )}
-
-        {lesson.examples?.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>📚 例字練習</div>
-            {lesson.examples.map((ex, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "8px 12px", background: "var(--panel-alt)", borderRadius: 8, marginBottom: 5, border: "1px solid var(--border)" }}>
-                <div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa", fontStyle: "italic" }}>{ex.word}</span>
-                  <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 7 }}>— {ex.meaningZh}</span>
-                </div>
-                <div style={{ display: "flex", gap: 5 }}>
-                  <AudioButton fallbackText={ex.tts} lang="en-GB" ttsRate={0.85} label="正常單字" color={color} sm />
-                  <RepeatBtn fallbackText={ex.tts} lang="en-GB" color={color} sm />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button onClick={() => onComplete(lesson.id)}
-          style={{ width: "100%", padding: "11px 0", borderRadius: 12, border: "none", cursor: "pointer",
-            background: done ? "#10b98118" : `linear-gradient(135deg, ${color}cc, ${color})`,
-            color: done ? "#10b981" : "#fff", fontWeight: 700, fontSize: 14 }}>
-          {done ? "✓ 已標記完成" : "✓ 標記完成"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════
 //  Main Component
 // ═══════════════════════════════════════════════════
 
+const STORAGE_KEY = "ep-completed-v1";
+
 export default function EnglishPronunciation({ onNav }) {
-  const [mode, setMode] = useState("route");
-  const [activeLevel, setActiveLevel] = useState(0);
-  const [selectedLesson, setSelectedLesson] = useState(null);
+  const [activeLevel, setActiveLevel] = useState(1);
   const [completedIds, setCompletedIds] = useState(new Set());
-  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => () => stopPronunciationAudio(), []);
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 680);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
-  useEffect(() => {
+    let loaded = new Set();
     try {
-      const saved = localStorage.getItem("ep-completed-v1");
-      if (saved) setCompletedIds(new Set(JSON.parse(saved)));
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) loaded = new Set(JSON.parse(saved));
     } catch (_) {}
+    setCompletedIds(loaded);
+    const idx = LEVELS.findIndex(lvl => {
+      const lessons = LESSONS.filter(l => l.levelId === lvl.id);
+      const done = lessons.filter(l => loaded.has(l.id)).length;
+      return lessons.length > 0 && done < lessons.length;
+    });
+    setActiveLevel(idx === -1 ? 0 : idx);
   }, []);
 
-  function toggleComplete(id) {
+  function markComplete(id) {
     setCompletedIds(prev => {
+      if (prev.has(id)) return prev;
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      try { localStorage.setItem("ep-completed-v1", JSON.stringify([...next])); } catch (_) {}
+      next.add(id);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...next])); } catch (_) {}
       return next;
     });
   }
 
   const curLevel = LEVELS[activeLevel];
   const curLessons = LESSONS.filter(l => l.levelId === curLevel.id);
-  const totalCount = LESSONS.length;
-  const doneCount = LESSONS.filter(l => completedIds.has(l.id)).length;
-  const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-
-  function handleSelect(lesson) {
-    setSelectedLesson(prev => prev?.id === lesson.id ? null : lesson);
-  }
-
-  const detailColor = selectedLesson ? (LEVELS.find(l => l.id === selectedLesson.levelId)?.color || "#6366f1") : "#6366f1";
-  const panelOpen = !!selectedLesson && !isMobile;
-
-  function renderLevelContent() {
-    const lvlDone = curLessons.filter(l => completedIds.has(l.id)).length;
-    const cols = panelOpen ? "1fr" : "repeat(auto-fill, minmax(258px, 1fr))";
-    return (
-      <div>
-        <div style={{ marginBottom: 14, padding: "11px 16px", background: curLevel.color + "0c",
-          borderRadius: 12, border: `1px solid ${curLevel.color}28`,
-          display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: curLevel.color }}>
-              {curLevel.emoji} 第 {activeLevel + 1} 階段：{curLevel.title}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2 }}>
-              {curLessons.length} 個項目 · {lvlDone} 已完成
-            </div>
-          </div>
-          {lvlDone === curLessons.length && curLessons.length > 0 && <span style={{ fontSize: 20 }}>🎉</span>}
-        </div>
-
-        <div style={{ display: "grid", gap: 11, gridTemplateColumns: cols, marginBottom: 18 }}>
-          {curLessons.map(lesson => (
-            <LessonCard key={lesson.id} lesson={lesson} color={curLevel.color}
-              isCompleted={completedIds.has(lesson.id)} isSelected={selectedLesson?.id === lesson.id}
-              onSelect={handleSelect} onComplete={toggleComplete} />
-          ))}
-        </div>
-
-        <div style={{ display: "flex", gap: 8 }}>
-          {activeLevel > 0 && (
-            <button onClick={() => { setActiveLevel(activeLevel - 1); setSelectedLesson(null); }}
-              style={{ flex: 1, padding: "10px 0", borderRadius: 12, border: "1px solid var(--border)",
-                background: "var(--panel)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-              ← {LEVELS[activeLevel - 1].emoji} {LEVELS[activeLevel - 1].title}
-            </button>
-          )}
-          {activeLevel < LEVELS.length - 1 && (
-            <button onClick={() => { setActiveLevel(activeLevel + 1); setSelectedLesson(null); }}
-              style={{ flex: 1, padding: "10px 0", borderRadius: 12, border: "none",
-                background: `linear-gradient(135deg, ${LEVELS[activeLevel + 1].color}bb, ${LEVELS[activeLevel + 1].color})`,
-                color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-              {LEVELS[activeLevel + 1].emoji} {LEVELS[activeLevel + 1].title} →
-            </button>
-          )}
-        </div>
-
-        {/* IELTS placeholder */}
-        {activeLevel === LEVELS.length - 1 && (
-          <div style={{ marginTop: 20, padding: "16px 20px", background: "var(--panel)", borderRadius: 14,
-            border: "1px solid var(--border)", opacity: 0.75 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text-muted)", marginBottom: 6 }}>
-              🎓 IELTS 分級路線（即將開放）
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-faint)", lineHeight: 1.8 }}>
-              完成音標發音路線後，進入 IELTS 聽說練習：<br/>
-              📗 Band 4 — 基礎生存表達<br/>
-              📘 Band 5 — 一般話題表達<br/>
-              📙 Band 6 — 較完整觀點表達
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderChartMode() {
-    const phonemes = LESSONS.filter(l => l.type === "phoneme");
-    return (
-      <div>
-        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
-          {phonemes.length} 個音標 · 點擊卡片查看詳解
-        </div>
-        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(235px, 1fr))" }}>
-          {phonemes.map(lesson => {
-            const lv = LEVELS.find(l => l.id === lesson.levelId);
-            return (
-              <LessonCard key={lesson.id} lesson={lesson} color={lv?.color || "#6366f1"}
-                isCompleted={completedIds.has(lesson.id)} isSelected={selectedLesson?.id === lesson.id}
-                onSelect={handleSelect} onComplete={toggleComplete} />
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--text)", overflow: "hidden" }}>
-      <style>{`.ep-body::-webkit-scrollbar{width:5px}.ep-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}`}</style>
+    <div style={{ height: "100%", overflowY: "auto", background: "var(--bg)", color: "var(--text)" }}>
+      <style>{`
+        .ep-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; }
+        @media (max-width: 980px) { .ep-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+        @media (max-width: 640px) { .ep-grid { grid-template-columns: 1fr; } }
+      `}</style>
 
-      {/* Header */}
-      <div style={{ padding: "10px 20px 8px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <button onClick={() => onNav && onNav("home")}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 7 }}>
-            <span style={{ fontSize: 14, color: "var(--text-faint)" }}>←</span>
-            <span style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>英語音標發音入門</span>
-          </button>
-          <div style={{ display: "flex", background: "var(--panel-alt)", borderRadius: 8, padding: 3, gap: 2 }}>
-            {[["route","路線模式"],["chart","音標表"]].map(([m, label]) => (
-              <button key={m} onClick={() => { setMode(m); setSelectedLesson(null); }}
-                style={{ padding: "4px 10px", borderRadius: 6, border: "none",
-                  background: mode === m ? "var(--panel)" : "transparent",
-                  color: mode === m ? "var(--text)" : "var(--text-faint)",
-                  cursor: "pointer", fontSize: 11, fontWeight: mode === m ? 700 : 400,
-                  boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.1)" : "none", transition: "all .15s" }}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {mode === "route" && (
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: "var(--text-faint)" }}>英語音標學習路線 · {doneCount}/{totalCount} 完成（{pct}%）</span>
-            </div>
-            <div style={{ height: 4, borderRadius: 2, background: "var(--border)" }}>
-              <div style={{ height: "100%", borderRadius: 2, background: "#3b82f6", width: `${pct}%`, transition: "width .3s" }} />
-            </div>
-          </div>
-        )}
+      {/* Minimal header (~70-90px) */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 30px", borderBottom: "1px solid var(--border)" }}>
+        <button onClick={() => onNav && onNav("home")}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 7 }}>
+          <span style={{ fontSize: 14, color: "var(--text-faint)" }}>←</span>
+          <span style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>英語音標發音入門</span>
+        </button>
+        <select value={activeLevel} onChange={e => setActiveLevel(Number(e.target.value))}
+          style={{ padding: "7px 12px", borderRadius: 9, border: "1px solid var(--border)", background: "var(--panel)", color: "var(--text)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          {LEVELS.map((lvl, i) => <option key={lvl.id} value={i}>{lvl.title}</option>)}
+        </select>
       </div>
 
-      {/* Level tabs */}
-      {mode === "route" && (
-        <div className="ep-body" style={{ display: "flex", gap: 4, padding: "6px 12px", overflowX: "auto",
-          flexShrink: 0, borderBottom: "1px solid var(--border)", background: "var(--panel-alt)" }}>
-          {LEVELS.map((lvl, i) => {
-            const lvlLessons = LESSONS.filter(l => l.levelId === lvl.id);
-            const lvlDone = lvlLessons.filter(l => completedIds.has(l.id)).length;
-            const isActive = i === activeLevel;
+      {/* Card grid */}
+      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "24px 30px 60px" }}>
+        <div className="ep-grid">
+          {curLessons.map(lesson => {
+            const ttsWord = lesson.examples?.[0]?.tts || lesson.exampleWord;
             return (
-              <button key={lvl.id} onClick={() => { setActiveLevel(i); setSelectedLesson(null); }}
-                style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 11px", borderRadius: 20,
-                  border: `1px solid ${isActive ? lvl.color + "60" : "var(--border)"}`,
-                  background: isActive ? lvl.color + "18" : "var(--panel)",
-                  color: isActive ? lvl.color : "var(--text-faint)",
-                  cursor: "pointer", fontSize: 11, fontWeight: isActive ? 700 : 400,
-                  whiteSpace: "nowrap", flexShrink: 0, transition: "all .15s",
-                  boxShadow: isActive ? `0 0 0 2px ${lvl.color}28` : "none" }}>
-                <span>{lvl.emoji}</span>
-                <span>{i + 1}. {lvl.title}</span>
-                {lvlDone > 0 && (
-                  <span style={{ background: "#10b98128", color: "#10b981", borderRadius: 10, padding: "1px 5px", fontSize: 9, fontWeight: 700 }}>
-                    {lvlDone}/{lvlLessons.length}
-                  </span>
-                )}
-              </button>
+              <EnglishPhonemeCard
+                key={lesson.id}
+                phoneme={lesson.symbol}
+                word={lesson.exampleWord}
+                audioWord={ttsWord}
+                translation={lesson.exampleMeaningZh}
+                normalAudioUrl={lesson.audio?.wordNormalUrl}
+                slowAudioUrl={lesson.audio?.wordSlowUrl}
+                teacherExplanation={{
+                  mouth: lesson.mouthTipZh,
+                  tongue: lesson.tongueTipZh,
+                  tip: lesson.airflowTipZh,
+                  mistake: lesson.commonMistakeZh,
+                }}
+                completed={completedIds.has(lesson.id)}
+                onEngage={() => markComplete(lesson.id)}
+              />
             );
           })}
         </div>
-      )}
-
-      {/* Content + Panel */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div className="ep-body" style={{ flex: 1, overflowY: "auto", padding: "14px 18px" }}>
-          {mode === "route" ? renderLevelContent() : renderChartMode()}
-        </div>
-
-        {selectedLesson && !isMobile && (
-          <div className="ep-body" style={{ width: 330, flexShrink: 0, borderLeft: "1px solid var(--border)", overflowY: "auto" }}>
-            <DetailPanel lesson={selectedLesson} color={detailColor}
-              completedIds={completedIds} onComplete={toggleComplete} onClose={() => { stopPronunciationAudio(); setSelectedLesson(null); }} />
-          </div>
-        )}
       </div>
-
-      {selectedLesson && isMobile && (
-        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 200,
-          maxHeight: "78vh", background: "var(--panel)", borderTop: "2px solid var(--border)",
-          borderRadius: "18px 18px 0 0", overflow: "hidden", display: "flex", flexDirection: "column",
-          boxShadow: "0 -10px 40px rgba(0,0,0,0.35)" }}>
-          <div style={{ display: "flex", justifyContent: "center", padding: "8px 0 0", flexShrink: 0 }}>
-            <div style={{ width: 34, height: 4, borderRadius: 2, background: "var(--border)" }} />
-          </div>
-          <div className="ep-body" style={{ flex: 1, overflowY: "auto" }}>
-            <DetailPanel lesson={selectedLesson} color={detailColor}
-              completedIds={completedIds} onComplete={toggleComplete} onClose={() => { stopPronunciationAudio(); setSelectedLesson(null); }} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
