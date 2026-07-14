@@ -12,7 +12,6 @@ import DictionaryRoom from "./DictionaryRoom";
 import FrenchPronunciation from "./FrenchPronunciation";
 import FrenchA1Unit1 from "./FrenchA1Unit1";
 import FrenchGrammar from "./FrenchGrammar";
-import FrenchHome from "./FrenchHome";
 import FrenchA1ExamScope from "./FrenchA1ExamScope";
 import SpanishPronunciation from "./SpanishPronunciation";
 import SpanishGrammar from "./SpanishGrammar";
@@ -649,7 +648,7 @@ export default function ChatApp({ user }) {
   const [showSpanishCourse,  setShowSpanishCourse]  = useState(false);
   const [showCustomVocab,    setShowCustomVocab]    = useState(false);
   const [showDict,           setShowDict]           = useState(false);
-  const [frenchView,         setFrenchView]         = useState(null); // null | 'route' | 'pron' | 'a1' | 'grammar'
+  const [frenchView,         setFrenchView]         = useState(null); // null | 'pron' | 'a1' | 'grammar' | 'a1exam'
   const [showSpanishPron,    setShowSpanishPron]    = useState(false);
   const [showSpanishGrammar, setShowSpanishGrammar] = useState(false);
   const [showEnglishPron,    setShowEnglishPron]    = useState(false);
@@ -1361,16 +1360,6 @@ export default function ChatApp({ user }) {
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>🇫🇷 法語學習</span>
           </div>
           <div style={{ padding: "0 10px 2px" }}>
-            <button onClick={() => { setFrenchView('route'); setShowSpanishCourse(false); setShowSpanish(false); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowCustomVocab(false); setShowDict(false); setShowEnglishPron(false); }} className={`fb ${frenchView === 'route' ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: frenchView === 'route' ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#1d4ed8,#7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🗺️</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>法語 A1 路線</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>六單元學習總覽</div>
-              </div>
-            </button>
-          </div>
-          <div style={{ padding: "0 10px 2px" }}>
             <button onClick={() => { setFrenchView('pron'); setShowSpanishCourse(false); setShowSpanish(false); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowCustomVocab(false); setShowDict(false); setShowEnglishPron(false); }} className={`fb ${frenchView === 'pron' ? "act" : ""}`}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: frenchView === 'pron' ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
               <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#1e40af,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🎵</div>
@@ -1721,24 +1710,14 @@ export default function ChatApp({ user }) {
           )}
 
           {/* French views */}
-          {frenchView === 'route' && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showSpanishPron && !showSpanishGrammar && (
-            <div style={{ flex: 1, overflow: "hidden" }}><FrenchHome user={user} db={db} onNavigate={(target) => {
-              if (target === 'dictionary') {
-                if (typeof window !== 'undefined') localStorage.setItem('dictLang', 'fr');
-                setFrenchView(null); setShowDict(true); setShowCustomVocab(false);
-              } else {
-                setFrenchView(target);
-              }
-            }} /></div>
-          )}
           {frenchView === 'pron' && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showSpanishPron && !showSpanishGrammar && (
-            <div style={{ flex: 1, overflow: "hidden" }}><FrenchPronunciation user={user} db={db} onNav={(t) => setFrenchView(t === 'home' ? 'route' : t)} /></div>
+            <div style={{ flex: 1, overflow: "hidden" }}><FrenchPronunciation user={user} db={db} onNav={(t) => setFrenchView(t === 'home' ? null : t)} /></div>
           )}
           {frenchView === 'a1' && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showSpanishPron && !showSpanishGrammar && (
-            <div style={{ flex: 1, overflow: "hidden" }}><FrenchA1Unit1 user={user} db={db} onNav={(t) => setFrenchView(t === 'home' ? 'route' : t)} /></div>
+            <div style={{ flex: 1, overflow: "hidden" }}><FrenchA1Unit1 user={user} db={db} onNav={(t) => setFrenchView(t === 'home' ? null : t)} /></div>
           )}
           {frenchView === 'grammar' && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showSpanishPron && !showSpanishGrammar && (
-            <div style={{ flex: 1, overflow: "hidden" }}><FrenchGrammar user={user} db={db} onNav={(t) => setFrenchView(t === 'home' ? 'route' : t)} /></div>
+            <div style={{ flex: 1, overflow: "hidden" }}><FrenchGrammar user={user} db={db} onNav={(t) => setFrenchView(t === 'home' ? null : t)} /></div>
           )}
           {frenchView === 'a1exam' && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showSpanishPron && !showSpanishGrammar && (
             <div style={{ flex: 1, overflow: "hidden" }}><FrenchA1ExamScope /></div>
