@@ -191,6 +191,14 @@ function DeepExplanationPanel({ entry, basicData, word, lang, onClose, onOpenVoc
                 <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.9 }}>{entry.meaningZh}</div>
               </DeepSection>
 
+              {lang === "es" && /^v\.?$|verbo|verb/i.test(entry.partOfSpeech || "") && (
+                <a href={`/spanish/verbs?verb=${encodeURIComponent(entry.lemma || entry.word || word)}`} target="_blank" rel="noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, padding: "7px 14px", borderRadius: 10,
+                    background: "rgba(220,38,38,0.12)", color: "#ef4444", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+                  🧩 查看完整變位表
+                </a>
+              )}
+
               {entry.coreImage && (
                 <DeepSection icon="💡" title="核心意象" color="#f59e0b">
                   <div style={{ fontSize: 14, color: "#fcd34d", lineHeight: 1.7, fontStyle: "italic", padding: "10px 14px", background: "rgba(245,158,11,0.08)", borderRadius: 10, borderLeft: "3px solid #f59e0b" }}>

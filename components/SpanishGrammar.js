@@ -758,6 +758,19 @@ function TopicView({ topic, completed, onComplete, onBack, onPrev, onNext, prevT
             ⚠️ 常見錯誤：{topic.mistake}
           </div>
 
+          {/* 完整變位表連結（ser / estar / tener） */}
+          {{ ser: ["ser"], estar: ["estar"], ser_vs_estar: ["ser", "estar"], tener: ["tener"] }[topic.id] && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+              {{ ser: ["ser"], estar: ["estar"], ser_vs_estar: ["ser", "estar"], tener: ["tener"] }[topic.id].map(v => (
+                <a key={v} href={`/spanish/verbs?verb=${v}`} target="_blank" rel="noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10,
+                    background: "rgba(220,38,38,0.12)", color: "#ef4444", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+                  🧩 查看 {v} 完整變位表
+                </a>
+              ))}
+            </div>
+          )}
+
           {/* 完成按鈕 */}
           {!completed && (
             <button onClick={onComplete} style={{ ...S.primaryBtn, marginBottom: 10 }}>
