@@ -212,8 +212,8 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 460, maxHeight: "85vh", overflow: "auto", border: "1px solid var(--border)" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <div style={{ background: "var(--panel)", borderRadius: 20, width: 460, maxWidth: "92vw", maxHeight: "85vh", overflow: "auto", border: "1px solid var(--border)" }}>
         <div style={{
           background: profileBgType === "gradient" ? profileBg : undefined,
           backgroundImage: profileBgType === "image" ? `url(${profileBg})` : undefined,
@@ -236,7 +236,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
             </div>
             <div style={{ paddingBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 20, color: "var(--text)" }}>{nickname}</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{myProfile.email}</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", maxWidth: "min(60vw, 260px)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myProfile.email}</div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 20, marginTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 14, paddingBottom: 14 }}>
@@ -400,8 +400,8 @@ function FriendSearch({ myUid, myProfile, onClose, onSendRequest }) {
   }, [searchText, myUid, myProfile.friends, myProfile.pendingOut]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 520, maxWidth: "95vw", border: "1px solid var(--border)", padding: 28 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <div style={{ background: "var(--panel)", borderRadius: 20, width: 520, maxWidth: "95vw", border: "1px solid var(--border)", padding: 28, boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ color: "var(--text)", margin: 0, fontSize: 20, fontWeight: 700 }}>搜尋並新增好友</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
@@ -442,8 +442,8 @@ function FriendRequests({ myProfile, onAccept, onDecline, onClose }) {
   }, [(myProfile.pendingIn || []).join(',')]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-      <div style={{ background: "var(--panel)", borderRadius: "var(--radius-lg)", width: 380, border: "1px solid var(--border)", padding: 24 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <div style={{ background: "var(--panel)", borderRadius: "var(--radius-lg)", width: 380, maxWidth: "92vw", border: "1px solid var(--border)", padding: 24, boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ color: "var(--text)", margin: 0, fontSize: 16, fontWeight: 700 }}>好友邀請 ({pendingProfiles.length})</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 20 }}>✕</button>
@@ -478,8 +478,8 @@ function CreateGroupModal({ friends, onClose, onCreate }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 400, maxHeight: "80vh", overflow: "auto", border: "1px solid var(--border)", padding: 24 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <div style={{ background: "var(--panel)", borderRadius: 20, width: 400, maxWidth: "92vw", maxHeight: "80vh", overflow: "auto", border: "1px solid var(--border)", padding: 24, boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ color: "var(--text)", margin: 0, fontSize: 18, fontWeight: 700 }}>建立群組</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
@@ -570,8 +570,8 @@ function DonateModal({ myProfile, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 380, border: "1px solid var(--border)", padding: 28 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <div style={{ background: "var(--panel)", borderRadius: 20, width: 380, maxWidth: "92vw", border: "1px solid var(--border)", padding: 28, boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text)" }}>🎁 打賞</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
@@ -1247,7 +1247,7 @@ export default function ChatApp({ user }) {
 
       {/* Right-click context menu */}
       {contextMenu && (
-        <div onClick={e => e.stopPropagation()} style={{ position: "fixed", top: contextMenu.y, left: contextMenu.x, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "4px 0", zIndex: 300, minWidth: 160, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+        <div onClick={e => e.stopPropagation()} style={{ position: "fixed", top: Math.min(contextMenu.y, window.innerHeight - 140), left: Math.min(contextMenu.x, window.innerWidth - 170), background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "4px 0", zIndex: 450, minWidth: 160, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
           <Link href={`/profile/${contextMenu.friend.uid}`} onClick={() => setContextMenu(null)}
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", color: "var(--text)", textDecoration: "none", fontSize: 13 }}
             onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
@@ -1271,8 +1271,8 @@ export default function ChatApp({ user }) {
 
       {/* Friend info card */}
       {friendInfo && (
-        <div onClick={() => setFriendInfo(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "var(--panel)", borderRadius: 20, width: 320, border: "1px solid var(--border)", overflow: "hidden" }}>
+        <div onClick={() => setFriendInfo(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "var(--panel)", borderRadius: 20, width: 320, maxWidth: "92vw", border: "1px solid var(--border)", overflow: "hidden" }}>
             <div style={{ background: friendInfo.profileBgType === "image" ? undefined : (friendInfo.profileBg || "linear-gradient(135deg,var(--accent-hover),#2d1f6e)"), backgroundImage: friendInfo.profileBgType === "image" ? `url(${friendInfo.profileBg})` : undefined, backgroundSize: "cover", backgroundPosition: "center", height: 80, position: "relative" }}>
               <button onClick={() => setFriendInfo(null)} style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.4)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 14 }}>✕</button>
             </div>
@@ -1337,7 +1337,7 @@ export default function ChatApp({ user }) {
           {/* My info */}
           <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--panel)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <button onClick={() => setShowProfile(true)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+              <button onClick={() => { setShowProfile(true); if (isMobile) setSidebarOpen(false); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
                 <AvatarImg avatarImage={myProfile.avatarImage} avatar={myProfile.avatar} color={myProfile.color} size={42} />
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -1350,8 +1350,8 @@ export default function ChatApp({ user }) {
                 {myProfile.statusText && <div style={{ fontSize: 11, color: "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myProfile.statusText}</div>}
               </div>
               <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <ThemeToggle mode="inline" onOpenProfile={() => setShowProfile(true)} />
-                <button onClick={() => auth.signOut()} title="登出" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>🚪</button>
+                <ThemeToggle mode="inline" onOpenProfile={() => { setShowProfile(true); if (isMobile) setSidebarOpen(false); }} />
+                <button onClick={() => { auth.signOut(); if (isMobile) setSidebarOpen(false); }} title="登出" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>🚪</button>
               </div>
             </div>
           </div>
@@ -1747,8 +1747,8 @@ export default function ChatApp({ user }) {
                   </div>
                   {/* Create room modal */}
                   {showCreateCinema && (
-                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}>
-                      <div style={{ background: "var(--panel-alt)", border: "1px solid var(--panel)", borderRadius: 20, padding: "32px", width: 360, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+                      <div style={{ background: "var(--panel-alt)", border: "1px solid var(--panel)", borderRadius: 20, padding: "32px", width: 360, maxWidth: "92vw", boxShadow: "0 20px 60px rgba(0,0,0,0.6)", boxSizing: "border-box" }}>
                         <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text)", marginBottom: 20 }}>🎬 建立新直播</div>
                         <input type="text" value={cinemaTitleInput} onChange={e => setCinemaTitleInput(e.target.value)}
           placeholder="輸入直播標題（例如：電影之夜）"
