@@ -505,7 +505,7 @@ function LessonView({ lesson, onComplete, onBack, onAddVocab }) {
                     <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
                       <SpanishText text={s.es} onWordClick={handleWordClick} />
                     </div>
-                    <div style={{ fontSize: 13, color: "var(--text-dim)" }}>{s.cn}</div>
+                    <div style={{ fontSize: 13, color: "#e6e1ff" }}>{s.cn}</div>
                   </div>
                   <button onClick={() => speakES(s.es)} style={{ background: `${color}22`, border: "none", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>🔊</button>
                 </div>
