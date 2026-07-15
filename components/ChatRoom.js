@@ -21,7 +21,7 @@ import {
   arrayUnion, arrayRemove, getDocs, where, limit, getDoc,
 } from "firebase/firestore";
 
-const EMOJI_QUICK  = ["??","??","?歹?","??","??","?"];
+const EMOJI_QUICK  = ["👍","❤️","😂","😮","😢","🙏"];
 const PROFILE_GRADIENTS = [
   "linear-gradient(135deg,#1e3a5f,#2d1f6e)",
   "linear-gradient(135deg,#f59e0b,#ef4444)",
@@ -48,10 +48,10 @@ function formatTime(ts) {
 
 function getStatus(status) {
   switch (status) {
-    case "online": return { label: "蝺?",    color: "#22c55e" };
-    case "away":   return { label: "?急??ａ?", color: "#eab308" };
-    case "dnd":    return { label: "隢?", color: "#ef4444" };
-    default:       return { label: "?Ｙ?",    color: "#6b7280" };
+    case "online": return { label: "線上",    color: "#22c55e" };
+    case "away":   return { label: "離開", color: "#eab308" };
+    case "dnd":    return { label: "勿擾", color: "#ef4444" };
+    default:       return { label: "離線",    color: "#6b7280" };
   }
 }
 
@@ -68,24 +68,24 @@ async function uploadToR2(file) {
     body: JSON.stringify({ fileName: file.name, fileType: file.type, fileData: base64 }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "銝憭望?");
+  if (!res.ok) throw new Error(data.error || "上傳失敗");
   return data.url;
 }
 
-// ?? Avatar helper ?????????????????????????????????????????????????????????????
+// Avatar helper
 
 function AvatarImg({ avatarImage, avatar, color, size = 36 }) {
   if (avatarImage) {
-    return <img src={avatarImage} alt="?剖?" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, display: "block" }} />;
+    return <img src={avatarImage} alt="頭像" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, display: "block" }} />;
   }
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.5, flexShrink: 0 }}>
-      {avatar || "??"}
+      {avatar || "😊"}
     </div>
   );
 }
 
-// ?? MessageBubble ?????????????????????????????????????????????????????????????
+// MessageBubble
 
 function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
   const [reactions, setReactions] = useState({});
@@ -97,9 +97,9 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
     if (!collectionPath) return;
     if (!confirm("確認撤回此訊息？")) return;
     try {
-      await updateDoc(doc(db, ...collectionPath), { recalled: true, text: "甇方??臬歇?嗅?", imageUrl: "", videoUrl: "" });
+      await updateDoc(doc(db, ...collectionPath), { recalled: true, text: "此訊息已撤回", imageUrl: "", videoUrl: "" });
     } catch (e) {
-      alert("?嗅?憭望?嚗??岫");
+      alert("撤回失敗，請重試");
     }
   };
 
@@ -109,7 +109,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8, maxWidth: "72%" }}>
           {!isMine && <div style={{ width: 30, flexShrink: 0 }} />}
           <div style={{ padding: "8px 14px", borderRadius: 18, background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text-dim)", fontSize: 13, fontStyle: "italic" }}>
-            甇方??臬歇?嗅?
+            此訊息已撤回
           </div>
         </div>
         <span style={{ fontSize: 10, color: "var(--border)", marginTop: 2, marginLeft: isMine ? 0 : 40 }}>{formatTime(msg.createdAt)}</span>
@@ -127,7 +127,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
     >
       {isMine && hovered && (
         <button onClick={recallMsg} style={{ position: "absolute", top: 0, right: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "2px 8px", fontSize: 11, color: "var(--text-muted)", cursor: "pointer", zIndex: 5, whiteSpace: "nowrap" }}>
-          ?嗅?
+          撤回
         </button>
       )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 8, maxWidth: "72%", marginTop: isMine && hovered ? 22 : 0 }}>
@@ -152,7 +152,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
               <video src={msg.videoUrl} controls style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
             )}
             {msg.imageUrl && (
-              <img src={msg.imageUrl} alt="??" style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
+              <img src={msg.imageUrl} alt="圖片" style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
             )}
             {msg.text}
           </div>
@@ -177,12 +177,12 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
   );
 }
 
-// ?? ProfilePage ???????????????????????????????????????????????????????????????
+// ProfilePage
 
 function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
   const [nickname,   setNickname]   = useState(myProfile.nickname || "");
   const [bio,        setBio]        = useState(myProfile.bio || "");
-  const [avatar,     setAvatar]     = useState(myProfile.avatar || "??");
+  const [avatar,     setAvatar]     = useState(myProfile.avatar || "😊");
   const [color,      setColor]      = useState(myProfile.color || "var(--accent)");
   const [statusText, setStatusText] = useState(myProfile.statusText || "");
   const [status,     setStatus]     = useState(myProfile.status || "online");
@@ -204,7 +204,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
       const url = await uploadToR2(file);
       await updateDoc(doc(db, 'users', myProfile.uid), { avatarImage: url });
     } catch {
-      alert("?剖?銝憭望?嚗??岫");
+      alert("頭像上傳失敗，請重試");
     } finally {
       setAvatarUploading(false);
       e.target.value = "";
@@ -221,17 +221,17 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
           backgroundPosition: profileBgType === "image" ? "center" : undefined,
           padding: "28px 28px 0", borderRadius: "20px 20px 0 0", position: "relative",
         }}>
-          <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(0,0,0,0.3)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "var(--text-muted)", cursor: "pointer", fontSize: 18 }}>??</button>
+          <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(0,0,0,0.3)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "var(--text-muted)", cursor: "pointer", fontSize: 18 }}>✕</button>
           {showCreator && <AvatarCreator myProfile={myProfile} onClose={() => setShowCreator(false)} />}
           <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
             <div style={{ position: "relative" }}>
               <AvatarImg avatarImage={myProfile.avatarImage} avatar={avatar} color={color} size={80} />
               <span style={{ position: "absolute", bottom: 2, right: 2, width: 18, height: 18, borderRadius: "50%", background: getStatus(status).color, border: "3px solid var(--panel)" }} />
-              <button onClick={() => setShowCreator(true)} title="閮剛????剖?"
+              <button onClick={() => setShowCreator(true)} title="更換頭像"
                 style={{ position: "absolute", top: 0, left: 0, width: 80, height: 80, borderRadius: "50%", background: "rgba(0,0,0,0)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.2s" }}
                 onMouseEnter={e => { e.currentTarget.style.opacity = 1; e.currentTarget.style.background = "rgba(0,0,0,0.45)"; }}
                 onMouseLeave={e => { e.currentTarget.style.opacity = 0; e.currentTarget.style.background = "rgba(0,0,0,0)"; }}>
-                <span style={{ fontSize: 22, pointerEvents: "none" }}>?</span>
+                <span style={{ fontSize: 22, pointerEvents: "none" }}>📷</span>
               </button>
             </div>
             <div style={{ paddingBottom: 12 }}>
@@ -242,30 +242,30 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
           <div style={{ display: "flex", gap: 20, marginTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 14, paddingBottom: 14 }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text)" }}>{friendList.length}</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>憟賢?</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>好友</div>
             </div>
           </div>
         </div>
         <div style={{ padding: 24 }}>
           <div style={{ marginBottom: 18 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>?剖??抒?</label>
+            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>頭像圖片</label>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <AvatarImg avatarImage={myProfile.avatarImage} avatar={avatar} color={color} size={48} />
               <div style={{ display: "flex", gap: 8, flexDirection: "column" }}>
                 <button onClick={() => avatarFileRef.current?.click()} disabled={avatarUploading}
                   style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "7px 14px", color: "var(--text-muted)", cursor: avatarUploading ? "default" : "pointer", fontSize: 13 }}>
-                  {avatarUploading ? "銝銝?.." : "? 銝?剖??抒?"}
+                  {avatarUploading ? "上傳中..." : "📷 上傳頭像圖片"}
                 </button>
                 {myProfile.avatarImage && (
                   <button onClick={() => updateDoc(doc(db, 'users', myProfile.uid), { avatarImage: "" })}
-                    style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, textAlign: "left" }}>??蝘駁?抒?</button>
+                    style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, textAlign: "left" }}>移除圖片</button>
                 )}
               </div>
               <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAvatarUpload} />
             </div>
           </div>
           <div style={{ marginBottom: 18 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>?剖? Emoji嚗??剁?</label>
+            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>頭像 Emoji（可選）</label>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {AVATAR_EMOJIS.map(e => (
                 <button key={e} onClick={() => setAvatar(e)} style={{ width: 36, height: 36, borderRadius: "50%", border: avatar === e ? "2px solid var(--accent)" : "2px solid var(--border)", background: color, cursor: "pointer", fontSize: 18 }}>{e}</button>
@@ -273,7 +273,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
             </div>
           </div>
           <div style={{ marginBottom: 18 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>?剖?憿</label>
+            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>頭像顏色</label>
             <div style={{ display: "flex", gap: 8 }}>
               {COLORS.map(c => (
                 <button key={c} onClick={() => setColor(c)} style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: color === c ? "3px solid #fff" : "3px solid transparent", cursor: "pointer" }} />
@@ -281,37 +281,37 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
             </div>
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>?梁迂</label>
+            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>暱稱</label>
             <input value={nickname} onChange={e => setNickname(e.target.value)} style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>?抒偷???憭?20 摮?</label>
-            <input value={signature} onChange={e => setSignature(e.target.value.slice(0, 20))} placeholder="撅祆雿?銝?亥店..."
+            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>個性簽名（最多 20 字）</label>
+            <input value={signature} onChange={e => setSignature(e.target.value.slice(0, 20))} placeholder="寫一句代表你的話..."
               style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
             <div style={{ textAlign: "right", fontSize: 11, color: "var(--text-dim)", marginTop: 3 }}>{signature.length} / 20</div>
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>?犖蝪∩?</label>
-            <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} placeholder="隞晶銝銝撌?.." style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box", resize: "none" }} />
+            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>自我介紹</label>
+            <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} placeholder="簡單介紹一下自己..." style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box", resize: "none" }} />
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>?????</label>
+            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>狀態文字</label>
             <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
               {STATUS_EMOJIS.map(e => <button key={e} onClick={() => setStatusText(p => p + e)} style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "4px 8px", cursor: "pointer", fontSize: 16 }}>{e}</button>)}
             </div>
-            <input value={statusText} onChange={e => setStatusText(e.target.value)} placeholder="?曉????.." style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+            <input value={statusText} onChange={e => setStatusText(e.target.value)} placeholder="在忙什麼呢..." style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
           </div>
           <div style={{ marginBottom: 20 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>銝????</label>
+            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>上線狀態</label>
             <div style={{ display: "flex", gap: 8 }}>
-              {[["online","蝺?"],["away","?恍"],["dnd","?踵"],["offline","?Ｙ?"]].map(([s,l]) => (
+              {[["online","線上"],["away","離開"],["dnd","勿擾"],["offline","離線"]].map(([s,l]) => (
                 <button key={s} onClick={() => setStatus(s)} style={{ flex: 1, padding: "8px 0", border: status === s ? `2px solid ${getStatus(s).color}` : "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: status === s ? `${getStatus(s).color}22` : "var(--panel-alt)", color: status === s ? getStatus(s).color : "var(--text-faint)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{l}</button>
               ))}
             </div>
           </div>
           {friendList.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>憟賢??” ({friendList.length})</label>
+              <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>好友列表 ({friendList.length})</label>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {friendList.map(f => (
                   <div key={f.uid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--panel-alt)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
@@ -326,7 +326,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
             </div>
           )}
           <div style={{ marginBottom: 20 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>?犖??</label>
+            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>個人背景</label>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
               {PROFILE_GRADIENTS.map((g, i) => (
                 <button key={i} onClick={() => { setProfileBg(g); setProfileBgType("gradient"); }}
@@ -336,11 +336,11 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button onClick={() => bgFileRef.current?.click()} disabled={bgUploading}
                 style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "7px 12px", color: "var(--text-muted)", cursor: bgUploading ? "default" : "pointer", fontSize: 13 }}>
-                {bgUploading ? "銝銝?.." : "?儭?銝???"}
+                {bgUploading ? "上傳中..." : "更換背景圖片"}
               </button>
               {profileBgType === "image" && (
                 <button onClick={() => { setProfileBg(PROFILE_GRADIENTS[0]); setProfileBgType("gradient"); }}
-                  style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12 }}>??蝘駁??</button>
+                  style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12 }}>移除背景</button>
               )}
               <input ref={bgFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async (e) => {
                 const file = e.target.files?.[0];
@@ -351,7 +351,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
                   setProfileBg(url);
                   setProfileBgType("image");
                 } catch {
-                  alert("?銝憭望?嚗??岫");
+                  alert("背景上傳失敗，請重試");
                 } finally {
                   setBgUploading(false);
                   e.target.value = "";
@@ -360,7 +360,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
             </div>
           </div>
           <button onClick={() => onSave({ nickname, bio, avatar, color, statusText, status, signature, profileBg, profileBgType })} style={{ width: "100%", background: "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: "var(--radius-md)", padding: "12px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-            ?脣?閮剖?
+            儲存設定
           </button>
         </div>
       </div>
@@ -368,7 +368,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
   );
 }
 
-// ?? FriendSearch ?????????????????????????????????????????????????????????????
+// FriendSearch????????????????????????????????????????????????????????????
 
 function FriendSearch({ myUid, myProfile, onClose, onSendRequest }) {
   const [searchText, setSearchText] = useState("");
@@ -403,13 +403,13 @@ function FriendSearch({ myUid, myProfile, onClose, onSendRequest }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
       <div style={{ background: "var(--panel)", borderRadius: 20, width: 520, maxWidth: "95vw", border: "1px solid var(--border)", padding: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 20, fontWeight: 700 }}>??銝血?憟賢?</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>??</button>
+          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 20, fontWeight: 700 }}>搜尋並新增好友</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
         </div>
-        <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="頛詨?梁迂?摮隞?.."
+        <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="輸入暱稱或電郵搜尋..."
           style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "13px 16px", color: "var(--text)", fontSize: 16, outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
-        {searching && <div style={{ textAlign: "center", color: "var(--text-faint)", fontSize: 16 }}>??銝?..</div>}
-        {!searching && results.length === 0 && searchText && <div style={{ textAlign: "center", color: "var(--text-faint)", fontSize: 16, padding: "16px 0" }}>?曆??啁??</div>}
+        {searching && <div style={{ textAlign: "center", color: "var(--text-faint)", fontSize: 16 }}>搜尋中...</div>}
+        {!searching && results.length === 0 && searchText && <div style={{ textAlign: "center", color: "var(--text-faint)", fontSize: 16, padding: "16px 0" }}>找不到相關使用者</div>}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {results.map(u => (
             <div key={u.uid} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "var(--panel-alt)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
@@ -419,7 +419,7 @@ function FriendSearch({ myUid, myProfile, onClose, onSendRequest }) {
                 {u.signature && <div style={{ fontSize: 13, color: "var(--text-muted)", fontStyle: "italic" }}>{u.signature}</div>}
                 <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>{u.email}</div>
               </div>
-              <button onClick={() => onSendRequest(u.uid)} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 18px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>?末??</button>
+              <button onClick={() => onSendRequest(u.uid)} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 18px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>加好友</button>
             </div>
           ))}
         </div>
@@ -428,7 +428,7 @@ function FriendSearch({ myUid, myProfile, onClose, onSendRequest }) {
   );
 }
 
-// ?? FriendRequests ????????????????????????????????????????????????????????????
+// FriendRequests
 
 function FriendRequests({ myProfile, onAccept, onDecline, onClose }) {
   const [pendingProfiles, setPendingProfiles] = useState([]);
@@ -445,20 +445,20 @@ function FriendRequests({ myProfile, onAccept, onDecline, onClose }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
       <div style={{ background: "var(--panel)", borderRadius: "var(--radius-lg)", width: 380, border: "1px solid var(--border)", padding: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 16, fontWeight: 700 }}>憟賢??隢?({pendingProfiles.length})</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 20 }}>??</button>
+          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 16, fontWeight: 700 }}>好友邀請 ({pendingProfiles.length})</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 20 }}>✕</button>
         </div>
-        {pendingProfiles.length === 0 && <div style={{ textAlign: "center", color: "var(--text-faint)", fontSize: 14, padding: "20px 0" }}>瘝?敺????隢?</div>}
+        {pendingProfiles.length === 0 && <div style={{ textAlign: "center", color: "var(--text-faint)", fontSize: 14, padding: "20px 0" }}>目前沒有待處理的邀請</div>}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {pendingProfiles.map(u => (
             <div key={u.uid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px", background: "var(--panel-alt)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
               <AvatarImg avatarImage={u.avatarImage} avatar={u.avatar} color={u.color} size={40} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 14 }}>{u.nickname}</div>
-                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>?喳?雿憟賢?</div>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>想加你為好友</div>
               </div>
-              <button onClick={() => onAccept(u.uid)} style={{ background: "#22c55e", border: "none", borderRadius: "var(--radius-sm)", padding: "6px 12px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", marginRight: 4 }}>??</button>
-              <button onClick={() => onDecline(u.uid)} style={{ background: "#ef4444", border: "none", borderRadius: "var(--radius-sm)", padding: "6px 12px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>??</button>
+              <button onClick={() => onAccept(u.uid)} style={{ background: "#22c55e", border: "none", borderRadius: "var(--radius-sm)", padding: "6px 12px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", marginRight: 4 }}>接受</button>
+              <button onClick={() => onDecline(u.uid)} style={{ background: "#ef4444", border: "none", borderRadius: "var(--radius-sm)", padding: "6px 12px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>拒絕</button>
             </div>
           ))}
         </div>
@@ -467,7 +467,7 @@ function FriendRequests({ myProfile, onAccept, onDecline, onClose }) {
   );
 }
 
-// ?? CreateGroupModal ??????????????????????????????????????????????????????????
+// CreateGroupModal
 
 function CreateGroupModal({ friends, onClose, onCreate }) {
   const [name, setName] = useState("");
@@ -481,17 +481,17 @@ function CreateGroupModal({ friends, onClose, onCreate }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
       <div style={{ background: "var(--panel)", borderRadius: 20, width: 400, maxHeight: "80vh", overflow: "auto", border: "1px solid var(--border)", padding: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 18, fontWeight: 700 }}>?萄遣蝢斤?</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>??</button>
+          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 18, fontWeight: 700 }}>建立群組</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>蝢斤??迂</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="頛詨蝢斤??迂..."
+          <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>群組名稱</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="輸入群組名稱..."
             style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>??嚗?憟賢?銝剝??</label>
-          {friends.length === 0 && <div style={{ color: "var(--text-faint)", fontSize: 13, padding: "8px 0" }}>??憟賢??撱箇?蝢斤?</div>}
+          <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>成員（選擇好友加入）</label>
+          {friends.length === 0 && <div style={{ color: "var(--text-faint)", fontSize: 13, padding: "8px 0" }}>尚無好友可加入群組</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {friends.map(f => (
               <button key={f.uid} onClick={() => toggle(f.uid)}
@@ -518,7 +518,7 @@ function CreateGroupModal({ friends, onClose, onCreate }) {
   );
 }
 
-// ?? RankBadge ?????????????????????????????????????????????????????????????????
+// RankBadge
 
 function RankBadge({ rank, size = 32 }) {
   const bg =
@@ -533,7 +533,7 @@ function RankBadge({ rank, size = 32 }) {
   );
 }
 
-// ?? DonateModal ???????????????????????????????????????????????????????????????
+// DonateModal
 
 function DonateModal({ myProfile, onClose }) {
   const [amount, setAmount] = useState(50);
@@ -563,7 +563,7 @@ function DonateModal({ myProfile, onClose }) {
       if (data.url) window.location.href = data.url;
       else alert("付款失敗：" + (data.error || "請稍後再試"));
     } catch {
-      alert("蝬脩窗?航炊嚗??岫");
+      alert("付款發生錯誤，請重試");
     } finally {
       setLoading(false);
     }
@@ -573,8 +573,8 @@ function DonateModal({ myProfile, onClose }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
       <div style={{ background: "var(--panel)", borderRadius: 20, width: 380, border: "1px solid var(--border)", padding: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text)" }}>?? ?豢?????</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>??</button>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text)" }}>🎁 打賞</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
           {[10, 30, 50, 100].map(a => (
@@ -588,7 +588,7 @@ function DonateModal({ myProfile, onClose }) {
           <div style={{ position: "relative" }}>
             <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: useCustom ? "#fbbf24" : "var(--text-faint)", fontWeight: 700, fontSize: 15, pointerEvents: "none" }}>HK$</span>
             <input
-              type="number" min="1" placeholder="?芾???"
+              type="number" min="1" placeholder="輸入金額"
               value={customInput}
               onChange={e => { setCustomInput(e.target.value); setUseCustom(true); }}
               onFocus={() => setUseCustom(true)}
@@ -598,15 +598,15 @@ function DonateModal({ myProfile, onClose }) {
         </div>
         <button onClick={handleDonate} disabled={loading || finalAmount < 1}
           style={{ width: "100%", background: finalAmount >= 1 && !loading ? "linear-gradient(135deg,#f59e0b,#d97706)" : "var(--border)", border: "none", borderRadius: "var(--radius-md)", padding: "14px", color: "#fff", fontSize: 16, fontWeight: 700, cursor: finalAmount >= 1 && !loading ? "pointer" : "default", transition: "all 0.15s" }}>
-          {loading ? "??銝?.." : finalAmount >= 1 ? `?? 蝡?? HK$${finalAmount}` : "?? 蝡??"}
+          {loading ? "處理中..." : finalAmount >= 1 ? `🎁 打賞 HK${finalAmount}` : "🎁 打賞"}
         </button>
-        <div style={{ textAlign: "center", fontSize: 12, color: "var(--text-dim)", marginTop: 10 }}>?舀靽∠?～隞窄?凝靽⊥隞pple Pay</div>
+        <div style={{ textAlign: "center", fontSize: 12, color: "var(--text-dim)", marginTop: 10 }}>支援信用卡、Apple Pay 等付款方式</div>
       </div>
     </div>
   );
 }
 
-// ?? Main ChatApp ??????????????????????????????????????????????????????????????
+// Main ChatApp
 
 export default function ChatApp({ user }) {
   const uid = user.uid;
@@ -821,7 +821,7 @@ export default function ChatApp({ user }) {
     return () => { clearTimeout(timer); events.forEach(e => document.removeEventListener(e, reset)); };
   }, [uid]);
 
-  // ?? Firestore write helpers ????????????????????????????????????????????????
+  // Firestore write helpers
 
   const sendHall = useCallback(async () => {
     if (!hallInput.trim() || !myProfile) return;
@@ -846,7 +846,7 @@ export default function ChatApp({ user }) {
         text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
       });
     } catch {
-      alert("慦?銝憭望?嚗??岫");
+      alert("上傳失敗，請重試");
     } finally {
       setHallUploading(false);
     }
@@ -875,7 +875,7 @@ export default function ChatApp({ user }) {
         text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
       });
     } catch {
-      alert("慦?銝憭望?嚗??岫");
+      alert("上傳失敗，請重試");
     } finally {
       setPrivateUploading(false);
     }
@@ -904,7 +904,7 @@ export default function ChatApp({ user }) {
         text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
       });
     } catch {
-      alert("慦?銝憭望?嚗??岫");
+      alert("上傳失敗，請重試");
     } finally {
       setGroupUploading(false);
     }
@@ -935,7 +935,7 @@ export default function ChatApp({ user }) {
     const members = [uid, ...memberUids];
     const ref = await addDoc(collection(db, 'groups'), {
       name,
-      avatar: "?",
+      avatar: "👥",
       members,
       createdBy: uid,
       createdAt: serverTimestamp(),
@@ -945,7 +945,7 @@ export default function ChatApp({ user }) {
     setShowCreateGroup(false);
   }, [uid]);
 
-  // ?? Cinema / WebRTC ???????????????????????????????????????????????????????????
+  // Cinema / WebRTC
 
   const ICE_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
@@ -1097,7 +1097,7 @@ export default function ChatApp({ user }) {
   if (!myProfile) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "var(--text-faint)" }}>頛銝?..</div>
+        <div style={{ color: "var(--text-faint)" }}>載入中...</div>
       </div>
     );
   }
@@ -1156,6 +1156,7 @@ export default function ChatApp({ user }) {
             margin: 0 !important;
             height: 100dvh !important;
             border-radius: 0 !important;
+            flex-direction: column !important;
           }
 
           /* Sidebar: fixed overlay, slides from left */
@@ -1251,20 +1252,20 @@ export default function ChatApp({ user }) {
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", color: "var(--text)", textDecoration: "none", fontSize: 13 }}
             onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
             onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-            ?? 憿舐內?犖銝駁?
+            🔍 查看個人檔案
           </Link>
           <button onClick={() => { setFriendInfo(contextMenu.friend); setContextMenu(null); }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 14px", color: "var(--text)", background: "none", border: "none", textAlign: "left", fontSize: 13, cursor: "pointer" }}
             onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
             onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-            ? ?犖鞈?
+            ℹ️ 個人資料
           </button>
           <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
           <button onClick={() => { setActiveFriendId(contextMenu.friend.uid); setActiveGroupId(null); setShowLeaderboard(false); setContextMenu(null); }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 14px", color: "var(--text)", background: "none", border: "none", textAlign: "left", fontSize: 13, cursor: "pointer" }}
             onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
             onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-            ? ?喲???          </button>
+            💬 傳送訊息</button>
         </div>
       )}
 
@@ -1273,7 +1274,7 @@ export default function ChatApp({ user }) {
         <div onClick={() => setFriendInfo(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: "var(--panel)", borderRadius: 20, width: 320, border: "1px solid var(--border)", overflow: "hidden" }}>
             <div style={{ background: friendInfo.profileBgType === "image" ? undefined : (friendInfo.profileBg || "linear-gradient(135deg,var(--accent-hover),#2d1f6e)"), backgroundImage: friendInfo.profileBgType === "image" ? `url(${friendInfo.profileBg})` : undefined, backgroundSize: "cover", backgroundPosition: "center", height: 80, position: "relative" }}>
-              <button onClick={() => setFriendInfo(null)} style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.4)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 14 }}>??</button>
+              <button onClick={() => setFriendInfo(null)} style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.4)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 14 }}>✕</button>
             </div>
             <div style={{ padding: "0 20px 20px", marginTop: -30 }}>
               <AvatarImg avatarImage={friendInfo.avatarImage} avatar={friendInfo.avatar} color={friendInfo.color} size={60} />
@@ -1290,10 +1291,10 @@ export default function ChatApp({ user }) {
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                 <button onClick={() => { setActiveFriendId(friendInfo.uid); setActiveGroupId(null); setShowLeaderboard(false); setFriendInfo(null); }}
                   style={{ flex: 1, background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 0", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                  ? ?唾???                </button>
+                  💬 傳送訊息                </button>
                 <Link href={`/profile/${friendInfo.uid}`} onClick={() => setFriendInfo(null)}
                   style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 0", color: "var(--text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  ?? 銝駁?
+                  🔍 查看檔案
                 </Link>
               </div>
             </div>
@@ -1314,9 +1315,23 @@ export default function ChatApp({ user }) {
       }}>
 
         {/* Backdrop (mobile only) */}
+        <div className="cr-mobile-topbar">
+          <button onClick={() => setSidebarOpen(true)} aria-label="開啟選單"
+            style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 22, padding: 4, lineHeight: 1, flexShrink: 0 }}>
+            ☰
+          </button>
+          <div style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 15, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {activeGroup ? activeGroup.name : activeFriendProfile ? activeFriendProfile.nickname : "Evonchat"}
+          </div>
+          <button onClick={() => setCalendarOpen(true)} aria-label="開啟日曆"
+            style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 20, padding: 4, lineHeight: 1, flexShrink: 0 }}>
+            📅
+          </button>
+        </div>
+
         {sidebarOpen && <div className="cr-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
-        {/* ?? Sidebar ?? */}
+        {/* 側邊欄 */}
         <div className={`cr-sidebar${sidebarOpen ? " cr-sidebar-open" : ""}`} style={{ width: 280, background: "var(--panel-alt)", borderRight: "1px solid var(--panel)", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
 
           {/* My info */}
@@ -1336,7 +1351,7 @@ export default function ChatApp({ user }) {
               </div>
               <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                 <ThemeToggle mode="inline" onOpenProfile={() => setShowProfile(true)} />
-                <button onClick={() => auth.signOut()} title="?餃" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>?</button>
+                <button onClick={() => auth.signOut()} title="登出" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>🚪</button>
               </div>
             </div>
           </div>
@@ -1349,10 +1364,10 @@ export default function ChatApp({ user }) {
           {pendingInCount > 0 && (
             <button onClick={() => setShowFriendReqs(true)}
               style={{ margin: "8px 10px 0", display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#dc2626,#b91c1c)", border: "none", borderRadius: "var(--radius-md)", padding: "10px 12px", color: "#fff", cursor: "pointer", width: "calc(100% - 20px)", textAlign: "left" }}>
-              <span style={{ fontSize: 18 }}>?</span>
+              <span style={{ fontSize: 18 }}>🔔</span>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 13 }}>雿? {pendingInCount} ?末??隢?</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>暺??亦?銝行??</div>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>你有 {pendingInCount} 個好友請求</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>點擊查看並處理</div>
               </div>
             </button>
           )}
@@ -1542,7 +1557,7 @@ export default function ChatApp({ user }) {
           {/* Groups section */}
           <div style={{ padding: "0 12px 4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>群組 {myGroups.length}</span>
-            <button onClick={() => setShowCreateGroup(true)} title="?萄遣蝢斤?" style={{ background: "var(--border)", border: "none", borderRadius: "var(--radius-sm)", padding: "3px 8px", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>+</button>
+            <button onClick={() => setShowCreateGroup(true)} title="建立群組" style={{ background: "var(--border)", border: "none", borderRadius: "var(--radius-sm)", padding: "3px 8px", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>+</button>
           </div>
           <div style={{ padding: "0 8px 6px" }}>
             {myGroups.map(group => {
@@ -1552,7 +1567,7 @@ export default function ChatApp({ user }) {
                   className={`fb ${isActive ? "act" : ""}`}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s", marginBottom: 2 }}>
                   <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,var(--text-dim),var(--border))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-                    {group.avatar || "?"}
+                    {group.avatar || "👥"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.name}</div>
@@ -1580,9 +1595,9 @@ export default function ChatApp({ user }) {
           <div style={{ padding: "0 8px 8px" }}>
             {myFriends.length === 0 && !searchQuery && (
               <div style={{ textAlign: "center", padding: "20px 12px", color: "var(--text-dim)", fontSize: 13 }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>?</div>
-                ???末??<br />
-                <button onClick={() => setShowFriendSearch(true)} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, marginTop: 6 }}>暺????末??</button>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>👋</div>
+                還沒有好友<br />
+                <button onClick={() => setShowFriendSearch(true)} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, marginTop: 6 }}>點擊搜尋好友</button>
               </div>
             )}
             {myFriends.map(friend => {
@@ -1609,7 +1624,7 @@ export default function ChatApp({ user }) {
           </div>
         </div>
 
-        {/* ?? Main area ?? */}
+        {/* 主要區域 */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg)", minWidth: 0 }}>
 
           {/* Leaderboard view */}
@@ -1619,7 +1634,7 @@ export default function ChatApp({ user }) {
                 {/* Title */}
                 <div style={{ textAlign: "center", marginBottom: 36 }}>
                   <div style={{ fontSize: 30, fontWeight: 900, color: "#f8c94f", letterSpacing: 3, textShadow: "0 0 30px rgba(248,201,79,0.6), 0 0 60px rgba(248,201,79,0.3)" }}>
-                    ?? ??璁???
+                    🏆 打賞排行榜
                   </div>
                   <div style={{ fontSize: 11, color: "#4a5580", letterSpacing: 8, marginTop: 8, fontWeight: 700 }}>
                     TIPPING LEADERBOARD
@@ -1628,9 +1643,9 @@ export default function ChatApp({ user }) {
 
                 {leaderboard.length === 0 && (
                   <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-dim)" }}>
-                    <div style={{ fontSize: 52, marginBottom: 14 }}>??</div>
-                    <div style={{ fontSize: 16, color: "var(--text-faint)" }}>???犖??</div>
-                    <div style={{ fontSize: 13, marginTop: 6, color: "var(--text-dim)" }}>?蝚砌???鞈?鈭箏嚗?</div>
+                    <div style={{ fontSize: 52, marginBottom: 14 }}>🏆</div>
+                    <div style={{ fontSize: 16, color: "var(--text-faint)" }}>還沒有人打賞</div>
+                    <div style={{ fontSize: 13, marginTop: 6, color: "var(--text-dim)" }}>快來成為第一位吧！</div>
                   </div>
                 )}
 
@@ -1679,7 +1694,7 @@ export default function ChatApp({ user }) {
               <div style={{ padding: "14px 20px", background: "#08091a", borderTop: "1px solid #1a1a3a", flexShrink: 0 }}>
                 <button onClick={() => setShowDonateModal(true)}
                   style={{ width: "100%", background: "linear-gradient(135deg,#f59e0b,#d97706)", border: "none", borderRadius: "var(--radius-lg)", padding: "13px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 20px rgba(245,158,11,0.35)", letterSpacing: 1 }}>
-                  ?? ????
+                  🎁 立即打賞
                 </button>
               </div>
             </>
@@ -1692,23 +1707,23 @@ export default function ChatApp({ user }) {
                 <>
                   {/* Header */}
                   <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
-                    <span style={{ fontSize: 20 }}>?</span>
+                    <span style={{ fontSize: 20 }}>🎬</span>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>?餃蔣??</div>
-                      <div style={{ fontSize: 11, color: "var(--text-faint)" }}>?Ｗ??澈?湔</div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>電影院</div>
+                      <div style={{ fontSize: 11, color: "var(--text-faint)" }}>同步觀看直播</div>
                     </div>
                     <button onClick={() => setShowCreateCinema(true)}
                       style={{ marginLeft: "auto", background: "#2563eb", border: "none", borderRadius: "var(--radius-md)", padding: "7px 16px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                      + ?萄遣?輸?
+                      + 建立直播
                     </button>
                   </div>
                   {/* Room list */}
                   <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
                     {cinemaRooms.length === 0 && (
                       <div style={{ textAlign: "center", padding: "80px 0", color: "var(--text-dim)" }}>
-                        <div style={{ fontSize: 56, marginBottom: 16 }}>?</div>
-                        <div style={{ fontSize: 16, color: "var(--text-faint)" }}>????剜??</div>
-                        <div style={{ fontSize: 13, marginTop: 8, color: "var(--text-dim)" }}>?蝚砌??蜓?剖嚗?</div>
+                        <div style={{ fontSize: 56, marginBottom: 16 }}>🎬</div>
+                        <div style={{ fontSize: 16, color: "var(--text-faint)" }}>目前沒有進行中的直播</div>
+                        <div style={{ fontSize: 13, marginTop: 8, color: "var(--text-dim)" }}>快來建立第一個吧！</div>
                       </div>
                     )}
                     <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 700, margin: "0 auto" }}>
@@ -1720,10 +1735,10 @@ export default function ChatApp({ user }) {
                             <div style={{ fontSize: 12, color: "var(--text-faint)" }}>主持人：{room.hostNickname}</div>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                            <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, letterSpacing: 1 }}>? LIVE</span>
+                            <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, letterSpacing: 1 }}>🔴 LIVE</span>
                             <button onClick={() => joinCinemaRoom(room)}
                               style={{ background: "linear-gradient(135deg,#2563eb,var(--accent-active))", border: "none", borderRadius: "var(--radius-md)", padding: "8px 18px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                              ?脣
+                              加入
                             </button>
                           </div>
                         </div>
@@ -1734,14 +1749,14 @@ export default function ChatApp({ user }) {
                   {showCreateCinema && (
                     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}>
                       <div style={{ background: "var(--panel-alt)", border: "1px solid var(--panel)", borderRadius: 20, padding: "32px", width: 360, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
-                        <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text)", marginBottom: 20 }}>? ?萄遣?湔?輸?</div>
+                        <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text)", marginBottom: 20 }}>🎬 建立新直播</div>
                         <input type="text" value={cinemaTitleInput} onChange={e => setCinemaTitleInput(e.target.value)}
           placeholder="輸入直播標題（例如：電影之夜）"
                           style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "11px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
-                        <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 20 }}>?脣?輸?敺?暺????湔嚗頂蝯望?隢??Ｗ??澈甈?</div>
+                        <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 20 }}>建立直播後，點擊開始畫面分享，好友就能同步觀看囉！</div>
                         <div style={{ display: "flex", gap: 10 }}>
                           <button onClick={() => { setShowCreateCinema(false); setCinemaTitleInput(''); }}
-                            style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "11px", color: "var(--text-muted)", fontSize: 14, cursor: "pointer" }}>??</button>
+                            style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "11px", color: "var(--text-muted)", fontSize: 14, cursor: "pointer" }}>取消</button>
                           <button onClick={createCinemaRoom}
                             style={{ flex: 1, background: "linear-gradient(135deg,#2563eb,var(--accent-active))", border: "none", borderRadius: "var(--radius-md)", padding: "11px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>蝣箏?</button>
                         </div>
@@ -1756,10 +1771,10 @@ export default function ChatApp({ user }) {
                   {/* Top bar */}
                   <div style={{ height: 48, background: "#0a0a0a", borderBottom: "1px solid #1a1a1a", display: "flex", alignItems: "center", padding: "0 16px", gap: 12, flexShrink: 0 }}>
                     <button onClick={() => leaveCinemaRoom(activeCinemaRoom.id, isHosting)}
-                      style={{ background: "var(--panel)", border: "none", borderRadius: "var(--radius-sm)", padding: "6px 14px", color: "var(--text-muted)", fontSize: 13, cursor: "pointer" }}>???ａ?</button>
+                      style={{ background: "var(--panel)", border: "none", borderRadius: "var(--radius-sm)", padding: "6px 14px", color: "var(--text-muted)", fontSize: 13, cursor: "pointer" }}>離開直播</button>
                     <span style={{ color: "var(--text)", fontWeight: 600, fontSize: 14 }}>{activeCinemaRoom.title}</span>
-                    <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, letterSpacing: 1 }}>? LIVE</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-muted)", fontSize: 13 }}>?? {cinemaViewerCount}</span>
+                    <span style={{ background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, letterSpacing: 1 }}>🔴 LIVE</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-muted)", fontSize: 13 }}>👁️ {cinemaViewerCount}</span>
                         <span style={{ marginLeft: "auto", color: "var(--text-faint)", fontSize: 12 }}>主持人：{activeCinemaRoom.hostNickname}</span>
                   </div>
                   {/* Video area */}
@@ -1767,7 +1782,7 @@ export default function ChatApp({ user }) {
                     {isHosting && !screenStream ? (
                       <button onClick={startHostStream}
                         style={{ background: "linear-gradient(135deg,#2563eb,var(--accent-active))", border: "none", borderRadius: 14, padding: "16px 32px", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
-                        ?????湔
+                        開始畫面分享
                       </button>
                     ) : isHosting ? (
                       <video ref={localVideoRef} autoPlay muted playsInline
@@ -1777,8 +1792,8 @@ export default function ChatApp({ user }) {
                         style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                     ) : (
                       <div style={{ textAlign: "center", color: "var(--text-dim)" }}>
-                        <div style={{ fontSize: 48, marginBottom: 12 }}>?</div>
-                        <div style={{ fontSize: 14 }}>蝑?銝餅???澈?Ｗ?...</div>
+                        <div style={{ fontSize: 48, marginBottom: 12 }}>📺</div>
+                        <div style={{ fontSize: 14 }}>等待主持人開始畫面分享...</div>
                       </div>
                     )}
                   </div>
@@ -1786,7 +1801,7 @@ export default function ChatApp({ user }) {
                   <div style={{ height: 220, background: "var(--bg)", borderTop: "1px solid var(--panel)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
                     <div style={{ flex: 1, overflowY: "auto", padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
                       {cinemaComments.length === 0 && (
-                        <div style={{ color: "var(--text-dim)", fontSize: 13, textAlign: "left", paddingTop: 8 }}>????閮嚗?蝚砌???閮?改?</div>
+                        <div style={{ color: "var(--text-dim)", fontSize: 13, textAlign: "left", paddingTop: 8 }}>還沒有留言，快來說第一句吧！</div>
                       )}
                       {cinemaComments.map(c => (
                         <div key={c.id} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -1802,10 +1817,10 @@ export default function ChatApp({ user }) {
                     <div style={{ padding: "8px 12px", borderTop: "1px solid var(--panel)", display: "flex", gap: 8 }}>
                       <input type="text" value={cinemaInput} onChange={e => setCinemaInput(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && sendCinemaComment()}
-                        placeholder="??..."
+                        placeholder="留言..."
                         style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 12px", color: "var(--text)", fontSize: 14, outline: "none" }} />
                       <button className="sb" onClick={sendCinemaComment}
-                        style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "8px 16px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>?潮?</button>
+                        style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "8px 16px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>傳送</button>
                     </div>
                   </div>
                 </div>
@@ -1867,26 +1882,26 @@ export default function ChatApp({ user }) {
           {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && (
             <>
               <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
-                <span style={{ fontSize: 20 }}>?</span>
+                <span style={{ fontSize: 20 }}>💬</span>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}># ?砍憭批輒</div>
-                  <div style={{ fontSize: 11, color: "var(--text-faint)" }}>?祇??駁?</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}># 公共大廳</div>
+                  <div style={{ fontSize: 11, color: "var(--text-faint)" }}>大家都可以看到這裡的訊息</div>
                 </div>
               </div>
               <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2 }}>
                 <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 12, padding: "8px 0 16px" }}>
-                  隞予 繚 {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric" })}
+                  今天 · {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric" })}
                 </div>
                 {hallMessages.length === 0 && (
                   <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
-                    <div style={{ fontSize: 40, marginBottom: 8 }}>??</div>
-                    <div>甇∟?靘?砍憭批輒嚗??箇洵銝?閮?犖??</div>
+                    <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
+                    <div>大廳還沒有訊息，來說第一句話吧！</div>
                   </div>
                 )}
                 {hallMessages.map((msg, i) => {
                   if (msg.isSystem) return (
                     <div key={msg.id} style={{ textAlign: "center", marginBottom: 10 }}>
-                      <span style={{ background: "var(--panel)", color: "var(--text-faint)", fontSize: 12, padding: "5px 14px", borderRadius: 20, border: "1px solid var(--border)" }}>? {msg.text}</span>
+                      <span style={{ background: "var(--panel)", color: "var(--text-faint)", fontSize: 12, padding: "5px 14px", borderRadius: 20, border: "1px solid var(--border)" }}>ℹ️ {msg.text}</span>
                     </div>
                   );
                   const isMine = msg.senderId === uid;
@@ -1902,9 +1917,9 @@ export default function ChatApp({ user }) {
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", cursor: hallUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                     {hallUploading ? "⏳" : "📎"}
                   </button>
-                  <input type="text" value={hallInput} onChange={e => setHallInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendHall()} placeholder="?典之撱喟????.."
+                  <input type="text" value={hallInput} onChange={e => setHallInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendHall()} placeholder="輸入訊息..."
                     style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
-                  <button className="sb" onClick={sendHall} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>?潮???</button>
+                  <button className="sb" onClick={sendHall} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>傳送</button>
                 </div>
               </div>
             </>
@@ -1921,13 +1936,13 @@ export default function ChatApp({ user }) {
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{activeFriendProfile.nickname}</div>
                   <div style={{ fontSize: 11, color: getStatus(activeFriendProfile.status).color }}>
-                    {getStatus(activeFriendProfile.status).label}{activeFriendProfile.statusText ? ` 繚 ${activeFriendProfile.statusText}` : ""}
+                    {getStatus(activeFriendProfile.status).label}{activeFriendProfile.statusText ? ` · ${activeFriendProfile.statusText}` : ""}
                   </div>
                 </div>
                 <Link href={`/profile/${activeFriendProfile.uid}`} style={{ marginLeft: "auto", color: "var(--text-faint)", fontSize: 12, textDecoration: "none" }}
                   onMouseEnter={e => e.currentTarget.style.color = "var(--text-muted)"}
                   onMouseLeave={e => e.currentTarget.style.color = "var(--text-faint)"}>
-                  ? ?犖?
+                  ℹ️ 個人檔案
                 </Link>
               </div>
               <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0)", backgroundSize: "28px 28px" }}>
@@ -1935,7 +1950,7 @@ export default function ChatApp({ user }) {
                   <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={56} />
                   <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{activeFriendProfile.nickname}</div>
                   {activeFriendProfile.bio && <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 4, maxWidth: 260, margin: "4px auto 0" }}>{activeFriendProfile.bio}</div>}
-                  <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>?雿?閮???</div>
+                  <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>你們已經是好友了</div>
                 </div>
                 {privateMessages.map((msg, i) => {
                   const isMine = msg.senderId === uid;
@@ -1950,13 +1965,13 @@ export default function ChatApp({ user }) {
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", cursor: privateUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                     {privateUploading ? "⏳" : "📎"}
                   </button>
-                  <input type="text" value={privateInput} onChange={e => setPrivateInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendPrivate()} placeholder={`?唾??舐策 ${activeFriendProfile.nickname}...`}
+                  <input type="text" value={privateInput} onChange={e => setPrivateInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendPrivate()} placeholder={`傳送訊息給 ${activeFriendProfile.nickname}...`}
                     style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
                   <button className="sb" onClick={sendPrivate} disabled={!privateInput.trim()}
                     style={{ background: privateInput.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: privateInput.trim() ? "#fff" : "var(--text-dim)", cursor: privateInput.trim() ? "pointer" : "default", fontSize: 14, fontWeight: 600, transition: "all 0.15s" }}>
-                    ?潮???                  </button>
+                    傳送                  </button>
                 </div>
-                <div style={{ textAlign: "right", fontSize: 11, color: "var(--border)", marginTop: 4 }}>??閮?”????繚 皛?蝘颱??芸楛???臬?嗅?</div>
+                <div style={{ textAlign: "right", fontSize: 11, color: "var(--border)", marginTop: 4 }}>私訊只有你們兩人看得到 · 雙方都可以撤回訊息</div>
               </div>
             </>
           )}
@@ -1966,18 +1981,18 @@ export default function ChatApp({ user }) {
             <>
               <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
                 <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,var(--text-dim),var(--border))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-                  {activeGroup.avatar || "?"}
+                  {activeGroup.avatar || "👥"}
                 </div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{activeGroup.name}</div>
-                  <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(activeGroup.members || []).length} 雿???</div>
+                  <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(activeGroup.members || []).length} 位成員</div>
                 </div>
               </div>
               <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2 }}>
                 {groupMessages.length === 0 && (
                   <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
-                    <div style={{ fontSize: 40, marginBottom: 8 }}>?</div>
-                    <div>蝢斤??遣蝡?敹思?隤芾雿末嚗?</div>
+                    <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
+                    <div>群組剛建立，開始聊天吧！</div>
                   </div>
                 )}
                 {groupMessages.map((msg, i) => {
@@ -1994,9 +2009,9 @@ export default function ChatApp({ user }) {
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", cursor: groupUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                     {groupUploading ? "⏳" : "📎"}
                   </button>
-                  <input type="text" value={groupInput} onChange={e => setGroupInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendGroup()} placeholder={`?具?{activeGroup.name}?????..`}
+                  <input type="text" value={groupInput} onChange={e => setGroupInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendGroup()} placeholder={`傳送訊息給 ${activeGroup.name}...`}
                     style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
-                  <button className="sb" onClick={sendGroup} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>?潮???</button>
+                  <button className="sb" onClick={sendGroup} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>傳送</button>
                 </div>
               </div>
             </>
@@ -2004,7 +2019,7 @@ export default function ChatApp({ user }) {
 
           {/* Loading friend profile */}
           {activeFriendId && !activeFriendProfile && (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)" }}>頛銝?..</div>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)" }}>載入中...</div>
           )}
         </div>
 
