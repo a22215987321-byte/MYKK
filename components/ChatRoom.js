@@ -655,6 +655,11 @@ export default function ChatApp({ user }) {
   const [showEnglishPron,    setShowEnglishPron]    = useState(false);
   const [showIeltsBand4,     setShowIeltsBand4]     = useState(false);
 
+  // Mobile / sidebar states
+  const [sidebarOpen,    setSidebarOpen]    = useState(false);
+  const [isMobile,       setIsMobile]       = useState(false);
+  const [calendarOpen,   setCalendarOpen]   = useState(false);
+
   // Cinema states
   const [showCinema,       setShowCinema]       = useState(false);
   const [cinemaView,       setCinemaView]       = useState('list');
@@ -774,6 +779,33 @@ export default function ChatApp({ user }) {
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [uid]);
+
+  // Mobile detection
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Escape to close sidebar / calendar
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") { setSidebarOpen(false); setCalendarOpen(false); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Lock body scroll when sidebar/calendar open on mobile
+  useEffect(() => {
+    if (isMobile && (sidebarOpen || calendarOpen)) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isMobile, sidebarOpen, calendarOpen]);
 
   useEffect(() => {
     let timer;
@@ -1095,6 +1127,106 @@ export default function ChatApp({ user }) {
         .sb:hover:not(:disabled) { background: #2563eb !important; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        /* ── Global overflow guard ── */
+        html, body { overflow-x: hidden; }
+        #__next { overflow-x: hidden; }
+
+        /* ── Mobile topbar: hidden on desktop ── */
+        .cr-mobile-topbar { display: none; }
+
+        /* ── Sidebar backdrop: hidden on desktop ── */
+        .cr-sidebar-backdrop { display: none; }
+
+        /* ── Calendar overlay ── */
+        .cr-cal { flex-shrink: 0; }
+
+        @media (max-width: 767px) {
+          /* Shell fills full screen */
+          .cr-shell {
+            margin: 0 !important;
+            height: 100dvh !important;
+            border-radius: 0 !important;
+          }
+
+          /* Sidebar: fixed overlay, slides from left */
+          .cr-sidebar {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            bottom: 0 !important;
+            width: min(86vw, 360px) !important;
+            height: 100dvh !important;
+            z-index: 400 !important;
+            transform: translateX(-100%);
+            transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+            overflow-y: auto !important;
+            padding-top: env(safe-area-inset-top) !important;
+            padding-bottom: env(safe-area-inset-bottom) !important;
+          }
+          .cr-sidebar-open { transform: translateX(0) !important; }
+
+          /* Backdrop */
+          .cr-sidebar-backdrop {
+            display: block;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.52);
+            z-index: 399;
+            -webkit-tap-highlight-color: transparent;
+          }
+
+          /* Main area: always full width */
+          .cr-main {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            flex: 1 !important;
+            overflow-x: hidden !important;
+          }
+
+          /* Mobile topbar shown */
+          .cr-mobile-topbar {
+            display: flex !important;
+            align-items: center;
+            gap: 10px;
+            padding: calc(env(safe-area-inset-top) + 8px) 14px 8px;
+            background: var(--panel-alt);
+            border-bottom: 1px solid var(--panel);
+            flex-shrink: 0;
+          }
+
+          /* Calendar: full-screen overlay */
+          .cr-cal {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100dvh !important;
+            z-index: 350 !important;
+            transform: translateX(100%);
+            transition: transform 0.28s ease;
+            overflow: hidden !important;
+            display: flex;
+            flex-direction: column;
+          }
+          .cr-cal-open { transform: translateX(0) !important; }
+
+          /* Input areas: safe area padding at bottom */
+          .cr-input-bar {
+            padding-bottom: calc(env(safe-area-inset-bottom) + 10px) !important;
+          }
+
+          /* Prevent any child from causing horizontal scroll */
+          .cr-main > * { max-width: 100%; }
+
+          /* Calendar inner: full width on mobile overlay */
+          .cal-inner {
+            width: 100% !important;
+            height: 100% !important;
+            border-left: none !important;
+            flex: 1 !important;
+          }
+        }
       `}</style>
 
       {showProfile    && <ProfilePage myProfile={myProfile} friendProfiles={friendProfiles} onSave={handleSaveProfile} onClose={() => setShowProfile(false)} />}
@@ -1160,15 +1292,18 @@ export default function ChatApp({ user }) {
         </div>
       )}
 
-      <div style={{
+      <div className="cr-shell" style={{
         display: "flex", height: "calc(100vh - var(--shell-margin) * 2)", margin: "var(--shell-margin)",
         background: "var(--shell-bg)", color: "var(--text)", fontFamily: "var(--font-body)", overflow: "hidden",
         borderRadius: "var(--shell-radius)", boxShadow: "var(--shell-shadow)",
         backdropFilter: "var(--shell-blur)", WebkitBackdropFilter: "var(--shell-blur)",
       }}>
 
+        {/* Backdrop (mobile only) */}
+        {sidebarOpen && <div className="cr-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+
         {/* ?? Sidebar ?? */}
-        <div style={{ width: 280, background: "var(--panel-alt)", borderRight: "1px solid var(--panel)", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+        <div className={`cr-sidebar${sidebarOpen ? " cr-sidebar-open" : ""}`} style={{ width: 280, background: "var(--panel-alt)", borderRight: "1px solid var(--panel)", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
 
           {/* My info */}
           <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--panel)" }}>
@@ -1193,7 +1328,8 @@ export default function ChatApp({ user }) {
           </div>
 
           {/* Scrollable nav area */}
-          <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+          <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}
+            onClick={e => { if (isMobile && e.target.closest("button:not([disabled]), a")) setSidebarOpen(false); }}>
 
           {/* Friend request banner */}
           {pendingInCount > 0 && (
@@ -1806,7 +1942,7 @@ export default function ChatApp({ user }) {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0 }}>
+              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input ref={hallFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendHallMedia(f); e.target.value = ""; } }} />
                   <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片/影片"
@@ -1854,7 +1990,7 @@ export default function ChatApp({ user }) {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0 }}>
+              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input ref={privateFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendPrivateMedia(f); e.target.value = ""; } }} />
                   <button onClick={() => privateFileRef.current?.click()} disabled={privateUploading} title="上傳圖片/影片"
@@ -1898,7 +2034,7 @@ export default function ChatApp({ user }) {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0 }}>
+              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input ref={groupFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendGroupMedia(f); e.target.value = ""; } }} />
                   <button onClick={() => groupFileRef.current?.click()} disabled={groupUploading} title="上傳圖片/影片"
@@ -1919,8 +2055,16 @@ export default function ChatApp({ user }) {
           )}
         </div>
 
-        {/* Right calendar panel */}
-        <CalendarMemo uid={uid} />
+        {/* Calendar panel - overlay on mobile, sidebar on desktop */}
+        <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`}>
+          {isMobile && (
+            <div style={{ padding: "calc(env(safe-area-inset-top) + 8px) 14px 8px", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              <span style={{ flex: 1, fontWeight: 700, fontSize: 14, color: "var(--text)" }}>📅 日曆備忘錄</span>
+              <button onClick={() => setCalendarOpen(false)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "5px 10px", color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>✕ 關閉</button>
+            </div>
+          )}
+          <CalendarMemo uid={uid} />
+        </div>
       </div>
     </>
   );

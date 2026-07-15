@@ -93,7 +93,7 @@ export default function CalendarMemo({ uid }) {
       width: 252, flexShrink: 0, background: "var(--panel-alt)",
       borderLeft: "1px solid var(--panel)", display: "flex",
       flexDirection: "column", height: "100%", overflow: "hidden",
-    }}>
+    }} className="cal-inner">
       {/* Header */}
       <div style={{ padding: "14px 12px 10px", borderBottom: "1px solid var(--panel)", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
