@@ -1170,7 +1170,12 @@ export default function ChatApp({ user }) {
       )}
 
       <div style={{
-        display: "flex", height: "calc(100vh - var(--shell-margin) * 2)", margin: "var(--shell-margin)",
+        display: "flex",
+        height: "calc(100vh - var(--shell-margin) * 2 - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+        marginTop: "calc(var(--shell-margin) + env(safe-area-inset-top))",
+        marginBottom: "calc(var(--shell-margin) + env(safe-area-inset-bottom))",
+        marginLeft: "calc(var(--shell-margin) + env(safe-area-inset-left))",
+        marginRight: "calc(var(--shell-margin) + env(safe-area-inset-right))",
         background: "var(--shell-bg)", color: "var(--text)", fontFamily: "var(--font-body)", overflow: "hidden",
         borderRadius: "var(--shell-radius)", boxShadow: "var(--shell-shadow)",
         backdropFilter: "var(--shell-blur)", WebkitBackdropFilter: "var(--shell-blur)",
