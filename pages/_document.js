@@ -18,9 +18,14 @@ export default function Document() {
 
         {/* Favicon & PWA */}
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png" />
+        <link rel="icon" href="/icon-512.png" sizes="512x512" type="image/png" />
         <link rel="shortcut icon" href="/favicon.svg" />
-        <link rel="apple-touch-icon" href="/favicon.svg" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Evonchat" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
         {/* Open Graph (WhatsApp / Facebook) */}
         <meta property="og:type" content="website" />
