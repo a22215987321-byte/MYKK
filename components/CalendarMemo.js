@@ -92,6 +92,7 @@ export default function CalendarMemo({ uid }) {
     <div style={{
       background: "var(--panel-alt)", display: "flex",
       flexDirection: "column", flexShrink: 0, overflow: "hidden",
+      borderTop: "1px solid var(--panel)",
     }}>
       {/* Header */}
       <div style={{ padding: "14px 12px 10px", borderBottom: "1px solid var(--panel)", flexShrink: 0 }}>

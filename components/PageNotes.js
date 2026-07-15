@@ -176,7 +176,7 @@ export default function PageNotes({ noteKey, pageTitle }) {
   const pathLabel = (typeof window !== "undefined" ? window.location.pathname : "") + "#" + noteKey;
 
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "18px 10px 12px", borderTop: "1px solid var(--panel)" }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "18px 10px 12px" }}>
       <style>{`.pn-hide-scrollbar::-webkit-scrollbar{width:0;height:0}.pn-hide-scrollbar{scrollbar-width:none}`}</style>
       <div style={{ fontSize: 12, fontWeight: 800, color: "var(--text)", marginBottom: 1 }}>本頁筆記</div>
       <div style={{ fontSize: 10, color: "var(--text-faint)", marginBottom: 8 }}>記低今頁問題 / 修改想法</div>

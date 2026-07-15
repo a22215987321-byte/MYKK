@@ -1874,8 +1874,8 @@ export default function ChatApp({ user }) {
 
         {/* Right calendar panel + per-page notes (西語頁面專用) */}
         <div style={{ width: 252, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", borderLeft: "1px solid var(--panel)" }}>
-          <CalendarMemo uid={uid} />
           {activeSpanishNotes && <PageNotes noteKey={activeSpanishNotes.key} pageTitle={activeSpanishNotes.title} />}
+          <CalendarMemo uid={uid} />
         </div>
       </div>
     </>
