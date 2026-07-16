@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { resolveVerb, searchVerbs, reverseLookup } from "../lib/spanishVerbs/verbEngine";
 import { PERSON_LABELS } from "../lib/spanishVerbs/conjugationEngine";
 import { VERB_NOTES } from "../lib/spanishVerbs/verbNotes";
+import ClickableSpanishText from "./ClickableSpanishText";
 
 const QUICK_VERBS = ["ser", "estar", "tener", "ir", "hacer", "poder", "querer", "decir", "ver", "dar", "saber", "venir", "poner", "salir", "hablar", "comer", "vivir"];
 
@@ -48,22 +49,42 @@ const SUBJUNTIVO_TENSES = [
   { key: "subjuntivoPreteritoPerfecto", label: "Pretérito perfecto 現在完成虛擬式" },
 ];
 
+// 反身動詞的每格是 { reflexivePronoun, verbForm, fullForm }（見 verbEngine.js 的
+// attachReflexive），一般動詞的每格仍然是單純字串——這裡把兩種形狀都攤平成
+// { display, isPlaceholder, reflexivePronoun, verbForm } 讓渲染邏輯只寫一次。
+function readCell(cell) {
+  if (cell && typeof cell === "object") {
+    return { display: cell.fullForm, isPlaceholder: false, reflexivePronoun: cell.reflexivePronoun, verbForm: cell.verbForm };
+  }
+  const isPlaceholder = typeof cell === "string" && cell.includes("稍後加入");
+  return { display: cell, isPlaceholder, reflexivePronoun: null, verbForm: null };
+}
+
 function ConjugationTable({ table, incomplete }) {
   if (!table) return <div style={{ fontSize: 13, color: "var(--text-faint)" }}>此時態資料稍後加入。</div>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {Object.keys(PERSON_LABELS).map(key => {
-        const form = table[key];
-        const isPlaceholder = typeof form === "string" && form.includes("稍後加入");
+        const { display, isPlaceholder, reflexivePronoun, verbForm } = readCell(table[key]);
         return (
           <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--panel-alt)", borderRadius: 10, border: "1px solid var(--border)" }}>
             <span style={{ fontSize: 12, color: "var(--text-faint)", width: 170, flexShrink: 0 }}>{PERSON_LABELS[key]}</span>
             {isPlaceholder ? (
-              <span style={{ fontSize: 13, color: "var(--text-faint)", fontStyle: "italic" }}>{form}</span>
+              <span style={{ fontSize: 13, color: "var(--text-faint)", fontStyle: "italic" }}>{display}</span>
             ) : (
               <>
-                <span style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", flex: 1 }}>{form}</span>
-                <PlayButton text={form} sm />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {reflexivePronoun && (
+                    <div style={{ fontSize: 11, marginBottom: 2 }}>
+                      <span style={{ color: "#f59e0b", fontWeight: 700 }}>{reflexivePronoun}</span>
+                      <span style={{ color: "var(--text-faint)" }}> 反身代詞 + </span>
+                      <span style={{ color: "#60a5fa", fontWeight: 700 }}>{verbForm}</span>
+                      <span style={{ color: "var(--text-faint)" }}> 動詞變位</span>
+                    </div>
+                  )}
+                  <ClickableSpanishText text={display} style={{ fontSize: 17, fontWeight: 700, color: "var(--text)" }} />
+                </div>
+                <PlayButton text={display} sm />
               </>
             )}
           </div>
@@ -80,25 +101,45 @@ function ImperativoTable({ afirmativo, negativo }) {
       <div>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#10b981", marginBottom: 8 }}>肯定命令式 Afirmativo</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {rows.map(([key, label]) => (
-            <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--panel-alt)", borderRadius: 10, border: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 12, color: "var(--text-faint)", width: 170, flexShrink: 0 }}>{label}</span>
-              <span style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", flex: 1 }}>{afirmativo?.[key]}</span>
-              <PlayButton text={afirmativo?.[key]} sm />
-            </div>
-          ))}
+          {rows.map(([key, label]) => {
+            const form = afirmativo?.[key];
+            const isPlaceholder = typeof form === "string" && form.includes("稍後加入");
+            return (
+              <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--panel-alt)", borderRadius: 10, border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 12, color: "var(--text-faint)", width: 170, flexShrink: 0 }}>{label}</span>
+                {isPlaceholder ? (
+                  <span style={{ fontSize: 13, color: "var(--text-faint)", fontStyle: "italic" }}>{form}</span>
+                ) : (
+                  <>
+                    <ClickableSpanishText text={form} style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", flex: 1 }} />
+                    <PlayButton text={form} sm />
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
       <div>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#ef4444", marginBottom: 8 }}>否定命令式 Negativo</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {rows.map(([key, label]) => (
-            <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--panel-alt)", borderRadius: 10, border: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 12, color: "var(--text-faint)", width: 170, flexShrink: 0 }}>{label}</span>
-              <span style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", flex: 1 }}>{negativo?.[key]}</span>
-              <PlayButton text={negativo?.[key]} sm />
-            </div>
-          ))}
+          {rows.map(([key, label]) => {
+            const form = negativo?.[key];
+            const isPlaceholder = typeof form === "string" && form.includes("稍後加入");
+            return (
+              <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--panel-alt)", borderRadius: 10, border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 12, color: "var(--text-faint)", width: 170, flexShrink: 0 }}>{label}</span>
+                {isPlaceholder ? (
+                  <span style={{ fontSize: 13, color: "var(--text-faint)", fontStyle: "italic" }}>{form}</span>
+                ) : (
+                  <>
+                    <ClickableSpanishText text={form} style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", flex: 1 }} />
+                    <PlayButton text={form} sm />
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -112,7 +153,7 @@ function NoPersonalesTable({ conjugation }) {
       {rows.map(([label, val]) => (
         <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--panel-alt)", borderRadius: 10, border: "1px solid var(--border)" }}>
           <span style={{ fontSize: 12, color: "var(--text-faint)", width: 170, flexShrink: 0 }}>{label}</span>
-          <span style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", flex: 1 }}>{val}</span>
+          <ClickableSpanishText text={val} style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", flex: 1 }} />
           <PlayButton text={val} sm />
         </div>
       ))}
@@ -124,8 +165,8 @@ function VerbDetail({ result }) {
   const [mood, setMood] = useState("indicativo");
   const [tenseKey, setTenseKey] = useState("presente");
   if (!result || !result.conjugation) return null;
-  const { entry, conjugation, autoGenerated } = result;
-  const notes = VERB_NOTES[entry.infinitive];
+  const { entry, conjugation, autoGenerated, isReflexive } = result;
+  const notes = VERB_NOTES[entry.reflexiveBaseInfinitive || entry.infinitive];
 
   const tenseList = mood === "indicativo" ? INDICATIVO_TENSES : mood === "subjuntivo" ? SUBJUNTIVO_TENSES : null;
   const activeTense = tenseList?.find(t => t.key === tenseKey) || tenseList?.[0];
@@ -147,6 +188,14 @@ function VerbDetail({ result }) {
         {entry.level && <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 9px", borderRadius: 8, background: "rgba(99,102,241,0.14)", color: "#6366f1" }}>{entry.level}</span>}
       </div>
       {entry.zh && <div style={{ fontSize: 16, color: "var(--text-muted)", marginBottom: 4 }}>{entry.zh}{entry.en && <span style={{ color: "var(--text-faint)" }}> · {entry.en}</span>}</div>}
+
+      {isReflexive && (
+        <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.25)", fontSize: 13, color: "var(--text)", lineHeight: 1.7 }}>
+          🔁 反身動詞由普通動詞原形＋se 組成（{entry.reflexiveBaseInfinitive} + se）。變位時，se 會根據主語變成
+          {" "}<b>me</b>、<b>te</b>、<b>se</b>、<b>nos</b>、<b>os</b>、<b>se</b>——下面每格會把「反身代詞」跟「動詞變位」分開標示。
+          命令式的反身代詞附加規則較複雜（牽涉重音位移），目前尚未支援，會顯示「稍後加入」。
+        </div>
+      )}
 
       {autoGenerated && (
         <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", fontSize: 13, color: "#d97706" }}>

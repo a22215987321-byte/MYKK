@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import listeningData from "../lib/spanishA1ListeningData";
-import spanishA1Dict from "../lib/spanishA1Dict";
+import ClickableSpanishText from "./ClickableSpanishText";
 
 const { listeningTopics, listeningExercises } = listeningData;
 
@@ -25,34 +25,6 @@ function speak(text, rate, onEnd) {
 }
 function stopSpeak() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
-}
-
-// ── DictChip ──────────────────────────────────────────────────────────
-function DictChip({ word }) {
-  const [open, setOpen] = useState(false);
-  const entry = spanishA1Dict[word.toLowerCase()] || null;
-  return (
-    <span style={{ position: "relative", display: "inline-block" }}>
-      <span onClick={() => setOpen(!open)}
-        style={{ cursor: "pointer", color: "#6366f1", fontWeight: 600, fontSize: 13, borderBottom: "1.5px dashed #6366f155", padding: "0 2px" }}>
-        {word}
-      </span>
-      {open && (
-        <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", zIndex: 30, minWidth: 180, maxWidth: 240, boxShadow: "0 6px 20px rgba(0,0,0,0.2)" }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 2 }}>{word}</div>
-          {entry ? (
-            <>
-              <div style={{ fontSize: 11, color: "#6366f1", marginBottom: 3 }}>{entry.partOfSpeech}</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{entry.zh}</div>
-              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{entry.en}</div>
-            </>
-          ) : <div style={{ fontSize: 12, color: "var(--text-faint)" }}>暫無收錄</div>}
-          <button onClick={(e) => { e.stopPropagation(); setOpen(false); }}
-            style={{ position: "absolute", top: 6, right: 8, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 14 }}>✕</button>
-        </div>
-      )}
-    </span>
-  );
 }
 
 // ── QuestionCard ──────────────────────────────────────────────────────
@@ -242,7 +214,7 @@ function AudioPlayer({ exercise, topicColor }) {
 
       {showTranscript && (
         <div style={{ padding: "12px 14px", borderRadius: 10, background: "var(--panel-alt)", border: "1px solid var(--border)", fontSize: 15, color: "var(--text)", lineHeight: 1.8, fontStyle: "italic" }}>
-          {exercise.transcript}
+          <ClickableSpanishText text={exercise.transcript} />
         </div>
       )}
       {showZh && (
@@ -321,7 +293,9 @@ function ExerciseView({ exercise, onBack, onDone }) {
               <div style={{ padding: "10px 14px", borderRadius: 10, background: "var(--panel)", border: "1px solid var(--border)" }}>
                 <span style={{ fontSize: 12, color: "var(--text-faint)", marginRight: 8 }}>相關詞彙：</span>
                 {exercise.relatedWords.map((w, i) => (
-                  <span key={w}>{i > 0 && <span style={{ marginRight: 6 }} />}<DictChip word={w} /></span>
+                  <span key={w}>{i > 0 && <span style={{ marginRight: 6 }} />}
+                    <ClickableSpanishText text={w} style={{ color: "#6366f1", fontWeight: 600, fontSize: 13 }} />
+                  </span>
                 ))}
               </div>
             )}

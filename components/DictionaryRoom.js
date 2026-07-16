@@ -4,6 +4,7 @@ import { db, auth } from "../lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
 import { lookupDeep } from "../lib/spanishDeepDict";
 import { getFrenchShard, normalizeFrench } from "../lib/frenchDictionary";
+import GrammarLearningCard from "./GrammarLearningCard";
 
 const EN_LETTERS = "abcdefghijklmnopqrstuvwxyz".split("");
 const ES_LETTERS = [...EN_LETTERS, "ñ"];
@@ -118,179 +119,6 @@ function ExpandedDictionaryPanel({ cards, lang, onClose, onSpeak, onAddToVocab }
   );
 }
 
-function DeepSection({ icon, title, color, children }) {
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-        <span style={{ fontSize: 14 }}>{icon}</span>
-        <span style={{ fontSize: 11, fontWeight: 800, color: color || "#6366f1", textTransform: "uppercase", letterSpacing: 0.8 }}>{title}</span>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function DeepExplanationPanel({ entry, basicData, word, lang, onClose, onOpenVocab }) {
-  return (
-    <>
-      <style>{`
-        .deep-panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 800; }
-        .deep-panel {
-          position: fixed; top: 0; right: 0; bottom: 0;
-          width: min(520px, 46vw); min-width: 360px;
-          border-radius: 16px 0 0 16px;
-          z-index: 801;
-          background: var(--panel-alt);
-          border: 1px solid var(--border);
-          display: flex; flex-direction: column; overflow: hidden;
-          box-shadow: 0 0 60px rgba(0,0,0,0.6);
-        }
-        @media (max-width: 767px) {
-          .deep-panel {
-            top: auto; left: 0; right: 0; bottom: 0;
-            width: 100%; min-width: unset;
-            height: 87vh;
-            border-radius: 20px 20px 0 0;
-          }
-        }
-      `}</style>
-      <div className="deep-panel-overlay" onClick={onClose} />
-      <div className="deep-panel">
-        {/* Header */}
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 12, flexShrink: 0 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 22, fontWeight: 800, color: "#a78bfa" }}>{entry?.word || word}</span>
-              {entry?.lemma && entry.lemma !== (entry?.word || word) && (
-                <span style={{ fontSize: 13, color: "var(--text-faint)" }}>← {entry.lemma}</span>
-              )}
-              <button onClick={() => speak(entry?.word || word, lang, basicData?.audioUrl)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#60a5fa", fontSize: 16, padding: 0, lineHeight: 1 }}>🔊</button>
-            </div>
-            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-              {entry?.level && <span style={{ fontSize: 11, padding: "1px 7px", background: "rgba(16,185,129,0.15)", color: "#10b981", borderRadius: 6, fontWeight: 700 }}>{entry.level}</span>}
-              {entry?.partOfSpeech && <span style={{ fontSize: 11, padding: "1px 7px", background: "rgba(99,102,241,0.15)", color: "#a78bfa", borderRadius: 6, fontWeight: 700 }}>{entry.partOfSpeech}</span>}
-              {basicData?.g && (
-                <span style={{ fontSize: 11, padding: "1px 7px", fontWeight: 700, borderRadius: 6,
-                  background: basicData.g === "f" ? "#4c1d1d" : "rgba(96,165,250,0.12)",
-                  color: basicData.g === "f" ? "#f87171" : "#60a5fa" }}>
-                  {basicData.g === "f" ? "f." : "m."}
-                </span>
-              )}
-            </div>
-          </div>
-          <button onClick={onClose}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 22, lineHeight: 1, padding: "2px 0", flexShrink: 0 }}>✕</button>
-        </div>
-
-        {/* Scrollable content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px 48px" }}>
-          {entry ? (
-            <>
-              <DeepSection icon="📖" title="中文意思" color="#a78bfa">
-                <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.9 }}>{entry.meaningZh}</div>
-              </DeepSection>
-
-              {lang === "es" && /^v\.?$|verbo|verb/i.test(entry.partOfSpeech || "") && (
-                <a href={`/spanish/verbs?verb=${encodeURIComponent(entry.lemma || entry.word || word)}`} target="_blank" rel="noreferrer"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, padding: "7px 14px", borderRadius: 10,
-                    background: "rgba(220,38,38,0.12)", color: "#ef4444", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
-                  🧩 查看完整變位表
-                </a>
-              )}
-
-              {entry.coreImage && (
-                <DeepSection icon="💡" title="核心意象" color="#f59e0b">
-                  <div style={{ fontSize: 14, color: "#fcd34d", lineHeight: 1.7, fontStyle: "italic", padding: "10px 14px", background: "rgba(245,158,11,0.08)", borderRadius: 10, borderLeft: "3px solid #f59e0b" }}>
-                    「{entry.coreImage}」
-                  </div>
-                </DeepSection>
-              )}
-
-              {entry.etymology && (
-                <DeepSection icon="🌱" title="詞源拆解" color="#10b981">
-                  {entry.etymology.note ? (
-                    <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.85, padding: "10px 14px", background: "rgba(16,185,129,0.06)", borderRadius: 10 }}>
-                      {entry.etymology.note}
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {Object.entries(entry.etymology).filter(([k]) => k !== "note").map(([k, v]) => (
-                        <div key={k} style={{ display: "flex", gap: 10, padding: "7px 12px", background: "rgba(16,185,129,0.06)", borderRadius: 8 }}>
-                          <span style={{ fontSize: 11, color: "#10b981", fontWeight: 800, minWidth: 56, flexShrink: 0 }}>{k}</span>
-                          <span style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.7 }}>{v}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </DeepSection>
-              )}
-
-              {entry.evolution && (
-                <DeepSection icon="🔄" title="意思演變" color="#06b6d4">
-                  <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.85 }}>{entry.evolution}</div>
-                </DeepSection>
-              )}
-
-              {entry.grammarNote && (
-                <DeepSection icon="📐" title="文法提醒" color="#8b5cf6">
-                  <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.9, whiteSpace: "pre-line", padding: "10px 14px", background: "rgba(139,92,246,0.06)", borderRadius: 10 }}>
-                    {entry.grammarNote}
-                  </div>
-                </DeepSection>
-              )}
-
-              {entry.examples?.length > 0 && (
-                <DeepSection icon="📝" title="例句" color="#ec4899">
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {entry.examples.map((ex, i) => (
-                      <div key={i} style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(236,72,153,0.06)", border: "1px solid rgba(236,72,153,0.18)" }}>
-                        <div style={{ fontSize: 14, color: "#c4b5fd", fontStyle: "italic", lineHeight: 1.65, marginBottom: 4 }}>{ex.es}</div>
-                        <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.6, marginBottom: ex.note ? 4 : 0 }}>{ex.zh}</div>
-                        {ex.note && <div style={{ fontSize: 11, color: "var(--text-faint)", lineHeight: 1.5 }}>💡 {ex.note}</div>}
-                      </div>
-                    ))}
-                  </div>
-                </DeepSection>
-              )}
-
-              {entry.wordFamily?.length > 0 && (
-                <DeepSection icon="🔗" title="同源詞" color="#f97316">
-                  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                    {entry.wordFamily.map((wf, i) => (
-                      <div key={i} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-                        <span style={{ fontWeight: 700, color: "#a78bfa", fontSize: 14, minWidth: 110, flexShrink: 0 }}>{wf.word}</span>
-                        <span style={{ fontSize: 13, color: "var(--text-dim)" }}>{wf.zh}</span>
-                      </div>
-                    ))}
-                  </div>
-                </DeepSection>
-              )}
-
-              {entry.shortSummary && (
-                <div style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.3)" }}>
-                  <div style={{ fontSize: 12, color: "#6366f1", fontWeight: 800, marginBottom: 5, letterSpacing: 0.5 }}>⚡ 記憶法</div>
-                  <div style={{ fontSize: 13, color: "#c4b5fd", lineHeight: 1.78 }}>{entry.shortSummary}</div>
-                </div>
-              )}
-
-              <button onClick={() => onOpenVocab(entry.word || word, basicData)}
-                style={{ marginTop: 20, width: "100%", padding: "12px 0", borderRadius: 12, border: "1px solid #166534", background: "#0a1e14", color: "#4ade80", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                ＋ 加入單字本
-              </button>
-            </>
-          ) : (
-            <div>
-              <div style={{ fontSize: 15, color: "var(--text)", lineHeight: 1.7, marginBottom: 8 }}>{basicData?.t || basicData?.en || "查無此字"}</div>
-              {basicData?.t && basicData?.en && <div style={{ fontSize: 13, color: "var(--text-faint)" }}>{basicData.en}</div>}
-              <div style={{ fontSize: 12, color: "var(--text-faint)", fontStyle: "italic", marginTop: 12 }}>暫無深度解釋，正在逐步擴充中。</div>
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
 
 function speak(word, lang, audioUrl = "") {
   if (typeof window === "undefined") return;
@@ -559,7 +387,7 @@ export default function DictionaryRoom() {
   const hasMore = visible.length < filtered.length;
 
   return (
-    <div style={{ flex: 1, background: "var(--bg)", display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", color: "var(--text)" }}>
+    <div style={{ flex: 1, minHeight: 0, background: "var(--bg)", display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", color: "var(--text)" }}>
 
       {/* Header */}
       <div style={{ padding: "16px 20px 0", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", flexShrink: 0 }}>
@@ -627,7 +455,7 @@ export default function DictionaryRoom() {
       />
 
       {/* Word list */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
 
         {!activeLetter && !search && (
           <div style={{ textAlign: "center", color: "var(--text-faint)", padding: 60 }}>
@@ -658,6 +486,17 @@ export default function DictionaryRoom() {
               style={{ padding: "10px 28px", borderRadius: 10, border: "1px solid var(--border)",
                 background: "var(--panel)", color: "var(--text-muted)", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
               載入更多（還有 {filtered.length - visible.length} 字）
+            </button>
+          </div>
+        )}
+
+        {/* 一般字典只收錄原形；動詞變位、代名詞、介系詞等要靠 Grammar Learning Card 才查得到 */}
+        {!loading && lang === "es" && search.trim() && (
+          <div style={{ textAlign: "center", padding: "10px 0 28px" }}>
+            <button onClick={() => setDeepModal({ word: search.trim().toLowerCase() })}
+              style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid rgba(99,102,241,0.4)",
+                background: "rgba(99,102,241,0.1)", color: "#a78bfa", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+              🧠 用 Grammar Learning Card 查看「{search.trim()}」（含動詞變位・代名詞・介系詞解釋）
             </button>
           </div>
         )}
@@ -815,15 +654,15 @@ export default function DictionaryRoom() {
         </>
       )}
 
-      {/* Deep explanation panel */}
+      {/* Grammar Learning Card — 共用的西語文法深度解釋卡片 */}
       {deepModal && (
-        <DeepExplanationPanel
-          entry={deepModal.entry}
-          basicData={deepModal.basicData}
+        <GrammarLearningCard
           word={deepModal.word}
-          lang={lang}
           onClose={() => setDeepModal(null)}
-          onOpenVocab={(w, d) => { setDeepModal(null); setVocabModal({ word: w, data: d }); }}
+          onAddVocab={(w, card) => {
+            setDeepModal(null);
+            setVocabModal({ word: w, data: { t: card?.zh, en: card?.en, s: card?.posLabel || card?.pos, p: "" } });
+          }}
         />
       )}
 

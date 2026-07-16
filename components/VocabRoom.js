@@ -152,6 +152,7 @@ export default function VocabRoom({ user, db }) {
   return (
     <div style={{
       flex: 1,
+      minHeight: 0,
       background: "var(--bg)",
       display: "flex",
       flexDirection: "column",

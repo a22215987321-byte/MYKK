@@ -1,137 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
 import spanishCourseData from "../lib/spanishCourseData";
-import spanishA1Dict from "../lib/spanishA1Dict";
+import ClickableSpanishText from "./ClickableSpanishText";
 
 const { chapters, lessons } = spanishCourseData;
-
-// ── Dictionary lookup ──────────────────────────────────────────────────
-function lookupWord(raw) {
-  const clean = raw.replace(/^[¿¡«"'(]+|[.,;:!?»"')]+$/g, "").toLowerCase();
-  return spanishA1Dict[clean] || spanishA1Dict[clean.normalize("NFD").replace(/[̀-ͯ]/g, "")] || null;
-}
-
-// ── WordPopup ──────────────────────────────────────────────────────────
-function WordPopup({ popup, onClose, onAddVocab }) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
-    }
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("touchstart", handleClick);
-    return () => { document.removeEventListener("mousedown", handleClick); document.removeEventListener("touchstart", handleClick); };
-  }, [onClose]);
-
-  if (!popup) return null;
-  const { word, entry, anchor } = popup;
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
-
-  const content = (
-    <div ref={ref} style={{
-      background: "var(--panel)",
-      border: "1px solid var(--border)",
-      borderRadius: isMobile ? "20px 20px 0 0" : 14,
-      padding: "16px 18px",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.22)",
-      minWidth: isMobile ? "100%" : 260,
-      maxWidth: isMobile ? "100%" : 320,
-      position: isMobile ? "fixed" : "absolute",
-      bottom: isMobile ? 0 : undefined,
-      left: isMobile ? 0 : undefined,
-      right: isMobile ? 0 : undefined,
-      top: isMobile ? undefined : (anchor ? anchor.y : 60),
-      zIndex: 1000,
-      ...((!isMobile && anchor) ? { left: Math.min(anchor.x, (typeof window !== "undefined" ? window.innerWidth : 400) - 340) } : {}),
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 17, fontWeight: 800, color: "var(--text)" }}>{word}</span>
-        {entry && (
-          <span style={{ fontSize: 11, padding: "2px 7px", background: "rgba(99,102,241,0.15)", color: "#6366f1", borderRadius: 6, fontWeight: 700 }}>
-            {entry.partOfSpeech}
-          </span>
-        )}
-        {entry && (
-          <span style={{ fontSize: 11, padding: "2px 6px", background: "rgba(16,185,129,0.12)", color: "#10b981", borderRadius: 6, fontWeight: 600 }}>
-            {entry.level}
-          </span>
-        )}
-      </div>
-      {entry ? (
-        <>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 3 }}>{entry.zh}</div>
-          <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 10 }}>{entry.en}</div>
-          {entry.example && (
-            <div style={{ background: "var(--panel-alt)", borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontStyle: "italic", color: "var(--text-dim)", marginBottom: 2 }}>{entry.example}</div>
-              <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{entry.exampleZh}</div>
-            </div>
-          )}
-        </>
-      ) : (
-        <div style={{ fontSize: 14, color: "var(--text-faint)", marginBottom: 12 }}>暫無解釋，可稍後加入</div>
-      )}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          onClick={() => { speakES(word); }}
-          style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}
-        >🔊</button>
-        {entry && (
-          <button
-            onClick={() => { onAddVocab(word); onClose(); }}
-            style={{ flex: 2, padding: "8px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}
-          >+ 加入單字本</button>
-        )}
-        <button
-          onClick={onClose}
-          style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}
-        >✕</button>
-      </div>
-    </div>
-  );
-
-  if (isMobile) {
-    return (
-      <div style={{ position: "fixed", inset: 0, zIndex: 999, background: "rgba(0,0,0,0.35)" }}>
-        {content}
-      </div>
-    );
-  }
-  return <div style={{ position: "fixed", inset: 0, zIndex: 999 }} onClick={onClose}>{content}</div>;
-}
-
-// ── SpanishText ────────────────────────────────────────────────────────
-function SpanishText({ text, onWordClick, style }) {
-  const tokens = text.split(/(\s+)/);
-  return (
-    <span style={style}>
-      {tokens.map((token, i) => {
-        if (/^\s+$/.test(token)) return <span key={i}>{token}</span>;
-        const clean = token.replace(/^[¿¡«"'(]+|[.,;:!?»"')]+$/g, "").toLowerCase();
-        const isWord = /[a-záéíóúüñ]/i.test(clean);
-        if (!isWord) return <span key={i}>{token}</span>;
-        const hasEntry = !!spanishA1Dict[clean] || !!spanishA1Dict[clean.normalize("NFD").replace(/[̀-ͯ]/g, "")];
-        return (
-          <span
-            key={i}
-            onClick={(e) => {
-              e.stopPropagation();
-              const rect = e.target.getBoundingClientRect();
-              onWordClick(token, { x: rect.left, y: rect.bottom + 6 });
-            }}
-            style={{
-              cursor: "pointer",
-              borderBottom: hasEntry ? "1.5px dashed rgba(99,102,241,0.5)" : "1.5px dashed rgba(160,160,160,0.3)",
-              borderRadius: 2,
-              display: "inline",
-            }}
-          >{token}</span>
-        );
-      })}
-    </span>
-  );
-}
 
 function speakES(text) {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -164,7 +36,12 @@ function getAllVocab(completed) {
 // ── Styles ─────────────────────────────────────────────────────────────
 const S = {
   page: {
-    minHeight: "100%",
+    // flex:1 + minHeight:0 是關鍵：這個元件的根 div 是 .cr-main（flex-column 容器）
+    // 的直接子項目。沒有這兩個屬性，flex 子項目預設 min-height:auto 會讓它長到
+    // 內容的自然高度（縱使有 overflowY:auto），結果是整個 div 撐爆父層，
+    // 多出來的內容被 .cr-main 的 overflow 裁掉，而不是在這裡捲動。
+    flex: 1,
+    minHeight: 0,
     background: "var(--bg)",
     color: "var(--text)",
     fontFamily: "inherit",
@@ -402,14 +279,7 @@ function LessonView({ lesson, onComplete, onBack, onAddVocab }) {
   const [orderPicked, setOrderPicked] = useState([]);
   const [orderDone, setOrderDone] = useState(false);
   const [orderCorrect, setOrderCorrect] = useState(null);
-  const [popup, setPopup] = useState(null);
   const totalSteps = 6;
-
-  function handleWordClick(token, anchor) {
-    const entry = lookupWord(token);
-    const clean = token.replace(/^[¿¡«"'(]+|[.,;:!?»"')]+$/g, "");
-    setPopup({ word: clean, entry, anchor });
-  }
 
   const ch = chapters.find((c) => c.id === lesson.chapter);
   const color = ch?.color || "#6366f1";
@@ -447,11 +317,42 @@ function LessonView({ lesson, onComplete, onBack, onAddVocab }) {
     setListeningDone(true);
   }
 
+  // 每一步是否可以「前進到下一步」——跟各步驟自己的「下一步」按鈕出現條件一致，
+  // 這樣滑動手勢才不會讓使用者跳過聽力/句子排序測驗還沒完成的關卡。
+  const canGoNext = step <= 3 || (step === 4 && listeningDone) || (step === 5 && orderDone);
+  const canGoPrev = step > 0;
+
+  function goToStep(target) {
+    if (target < 0 || target > totalSteps - 1) return;
+    if (target === step + 1 && !canGoNext) return;
+    if (target < step && !canGoPrev) return;
+    if (target > step + 1) return; // 一次只能前進一步，不能跳過中間關卡
+    setStep(target);
+  }
+
+  // 左右滑動切換步驟：手勢以水平位移為主（避免誤觸垂直滾動）且超過門檻值才觸發。
+  const touchStartRef = useRef(null);
+  function handleTouchStart(e) {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+  }
+  function handleTouchEnd(e) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const SWIPE_THRESHOLD = 60;
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) goToStep(step + 1); // 向左滑：前進下一步
+    else goToStep(step - 1); // 向右滑：返回上一步
+  }
+
   const steps = ["情境", "核心句子", "單字", "文法", "聽力練習", "句子排序"];
 
   return (
     <div style={S.page}>
-      {popup && <WordPopup popup={popup} onClose={() => setPopup(null)} onAddVocab={onAddVocab} />}
       {/* Header */}
       <div style={S.header}>
         <button onClick={onBack} style={S.backBtn}>←</button>
@@ -467,21 +368,23 @@ function LessonView({ lesson, onComplete, onBack, onAddVocab }) {
         <div style={{ height: "100%", width: `${(step / totalSteps) * 100}%`, background: color, transition: "width 0.4s" }} />
       </div>
 
-      {/* Step tabs */}
+      {/* Step tabs — 已到達過的步驟可以點擊回去複習，還沒到的步驟不能跳著點 */}
       <div style={{ display: "flex", overflowX: "auto", gap: 6, padding: "10px 16px", borderBottom: "1px solid var(--border)" }}>
         {steps.map((s, i) => (
-          <div key={i} style={{
+          <div key={i} onClick={() => i <= step && goToStep(i)} style={{
             padding: "4px 10px", borderRadius: 20, fontSize: 12, whiteSpace: "nowrap",
             background: step === i ? color : "var(--panel-alt)",
             color: step === i ? "#fff" : (i < step ? "var(--text-dim)" : "var(--text-faint)"),
             fontWeight: step === i ? 700 : 400,
             border: i < step ? `1px solid ${color}44` : "1px solid var(--border)",
+            cursor: i <= step ? "pointer" : "default",
           }}>{i < step ? "✓ " : ""}{s}</div>
         ))}
       </div>
 
-      {/* Content */}
-      <div style={{ padding: "20px 16px 100px" }}>
+      {/* Content — 支援左右滑動切換步驟（向左滑：下一步，向右滑：上一步），
+          規則跟「下一步」按鈕一致：聽力/句子排序測驗還沒完成時不能滑著跳過去 */}
+      <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{ padding: "20px 16px 100px", touchAction: "pan-y" }}>
 
         {/* STEP 0: Context */}
         {step === 0 && (
@@ -503,7 +406,7 @@ function LessonView({ lesson, onComplete, onBack, onAddVocab }) {
                 <div key={i} style={{ ...S.card, margin: 0, display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
-                      <SpanishText text={s.es} onWordClick={handleWordClick} />
+                      <ClickableSpanishText text={s.es} onAddVocab={onAddVocab} />
                     </div>
                     <div style={{ fontSize: 13, color: "#e6e1ff" }}>{s.cn}</div>
                   </div>
@@ -525,10 +428,8 @@ function LessonView({ lesson, onComplete, onBack, onAddVocab }) {
                   <button onClick={() => speakES(v.word)} style={{ background: `${color}22`, border: "none", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>🔊</button>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      <span
-                        onClick={(e) => { e.stopPropagation(); const rect = e.target.getBoundingClientRect(); handleWordClick(v.word, { x: rect.left, y: rect.bottom + 6 }); }}
-                        style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", cursor: "pointer", borderBottom: "1.5px dashed rgba(99,102,241,0.5)", borderRadius: 2 }}
-                      >{v.word}</span>
+                      <ClickableSpanishText text={v.word} onAddVocab={onAddVocab}
+                        style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }} />
                       {v.gender === "m" && <span style={{ fontSize: 10, padding: "1px 5px", background: "rgba(96,165,250,0.15)", color: "#60a5fa", borderRadius: 4, fontWeight: 700 }}>m.</span>}
                       {v.gender === "f" && <span style={{ fontSize: 10, padding: "1px 5px", background: "rgba(248,113,113,0.15)", color: "#f87171", borderRadius: 4, fontWeight: 700 }}>f.</span>}
                       <span style={{ fontSize: 11, color: "var(--text-faint)" }}>{v.phonetic}</span>
@@ -578,7 +479,7 @@ function LessonView({ lesson, onComplete, onBack, onAddVocab }) {
               <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 8 }}>對話內容：</div>
               <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text-dim)", marginBottom: 10 }}>
                 {lesson.listening.script.split("\n").map((line, i) => (
-                  <div key={i}><SpanishText text={line} onWordClick={handleWordClick} /></div>
+                  <div key={i}><ClickableSpanishText text={line} onAddVocab={onAddVocab} /></div>
                 ))}
               </div>
               <button

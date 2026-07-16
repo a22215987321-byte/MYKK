@@ -237,7 +237,7 @@ function StudyView({ list, mode, onBack, user }) {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
 
         {/* Browse */}
         {mode === "browse" && (
@@ -601,7 +601,7 @@ function ManageView({ list, db, onBack, onUpdate }) {
         )}
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
         {words.length === 0 && (
           <div style={{ textAlign: "center", color: "var(--text-faint)", padding: 60 }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
@@ -756,7 +756,7 @@ export default function CustomVocabRoom({ user, db }) {
 
   if (view === "study" && activeList) {
     return (
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg)", height: "100%", overflow: "hidden", color: "var(--text)" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--bg)", height: "100%", overflow: "hidden", color: "var(--text)" }}>
         {(activeList.uid || activeList.ownerId) === user?.uid && (
           <div style={{ padding: "8px 16px", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", justifyContent: "flex-end" }}>
             <button onClick={() => openManage(activeList)}
@@ -793,7 +793,7 @@ export default function CustomVocabRoom({ user, db }) {
 
   if (view === "manage" && activeList) {
     return (
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg)", height: "100%", overflow: "hidden", color: "var(--text)" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--bg)", height: "100%", overflow: "hidden", color: "var(--text)" }}>
         <ManageView
           list={activeList}
           db={db}
@@ -814,7 +814,7 @@ export default function CustomVocabRoom({ user, db }) {
   const displayLists = tab === "mine" ? myLists : publicLists;
 
   return (
-    <div style={{ flex: 1, background: "var(--bg)", display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", color: "var(--text)" }}>
+    <div style={{ flex: 1, minHeight: 0, background: "var(--bg)", display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", color: "var(--text)" }}>
       {/* Header */}
       <div style={{ padding: "16px 20px 0", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -843,7 +843,7 @@ export default function CustomVocabRoom({ user, db }) {
       </div>
 
       {/* List */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
         {tab === "mine" && myLists.length === 0 && (
           <div style={{ textAlign: "center", color: "var(--text-faint)", padding: 60 }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>📝</div>

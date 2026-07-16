@@ -243,6 +243,15 @@ export default function ProfilePublicPage() {
         body { background: var(--panel-alt); }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        @media (max-width: 767px) {
+          /* Prevent iOS Safari auto-zoom on input focus (needs >=16px) */
+          input, textarea, select { font-size: 16px !important; }
+
+          .pp-banner { height: 140px !important; }
+          .pp-avatar { width: 84px !important; height: 84px !important; }
+          .pp-avatar-row { margin-top: -42px !important; }
+        }
       `}</style>
 
       {/* Lightbox */}
@@ -274,18 +283,18 @@ export default function ProfilePublicPage() {
         </div>
 
         {/* Banner */}
-        <div style={{ height: 200, ...bannerStyle }} />
+        <div className="pp-banner" style={{ height: 200, ...bannerStyle }} />
 
         {/* Avatar + actions row */}
         <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: -52, marginBottom: 12 }}>
-            <div style={{ flexShrink: 0, position: "relative", cursor: profile.avatarImage ? "pointer" : "default" }}
+          <div className="pp-avatar-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: -52, marginBottom: 12 }}>
+            <div className="pp-avatar" style={{ flexShrink: 0, position: "relative", cursor: profile.avatarImage ? "pointer" : "default", width: 104, height: 104 }}
               onClick={() => profile.avatarImage && setLightboxImg(profile.avatarImage)}
               onMouseEnter={() => setAvatarHover(true)}
               onMouseLeave={() => setAvatarHover(false)}>
               {profile.avatarImage
-                ? <img src={profile.avatarImage} alt="頭像" style={{ width: 104, height: 104, borderRadius: "50%", objectFit: "cover", border: "4px solid var(--panel-alt)", display: "block", transition: "filter 0.2s", filter: avatarHover ? "brightness(0.75)" : "brightness(1)" }} />
-                : <div style={{ width: 104, height: 104, borderRadius: "50%", background: profile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, border: "4px solid var(--panel-alt)" }}>{profile.avatar || "😊"}</div>
+                ? <img src={profile.avatarImage} alt="頭像" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "4px solid var(--panel-alt)", display: "block", transition: "filter 0.2s", filter: avatarHover ? "brightness(0.75)" : "brightness(1)" }} />
+                : <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: profile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, border: "4px solid var(--panel-alt)" }}>{profile.avatar || "😊"}</div>
               }
               {profile.avatarImage && avatarHover && (
                 <div style={{ position: "absolute", inset: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>

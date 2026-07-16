@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ClickableSpanishText from "./ClickableSpanishText";
 
 // ── TTS ────────────────────────────────────────────────────────────────
 function speak(text, rate = 0.85) {
@@ -744,7 +745,7 @@ function TopicView({ topic, completed, onComplete, onBack, onPrev, onNext, prevT
                 <div key={i} style={{ padding: "12px 14px", background: "var(--panel)", borderRadius: 12, border: "1px solid var(--border)" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
                     <button onClick={() => speak(ex.es)} style={{ background: "none", border: "none", cursor: "pointer", color: "#60a5fa", fontSize: 16, padding: 0, flexShrink: 0, marginTop: 2 }}>🔊</button>
-                    <div style={{ fontSize: 15, fontStyle: "italic", color: "#c4b5fd", lineHeight: 1.5, fontWeight: 600 }}>{ex.es}</div>
+                    <ClickableSpanishText text={ex.es} style={{ fontSize: 15, fontStyle: "italic", color: "#c4b5fd", lineHeight: 1.5, fontWeight: 600 }} />
                   </div>
                   <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4, marginLeft: 28 }}>{ex.zh}</div>
                   <div style={{ fontSize: 11, color: "#94a3b8", marginLeft: 28, lineHeight: 1.6 }}>🔍 {ex.breakdown}</div>

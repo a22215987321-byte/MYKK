@@ -146,14 +146,14 @@ function PostCard({ post, myUid, myProfile }) {
 
       {/* Image */}
       {post.imageUrl && (
-        <div style={{ width: "100%", maxHeight: 480, overflow: "hidden", background: "var(--panel-alt)" }}>
+        <div className="feed-media" style={{ width: "100%", maxHeight: 480, overflow: "hidden", background: "var(--panel-alt)" }}>
           <img src={post.imageUrl} alt="貼文圖片" style={{ width: "100%", maxHeight: 480, objectFit: "contain", display: "block" }} />
         </div>
       )}
 
       {/* Video */}
       {post.videoUrl && (
-        <div style={{ width: "100%", background: "#000" }}>
+        <div className="feed-media" style={{ width: "100%", background: "#000" }}>
           <video
             src={post.videoUrl}
             controls
@@ -166,6 +166,7 @@ function PostCard({ post, myUid, myProfile }) {
       <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 16, borderTop: "1px solid var(--panel)" }}>
         <button
           onClick={toggleLike}
+          className="feed-action-btn"
           style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: liked ? "#ef4444" : "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}
         >
           <span style={{ fontSize: 18 }}>{liked ? "❤️" : "🤍"}</span>
@@ -173,6 +174,7 @@ function PostCard({ post, myUid, myProfile }) {
         </button>
         <button
           onClick={() => setShowComments(v => !v)}
+          className="feed-action-btn"
           style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}
         >
           <span style={{ fontSize: 18 }}>💬</span>
@@ -325,11 +327,21 @@ export default function FeedApp({ user }) {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
         * { box-sizing: border-box; }
+        html, body { overflow-x: hidden; }
+
+        @media (max-width: 767px) {
+          /* Prevent iOS Safari auto-zoom on input focus (needs >=16px) */
+          input, textarea, select { font-size: 16px !important; }
+
+          .feed-topnav { padding: 0 14px !important; }
+          .feed-media img, .feed-media video { max-height: 320px !important; }
+          .feed-action-btn { padding: 8px 4px !important; }
+        }
       `}</style>
       <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "'Inter','Helvetica Neue',sans-serif" }}>
 
         {/* Top Nav */}
-        <div style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 20px", height: 56 }}>
+        <div className="feed-topnav" style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 20px", height: 56 }}>
           <div style={{ fontSize: 20 }}>📋</div>
           <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text)", flex: 1 }}>動態消息</div>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "6px 14px", color: "var(--text-muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>

@@ -163,7 +163,7 @@ export default function SpanishRoom({ user, db }) {
   const learnedCount = categoryWords.filter((w) => learnedWords.has(w.word)).length;
 
   return (
-    <div style={{ flex: 1, background: "var(--bg)", display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", color: "var(--text)" }}>
+    <div style={{ flex: 1, minHeight: 0, background: "var(--bg)", display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", color: "var(--text)" }}>
 
       {/* Header */}
       <div style={{ padding: "16px 20px 0", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)" }}>
@@ -279,7 +279,7 @@ export default function SpanishRoom({ user, db }) {
       </div>
 
       {/* Main content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
 
         {/* === BROWSE MODE === */}
         {mode === "browse" && (

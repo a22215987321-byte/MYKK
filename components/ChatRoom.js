@@ -5,6 +5,9 @@ import AvatarCreator from "./AvatarCreator";
 import CalendarMemo from "./CalendarMemo";
 import PageNotes from "./PageNotes";
 import ThemeToggle from "./ThemeToggle";
+import NavItem from "./nav/NavItem";
+import ChatMoreMenu from "./ChatMoreMenu";
+import ChatMobileTabBar from "./ChatMobileTabBar";
 import VocabRoom from "./VocabRoom";
 import SpanishRoom from "./SpanishRoom";
 import SpanishCourseRoom from "./SpanishCourseRoom";
@@ -91,6 +94,8 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
   const [reactions, setReactions] = useState({});
   const [showPicker, setShowPicker] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [tapped, setTapped] = useState(false);
+  const showActions = hovered || tapped;
   const addReaction = (e) => { setReactions(r => ({ ...r, [e]: (r[e]||0)+1 })); setShowPicker(false); };
 
   const recallMsg = async () => {
@@ -123,14 +128,15 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={() => { if (isMine) setTapped(v => !v); }}
       style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start", marginBottom: 2, position: "relative" }}
     >
-      {isMine && hovered && (
-        <button onClick={recallMsg} style={{ position: "absolute", top: 0, right: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "2px 8px", fontSize: 11, color: "var(--text-muted)", cursor: "pointer", zIndex: 5, whiteSpace: "nowrap" }}>
+      {isMine && showActions && (
+        <button onClick={e => { e.stopPropagation(); recallMsg(); }} style={{ position: "absolute", top: 0, right: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "2px 8px", fontSize: 11, color: "var(--text-muted)", cursor: "pointer", zIndex: 5, whiteSpace: "nowrap" }}>
           撤回
         </button>
       )}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, maxWidth: "72%", marginTop: isMine && hovered ? 22 : 0 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, maxWidth: "72%", marginTop: isMine && showActions ? 22 : 0 }}>
         {!isMine && showSender && (
           <div style={{ flexShrink: 0 }}>
             <AvatarImg avatarImage={msg.senderAvatarImage} avatar={msg.avatar || msg.sender?.[0]} color="var(--accent-2)" size={30} />
@@ -213,7 +219,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 460, maxWidth: "92vw", maxHeight: "85vh", overflow: "auto", border: "1px solid var(--border)" }}>
+      <div className="cr-modal-full" style={{ background: "var(--panel)", borderRadius: 20, width: 460, maxWidth: "92vw", maxHeight: "85vh", overflow: "auto", border: "1px solid var(--border)" }}>
         <div style={{
           background: profileBgType === "gradient" ? profileBg : undefined,
           backgroundImage: profileBgType === "image" ? `url(${profileBg})` : undefined,
@@ -221,7 +227,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
           backgroundPosition: profileBgType === "image" ? "center" : undefined,
           padding: "28px 28px 0", borderRadius: "20px 20px 0 0", position: "relative",
         }}>
-          <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(0,0,0,0.3)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "var(--text-muted)", cursor: "pointer", fontSize: 18 }}>✕</button>
+          <button onClick={onClose} className="cr-close-btn" style={{ position: "absolute", top: 14, right: 14, background: "rgba(0,0,0,0.3)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "var(--text-muted)", cursor: "pointer", fontSize: 18 }}>✕</button>
           {showCreator && <AvatarCreator myProfile={myProfile} onClose={() => setShowCreator(false)} />}
           <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
             <div style={{ position: "relative" }}>
@@ -401,10 +407,10 @@ function FriendSearch({ myUid, myProfile, onClose, onSendRequest }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 520, maxWidth: "95vw", border: "1px solid var(--border)", padding: 28, boxSizing: "border-box" }}>
+      <div className="cr-modal-full" style={{ background: "var(--panel)", borderRadius: 20, width: 520, maxWidth: "95vw", border: "1px solid var(--border)", padding: 28, boxSizing: "border-box", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ color: "var(--text)", margin: 0, fontSize: 20, fontWeight: 700 }}>搜尋並新增好友</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
+          <button onClick={onClose} className="cr-close-btn" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
         </div>
         <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="輸入暱稱或電郵搜尋..."
           style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "13px 16px", color: "var(--text)", fontSize: 16, outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
@@ -442,11 +448,11 @@ function FriendRequests({ myProfile, onAccept, onDecline, onClose }) {
   }, [(myProfile.pendingIn || []).join(',')]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
-      <div style={{ background: "var(--panel)", borderRadius: "var(--radius-lg)", width: 380, maxWidth: "92vw", border: "1px solid var(--border)", padding: 24, boxSizing: "border-box" }}>
+    <div className="cr-sheet-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <div className="cr-sheet" style={{ background: "var(--panel)", borderRadius: "var(--radius-lg)", width: 380, maxWidth: "92vw", border: "1px solid var(--border)", padding: 24, boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ color: "var(--text)", margin: 0, fontSize: 16, fontWeight: 700 }}>好友邀請 ({pendingProfiles.length})</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 20 }}>✕</button>
+          <button onClick={onClose} className="cr-close-btn" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 20 }}>✕</button>
         </div>
         {pendingProfiles.length === 0 && <div style={{ textAlign: "center", color: "var(--text-faint)", fontSize: 14, padding: "20px 0" }}>目前沒有待處理的邀請</div>}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -479,10 +485,10 @@ function CreateGroupModal({ friends, onClose, onCreate }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 400, maxWidth: "92vw", maxHeight: "80vh", overflow: "auto", border: "1px solid var(--border)", padding: 24, boxSizing: "border-box" }}>
+      <div className="cr-modal-full" style={{ background: "var(--panel)", borderRadius: 20, width: 400, maxWidth: "92vw", maxHeight: "80vh", overflow: "auto", border: "1px solid var(--border)", padding: 24, boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ color: "var(--text)", margin: 0, fontSize: 18, fontWeight: 700 }}>建立群組</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
+          <button onClick={onClose} className="cr-close-btn" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
         </div>
         <div style={{ marginBottom: 16 }}>
           <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>群組名稱</label>
@@ -570,11 +576,11 @@ function DonateModal({ myProfile, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 380, maxWidth: "92vw", border: "1px solid var(--border)", padding: 28, boxSizing: "border-box" }}>
+    <div className="cr-sheet-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <div className="cr-sheet" style={{ background: "var(--panel)", borderRadius: 20, width: 380, maxWidth: "92vw", border: "1px solid var(--border)", padding: 28, boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text)" }}>🎁 打賞</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
+          <button onClick={onClose} className="cr-close-btn" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
           {[10, 30, 50, 100].map(a => (
@@ -655,9 +661,18 @@ export default function ChatApp({ user }) {
   const [showIeltsBand4,     setShowIeltsBand4]     = useState(false);
 
   // Mobile / sidebar states
-  const [sidebarOpen,    setSidebarOpen]    = useState(false);
   const [isMobile,       setIsMobile]       = useState(false);
   const [calendarOpen,   setCalendarOpen]   = useState(false);
+  const [mobileView,     setMobileView]     = useState(null); // 'list' | 'more' | null (content-driven)
+
+  const resetAllViews = useCallback(() => {
+    setActiveFriendId(null); setActiveGroupId(null);
+    setShowLeaderboard(false); setShowCinema(false);
+    setShowVocab(false); setShowSpanish(false); setShowSpanishCourse(false);
+    setShowCustomVocab(false); setShowDict(false); setFrenchView(null);
+    setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false);
+    setShowEnglishPron(false); setShowIeltsBand4(false);
+  }, []);
 
   // Cinema states
   const [showCinema,       setShowCinema]       = useState(false);
@@ -675,6 +690,8 @@ export default function ChatApp({ user }) {
 
   const messagesEndRef = useRef(null);
   const loadedFriendIds = useRef(new Set());
+  const longPressTimerRef = useRef(null);
+  const longPressFiredRef = useRef(false);
   const hallFileRef = useRef(null);
   const privateFileRef = useRef(null);
   const groupFileRef = useRef(null);
@@ -683,6 +700,7 @@ export default function ChatApp({ user }) {
   const peerConnectionsRef = useRef({});
   const myPeerRef = useRef(null);
   const cinemaCommentsEndRef = useRef(null);
+  const mainTouchRef = useRef(null); // 手機版：從內容區域向右滑，回到聊天列表/更多選單
   const signalUnsubRef = useRef(null);
   const commentsUnsubRef = useRef(null);
   const viewersUnsubRef = useRef(null);
@@ -787,24 +805,24 @@ export default function ChatApp({ user }) {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Escape to close sidebar / calendar
+  // Escape to close calendar overlay
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "Escape") { setSidebarOpen(false); setCalendarOpen(false); }
+      if (e.key === "Escape") setCalendarOpen(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  // Lock body scroll when sidebar/calendar open on mobile
+  // Lock body scroll when calendar open on mobile
   useEffect(() => {
-    if (isMobile && (sidebarOpen || calendarOpen)) {
+    if (isMobile && calendarOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
     }
     return () => { document.body.style.overflow = ""; };
-  }, [isMobile, sidebarOpen, calendarOpen]);
+  }, [isMobile, calendarOpen]);
 
   useEffect(() => {
     let timer;
@@ -1109,6 +1127,31 @@ export default function ChatApp({ user }) {
   const pendingInCount = (myProfile.pendingIn || []).length;
   const activeGroup = activeGroupId ? myGroups.find(g => g.id === activeGroupId) : null;
 
+  // Mobile nav: which top-level destination is currently "drilled into"
+  const inTool = showLeaderboard || showCinema || showVocab || showSpanish || showSpanishCourse ||
+    showCustomVocab || showDict || showSpanishPron || showSpanishGrammar || showSpanishVerbs ||
+    showEnglishPron || showIeltsBand4;
+  const inThread = !!activeFriendId || !!activeGroupId;
+
+  // 手機版：在內容區域（聊天串/工具畫面）向右滑，回到左側導覽（聊天列表或更多選單），
+  // 跟頂部返回鍵是同一個動作，只是多一種手勢觸發方式。用水平位移為主的門檻避免誤觸垂直捲動。
+  function handleMainTouchStart(e) {
+    if (!isMobile || mobileView !== null) return;
+    const t = e.touches[0];
+    mainTouchRef.current = { x: t.clientX, y: t.clientY };
+  }
+  function handleMainTouchEnd(e) {
+    const start = mainTouchRef.current;
+    mainTouchRef.current = null;
+    if (!start || !isMobile || mobileView !== null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (dx < 70 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (inTool) setMobileView('more');
+    else { resetAllViews(); setMobileView('list'); }
+  }
+
   const leaderboard = Object.values(
     donations.reduce((acc, d) => {
       if (!acc[d.userId]) acc[d.userId] = { userId: d.userId, userNickname: d.userNickname, userAvatar: d.userAvatar, userColor: d.userColor, userAvatarImage: d.userAvatarImage, total: 0 };
@@ -1144,13 +1187,16 @@ export default function ChatApp({ user }) {
         /* ── Mobile topbar: hidden on desktop ── */
         .cr-mobile-topbar { display: none; }
 
-        /* ── Sidebar backdrop: hidden on desktop ── */
-        .cr-sidebar-backdrop { display: none; }
+        /* ── Mobile tab bar: hidden on desktop ── */
+        .cr-tabbar { display: none; }
 
         /* ── Calendar overlay ── */
         .cr-cal { flex-shrink: 0; }
 
         @media (max-width: 767px) {
+          /* Prevent iOS Safari auto-zoom on input focus (needs >=16px) */
+          input, textarea, select { font-size: 16px !important; }
+
           /* Shell fills full screen */
           .cr-shell {
             margin: 0 !important;
@@ -1159,31 +1205,11 @@ export default function ChatApp({ user }) {
             flex-direction: column !important;
           }
 
-          /* Sidebar: fixed overlay, slides from left */
+          /* Sidebar (聊天分頁): full-width panel, shown/hidden via JS display toggle */
           .cr-sidebar {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            bottom: 0 !important;
-            width: min(86vw, 360px) !important;
-            height: 100dvh !important;
-            z-index: 400 !important;
-            transform: translateX(-100%);
-            transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
-            overflow-y: auto !important;
+            width: 100% !important;
+            border-right: none !important;
             padding-top: env(safe-area-inset-top) !important;
-            padding-bottom: env(safe-area-inset-bottom) !important;
-          }
-          .cr-sidebar-open { transform: translateX(0) !important; }
-
-          /* Backdrop */
-          .cr-sidebar-backdrop {
-            display: block;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.52);
-            z-index: 399;
-            -webkit-tap-highlight-color: transparent;
           }
 
           /* Main area: always full width */
@@ -1192,7 +1218,12 @@ export default function ChatApp({ user }) {
             max-width: 100% !important;
             min-width: 0 !important;
             flex: 1 !important;
+            /* 沒有 min-height:0，flex 子項目預設 min-height:auto 會撐開超過可用空間，
+               導致內容被 .cr-shell 的 overflow:hidden 直接裁掉，而不是自己捲動——
+               這是各個「room」（西語課程/字典/大廳訊息等）在手機版滑不動的根本原因。 */
+            min-height: 0 !important;
             overflow-x: hidden !important;
+            overflow-y: hidden !important;
           }
 
           /* Mobile topbar shown */
@@ -1204,6 +1235,15 @@ export default function ChatApp({ user }) {
             background: var(--panel-alt);
             border-bottom: 1px solid var(--panel);
             flex-shrink: 0;
+          }
+
+          /* Bottom tab bar shown */
+          .cr-tabbar {
+            display: flex !important;
+            flex-shrink: 0;
+            border-top: 1px solid var(--panel);
+            background: var(--panel-alt);
+            padding-bottom: env(safe-area-inset-bottom);
           }
 
           /* Calendar: full-screen overlay */
@@ -1235,6 +1275,34 @@ export default function ChatApp({ user }) {
             height: 100% !important;
             border-left: none !important;
             flex: 1 !important;
+          }
+
+          /* Comfortable ~44px touch target for icon-only close buttons */
+          .cr-close-btn {
+            min-width: 44px !important;
+            min-height: 44px !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+          }
+
+          /* Modal → bottom sheet */
+          .cr-sheet-overlay { align-items: flex-end !important; }
+          .cr-sheet {
+            width: 100% !important;
+            max-width: 100% !important;
+            border-radius: 20px 20px 0 0 !important;
+            max-height: 80vh !important;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+          }
+
+          /* Modal → full-screen */
+          .cr-modal-full {
+            border-radius: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
           }
         }
       `}</style>
@@ -1271,10 +1339,10 @@ export default function ChatApp({ user }) {
 
       {/* Friend info card */}
       {friendInfo && (
-        <div onClick={() => setFriendInfo(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "var(--panel)", borderRadius: 20, width: 320, maxWidth: "92vw", border: "1px solid var(--border)", overflow: "hidden" }}>
+        <div onClick={() => setFriendInfo(null)} className="cr-sheet-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+          <div onClick={e => e.stopPropagation()} className="cr-sheet" style={{ background: "var(--panel)", borderRadius: 20, width: 320, maxWidth: "92vw", border: "1px solid var(--border)", overflow: "hidden" }}>
             <div style={{ background: friendInfo.profileBgType === "image" ? undefined : (friendInfo.profileBg || "linear-gradient(135deg,var(--accent-hover),#2d1f6e)"), backgroundImage: friendInfo.profileBgType === "image" ? `url(${friendInfo.profileBg})` : undefined, backgroundSize: "cover", backgroundPosition: "center", height: 80, position: "relative" }}>
-              <button onClick={() => setFriendInfo(null)} style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.4)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 14 }}>✕</button>
+              <button onClick={() => setFriendInfo(null)} className="cr-close-btn" style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.4)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 14 }}>✕</button>
             </div>
             <div style={{ padding: "0 20px 20px", marginTop: -30 }}>
               <AvatarImg avatarImage={friendInfo.avatarImage} avatar={friendInfo.avatar} color={friendInfo.color} size={60} />
@@ -1314,14 +1382,18 @@ export default function ChatApp({ user }) {
         backdropFilter: "var(--shell-blur)", WebkitBackdropFilter: "var(--shell-blur)",
       }}>
 
-        {/* Backdrop (mobile only) */}
+        {/* Mobile topbar: back chevron (in-thread/tool only) + title + calendar */}
         <div className="cr-mobile-topbar">
-          <button onClick={() => setSidebarOpen(true)} aria-label="開啟選單"
-            style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 22, padding: 4, lineHeight: 1, flexShrink: 0 }}>
-            ☰
-          </button>
+          {mobileView === null ? (
+            <button onClick={() => { if (inTool) { setMobileView('more'); } else { resetAllViews(); setMobileView('list'); } }} aria-label="返回"
+              style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 22, padding: 4, lineHeight: 1, flexShrink: 0 }}>
+              ‹
+            </button>
+          ) : (
+            <div style={{ width: 22, flexShrink: 0 }} />
+          )}
           <div style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 15, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {activeGroup ? activeGroup.name : activeFriendProfile ? activeFriendProfile.nickname : "Evonchat"}
+            {mobileView === 'list' ? "聊天" : mobileView === 'more' ? "更多" : activeGroup ? activeGroup.name : activeFriendProfile ? activeFriendProfile.nickname : "Evonchat"}
           </div>
           <button onClick={() => setCalendarOpen(true)} aria-label="開啟日曆"
             style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 20, padding: 4, lineHeight: 1, flexShrink: 0 }}>
@@ -1329,15 +1401,13 @@ export default function ChatApp({ user }) {
           </button>
         </div>
 
-        {sidebarOpen && <div className="cr-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
-
-        {/* 側邊欄 */}
-        <div className={`cr-sidebar${sidebarOpen ? " cr-sidebar-open" : ""}`} style={{ width: 280, background: "var(--panel-alt)", borderRight: "1px solid var(--panel)", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+        {/* 側邊欄（手機版＝聊天分頁的列表畫面；桌面版＝常駐側欄） */}
+        <div className="cr-sidebar" style={{ width: 280, background: "var(--panel-alt)", borderRight: "1px solid var(--panel)", display: (isMobile && mobileView !== 'list') ? "none" : "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
 
           {/* My info */}
           <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--panel)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <button onClick={() => { setShowProfile(true); if (isMobile) setSidebarOpen(false); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+              <button onClick={() => setShowProfile(true)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
                 <AvatarImg avatarImage={myProfile.avatarImage} avatar={myProfile.avatar} color={myProfile.color} size={42} />
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -1350,15 +1420,14 @@ export default function ChatApp({ user }) {
                 {myProfile.statusText && <div style={{ fontSize: 11, color: "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myProfile.statusText}</div>}
               </div>
               <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <ThemeToggle mode="inline" onOpenProfile={() => { setShowProfile(true); if (isMobile) setSidebarOpen(false); }} />
-                <button onClick={() => { auth.signOut(); if (isMobile) setSidebarOpen(false); }} title="登出" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>🚪</button>
+                <ThemeToggle mode="inline" onOpenProfile={() => setShowProfile(true)} />
+                <button onClick={() => auth.signOut()} title="登出" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>🚪</button>
               </div>
             </div>
           </div>
 
           {/* Scrollable nav area */}
-          <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}
-            onClick={e => { if (isMobile && e.target.closest("button:not([disabled]), a")) setSidebarOpen(false); }}>
+          <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
 
           {/* Friend request banner */}
           {pendingInCount > 0 && (
@@ -1393,38 +1462,23 @@ export default function ChatApp({ user }) {
 
           {/* Hall button */}
           <div style={{ padding: "4px 10px 0" }}>
-            <button onClick={() => { setActiveFriendId(null); setActiveGroupId(null); setShowLeaderboard(false); setShowCinema(false); setShowVocab(false); setShowSpanish(false); setShowSpanishCourse(false); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowEnglishPron(false); setShowIeltsBand4(false); }} className={`fb ${!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-md)", border: "none", background: !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,var(--accent-2),#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>💬</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}># 公共大廳</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>和大家聊天吧</div>
-              </div>
-            </button>
+            <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧" mobileTouch
+              active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4}
+              onClick={() => { resetAllViews(); if (isMobile) setMobileView(null); }} />
           </div>
 
+          {!isMobile && (
+          <>
           {/* Leaderboard button */}
           <div style={{ padding: "4px 10px 6px" }}>
-            <button onClick={() => { setShowLeaderboard(true); setActiveFriendId(null); setActiveGroupId(null); setShowCinema(false); setShowVocab(false); setShowSpanish(false); setShowSpanishCourse(false); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowEnglishPron(false); }} className={`fb ${showLeaderboard ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-md)", border: "none", background: showLeaderboard ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏆</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>排行榜</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>積分排名</div>
-              </div>
-            </button>
+            <NavItem icon="🏆" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
+              active={showLeaderboard} onClick={() => { resetAllViews(); setShowLeaderboard(true); }} />
           </div>
 
           {/* Cinema button */}
           <div style={{ padding: "0 10px 6px" }}>
-            <button onClick={() => { setShowCinema(true); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowVocab(false); setShowSpanish(false); setShowSpanishCourse(false); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowEnglishPron(false); }} className={`fb ${showCinema ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-md)", border: "none", background: showCinema ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,var(--accent-hover),#2563eb)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🎬</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>電影院</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>同步觀看影片</div>
-              </div>
-            </button>
+            <NavItem icon="🎬" iconBg="linear-gradient(135deg,var(--accent-hover),#2563eb)" label="電影院" sublabel="同步觀看影片"
+              active={showCinema} onClick={() => { resetAllViews(); setShowCinema(true); }} />
           </div>
 
           {/* English section label */}
@@ -1434,38 +1488,20 @@ export default function ChatApp({ user }) {
 
           {/* English Pronunciation button */}
           <div style={{ padding: "0 10px 6px" }}>
-            <button onClick={() => { setShowEnglishPron(true); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowSpanish(false); setShowSpanishCourse(false); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); }} className={`fb ${showEnglishPron ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: showEnglishPron ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#1e3a5f,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔤</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>英語發音</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>音標・母音・子音</div>
-              </div>
-            </button>
+            <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音"
+              active={showEnglishPron} onClick={() => { resetAllViews(); setShowEnglishPron(true); }} />
           </div>
 
           {/* IELTS Band 4 button */}
           <div style={{ padding: "0 10px 2px" }}>
-            <button onClick={() => { setShowIeltsBand4(true); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowSpanish(false); setShowSpanishCourse(false); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowEnglishPron(false); }} className={`fb ${showIeltsBand4 ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: showIeltsBand4 ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#1e3a1e,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🎯</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>IELTS 4.0 入門</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>詞彙・聽力・口說</div>
-              </div>
-            </button>
+            <NavItem compact icon="🎯" iconBg="linear-gradient(135deg,#1e3a1e,#6366f1)" label="IELTS 4.0 入門" sublabel="詞彙・聽力・口說"
+              active={showIeltsBand4} onClick={() => { resetAllViews(); setShowIeltsBand4(true); }} />
           </div>
 
           {/* Vocab button */}
           <div style={{ padding: "0 10px 6px" }}>
-            <button onClick={() => { setShowVocab(true); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowSpanish(false); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowEnglishPron(false); setShowIeltsBand4(false); }} className={`fb ${showVocab ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-md)", border: "none", background: showVocab ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#065f46,#10b981)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📚</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>IELTS 詞彙</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>IELTS 單字練習</div>
-              </div>
-            </button>
+            <NavItem icon="📚" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習"
+              active={showVocab} onClick={() => { resetAllViews(); setShowVocab(true); }} />
           </div>
 
           {/* Spanish section label */}
@@ -1475,84 +1511,44 @@ export default function ChatApp({ user }) {
 
           {/* Spanish button */}
           <div style={{ padding: "0 10px 2px" }}>
-            <button onClick={() => { setShowSpanish(true); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowEnglishPron(false); }} className={`fb ${showSpanish ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-md)", border: "none", background: showSpanish ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#7c1d1d,#dc2626)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🇪🇸</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>西班牙語學習</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>CEFR A1/A2</div>
-              </div>
-            </button>
+            <NavItem icon="🇪🇸" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西班牙語學習" sublabel="CEFR A1/A2"
+              active={showSpanish} onClick={() => { resetAllViews(); setShowSpanish(true); }} />
           </div>
 
           {/* Spanish Course button */}
           <div style={{ padding: "0 10px 2px" }}>
-            <button onClick={() => { setShowSpanishCourse(true); setShowSpanish(false); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowEnglishPron(false); }} className={`fb ${showSpanishCourse ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: showSpanishCourse ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#1e1b4b,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🗺️</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>西語 A1 路線</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>初學者情境課程</div>
-              </div>
-            </button>
+            <NavItem compact icon="🗺️" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="西語 A1 路線" sublabel="初學者情境課程"
+              active={showSpanishCourse} onClick={() => { resetAllViews(); setShowSpanishCourse(true); }} />
           </div>
 
           {/* Spanish Pronunciation button */}
           <div style={{ padding: "0 10px 2px" }}>
-            <button onClick={() => { setShowSpanishPron(true); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowSpanishCourse(false); setShowSpanish(false); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowEnglishPron(false); }} className={`fb ${showSpanishPron ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: showSpanishPron ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#7c1d1d,#b91c1c)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔤</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>西語發音</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>母音 · 子音 · 重音</div>
-              </div>
-            </button>
+            <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#7c1d1d,#b91c1c)" label="西語發音" sublabel="母音 · 子音 · 重音"
+              active={showSpanishPron} onClick={() => { resetAllViews(); setShowSpanishPron(true); }} />
           </div>
 
           {/* Spanish Grammar button */}
           <div style={{ padding: "0 10px 6px" }}>
-            <button onClick={() => { setShowSpanishGrammar(true); setShowSpanishPron(false); setShowSpanishCourse(false); setShowSpanish(false); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowEnglishPron(false); }} className={`fb ${showSpanishGrammar ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: showSpanishGrammar ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#14532d,#16a34a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📐</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>西語文法</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>ser/estar · 代詞 · 動詞</div>
-              </div>
-            </button>
+            <NavItem compact icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="西語文法" sublabel="ser/estar · 代詞 · 動詞"
+              active={showSpanishGrammar} onClick={() => { resetAllViews(); setShowSpanishGrammar(true); }} />
           </div>
 
           {/* Spanish Verb Conjugator button */}
           <div style={{ padding: "0 10px 6px" }}>
-            <button onClick={() => { setShowSpanishVerbs(true); setShowSpanishGrammar(false); setShowSpanishPron(false); setShowSpanishCourse(false); setShowSpanish(false); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowEnglishPron(false); }} className={`fb ${showSpanishVerbs ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: showSpanishVerbs ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#7c2d12,#dc2626)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🧩</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>西語動詞變位</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>完整變位查詢</div>
-              </div>
-            </button>
+            <NavItem compact icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢"
+              active={showSpanishVerbs} onClick={() => { resetAllViews(); setShowSpanishVerbs(true); }} />
           </div>
-
 
           {/* Custom vocab button */}
           <div style={{ padding: "0 10px 6px" }}>
-            <button onClick={() => { setShowCustomVocab(true); setShowSpanishCourse(false); setShowSpanish(false); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowEnglishPron(false); }} className={`fb ${showCustomVocab ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-md)", border: "none", background: showCustomVocab ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,var(--accent-hover),#7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>✏️</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>自定詞彙</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>建立個人單字本</div>
-              </div>
-            </button>
-            <button onClick={() => { setShowDict(true); setShowCustomVocab(false); setShowSpanish(false); setShowVocab(false); setShowCinema(false); setShowLeaderboard(false); setActiveFriendId(null); setActiveGroupId(null); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowEnglishPron(false); }} className={`fb ${showDict ? "act" : ""}`}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-md)", border: "none", background: showDict ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#0f2e1c,#166534)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📖</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>字典</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>英・西・法 A-Z</div>
-              </div>
-            </button>
+            <NavItem icon="✏️" iconBg="linear-gradient(135deg,var(--accent-hover),#7c3aed)" label="自定詞彙" sublabel="建立個人單字本"
+              active={showCustomVocab} onClick={() => { resetAllViews(); setShowCustomVocab(true); }} />
+            <div style={{ height: 6 }} />
+            <NavItem icon="📖" iconBg="linear-gradient(135deg,#0f2e1c,#166534)" label="字典" sublabel="英・西・法 A-Z"
+              active={showDict} onClick={() => { resetAllViews(); setShowDict(true); }} />
           </div>
+          </>
+          )}
 
           {/* Groups section */}
           <div style={{ padding: "0 12px 4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1563,7 +1559,7 @@ export default function ChatApp({ user }) {
             {myGroups.map(group => {
               const isActive = activeGroupId === group.id;
               return (
-                <button key={group.id} onClick={() => { setActiveGroupId(group.id); setActiveFriendId(null); setShowLeaderboard(false); setShowCinema(false); setShowVocab(false); setShowSpanish(false); setShowSpanishCourse(false); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); }}
+                <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); if (isMobile) setMobileView(null); }}
                   className={`fb ${isActive ? "act" : ""}`}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s", marginBottom: 2 }}>
                   <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,var(--text-dim),var(--border))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
@@ -1603,10 +1599,21 @@ export default function ChatApp({ user }) {
             {myFriends.map(friend => {
               const isActive = activeFriendId === friend.uid;
               return (
-                <button key={friend.uid} onClick={() => { setActiveFriendId(friend.uid); setActiveGroupId(null); setShowLeaderboard(false); setShowVocab(false); setShowSpanish(false); setShowSpanishCourse(false); setShowCustomVocab(false); setShowDict(false); setFrenchView(null); setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); }}
+                <button key={friend.uid} onClick={() => { if (longPressFiredRef.current) { longPressFiredRef.current = false; return; } resetAllViews(); setActiveFriendId(friend.uid); if (isMobile) setMobileView(null); }}
                   onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, friend }); }}
+                  onTouchStart={e => {
+                    longPressFiredRef.current = false;
+                    const touch = e.touches[0];
+                    const x = touch.clientX, y = touch.clientY;
+                    longPressTimerRef.current = setTimeout(() => {
+                      longPressFiredRef.current = true;
+                      setContextMenu({ x, y, friend });
+                    }, 500);
+                  }}
+                  onTouchEnd={() => clearTimeout(longPressTimerRef.current)}
+                  onTouchMove={() => clearTimeout(longPressTimerRef.current)}
                   className={`fb ${isActive ? "act" : ""}`}
-                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s", marginBottom: 2 }}>
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s", marginBottom: 2, WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}>
                   <div style={{ position: "relative", flexShrink: 0 }}>
                     <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={36} />
                     <span style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
@@ -1624,13 +1631,23 @@ export default function ChatApp({ user }) {
           </div>
         </div>
 
+        {/* 更多選單（手機版「更多」分頁） */}
+        {isMobile && mobileView === 'more' && (
+          <ChatMoreMenu
+            state={{ showLeaderboard, showCinema, showEnglishPron, showIeltsBand4, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showCustomVocab, showDict }}
+            setters={{ setShowLeaderboard, setShowCinema, setShowEnglishPron, setShowIeltsBand4, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowCustomVocab, setShowDict }}
+            onOpen={(setter) => { resetAllViews(); setter(true); setMobileView(null); }}
+          />
+        )}
+
         {/* 主要區域 */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg)", minWidth: 0 }}>
+        <div className="cr-main" onTouchStart={handleMainTouchStart} onTouchEnd={handleMainTouchEnd}
+          style={{ flex: 1, display: (isMobile && mobileView !== null) ? "none" : "flex", flexDirection: "column", background: "var(--bg)", minWidth: 0, minHeight: 0 }}>
 
           {/* Leaderboard view */}
           {showLeaderboard && !activeFriendId && !activeGroupId && (
             <>
-              <div style={{ flex: 1, overflowY: "auto", background: "linear-gradient(180deg,#08091a 0%,#0d0a28 60%,var(--bg) 100%)", padding: "36px 28px 24px" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "linear-gradient(180deg,#08091a 0%,#0d0a28 60%,var(--bg) 100%)", padding: "36px 28px 24px" }}>
                 {/* Title */}
                 <div style={{ textAlign: "center", marginBottom: 36 }}>
                   <div style={{ fontSize: 30, fontWeight: 900, color: "#f8c94f", letterSpacing: 3, textShadow: "0 0 30px rgba(248,201,79,0.6), 0 0 60px rgba(248,201,79,0.3)" }}>
@@ -1718,7 +1735,7 @@ export default function ChatApp({ user }) {
                     </button>
                   </div>
                   {/* Room list */}
-                  <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+                  <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "24px 28px" }}>
                     {cinemaRooms.length === 0 && (
                       <div style={{ textAlign: "center", padding: "80px 0", color: "var(--text-dim)" }}>
                         <div style={{ fontSize: 56, marginBottom: 16 }}>🎬</div>
@@ -1747,8 +1764,8 @@ export default function ChatApp({ user }) {
                   </div>
                   {/* Create room modal */}
                   {showCreateCinema && (
-                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
-                      <div style={{ background: "var(--panel-alt)", border: "1px solid var(--panel)", borderRadius: 20, padding: "32px", width: 360, maxWidth: "92vw", boxShadow: "0 20px 60px rgba(0,0,0,0.6)", boxSizing: "border-box" }}>
+                    <div className="cr-sheet-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+                      <div className="cr-sheet" style={{ background: "var(--panel-alt)", border: "1px solid var(--panel)", borderRadius: 20, padding: "32px", width: 360, maxWidth: "92vw", boxShadow: "0 20px 60px rgba(0,0,0,0.6)", boxSizing: "border-box" }}>
                         <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text)", marginBottom: 20 }}>🎬 建立新直播</div>
                         <input type="text" value={cinemaTitleInput} onChange={e => setCinemaTitleInput(e.target.value)}
           placeholder="輸入直播標題（例如：電影之夜）"
@@ -1758,7 +1775,7 @@ export default function ChatApp({ user }) {
                           <button onClick={() => { setShowCreateCinema(false); setCinemaTitleInput(''); }}
                             style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "11px", color: "var(--text-muted)", fontSize: 14, cursor: "pointer" }}>取消</button>
                           <button onClick={createCinemaRoom}
-                            style={{ flex: 1, background: "linear-gradient(135deg,#2563eb,var(--accent-active))", border: "none", borderRadius: "var(--radius-md)", padding: "11px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>蝣箏?</button>
+                            style={{ flex: 1, background: "linear-gradient(135deg,#2563eb,var(--accent-active))", border: "none", borderRadius: "var(--radius-md)", padding: "11px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>建立直播</button>
                         </div>
                       </div>
                     </div>
@@ -1799,7 +1816,7 @@ export default function ChatApp({ user }) {
                   </div>
                   {/* Comments area */}
                   <div style={{ height: 220, background: "var(--bg)", borderTop: "1px solid var(--panel)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
-                    <div style={{ flex: 1, overflowY: "auto", padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
                       {cinemaComments.length === 0 && (
                         <div style={{ color: "var(--text-dim)", fontSize: 13, textAlign: "left", paddingTop: 8 }}>還沒有留言，快來說第一句吧！</div>
                       )}
@@ -1845,22 +1862,22 @@ export default function ChatApp({ user }) {
 
           {/* Spanish Pronunciation view */}
           {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && (
-            <div style={{ flex: 1, overflow: "hidden" }}><SpanishPronunciation onNav={() => setShowSpanishPron(false)} /></div>
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishPronunciation onNav={() => { setShowSpanishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Grammar view */}
           {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && (
-            <div style={{ flex: 1, overflow: "hidden" }}><SpanishGrammar onNav={() => setShowSpanishGrammar(false)} /></div>
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishGrammar onNav={() => { setShowSpanishGrammar(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Verb Conjugator view */}
           {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && (
-            <div style={{ flex: 1, overflowY: "auto" }}><SpanishVerbConjugator onNav={() => setShowSpanishVerbs(false)} /></div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><SpanishVerbConjugator onNav={() => { setShowSpanishVerbs(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* English Pronunciation view */}
           {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && (
-            <div style={{ flex: 1, overflow: "hidden" }}><EnglishPronunciation user={user} db={db} onNav={() => setShowEnglishPron(false)} /></div>
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishPronunciation user={user} db={db} onNav={() => { setShowEnglishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Custom vocab view */}
@@ -1876,7 +1893,7 @@ export default function ChatApp({ user }) {
           {/* Public hall */}
           {/* IELTS Band 4 view */}
           {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && (
-            <div style={{ flex: 1, overflow: "hidden" }}><IeltsBand4 onNav={() => setShowIeltsBand4(false)} /></div>
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><IeltsBand4 onNav={() => { setShowIeltsBand4(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && (
@@ -1888,7 +1905,7 @@ export default function ChatApp({ user }) {
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>大家都可以看到這裡的訊息</div>
                 </div>
               </div>
-              <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2 }}>
                 <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 12, padding: "8px 0 16px" }}>
                   今天 · {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric" })}
                 </div>
@@ -1918,7 +1935,7 @@ export default function ChatApp({ user }) {
                     {hallUploading ? "⏳" : "📎"}
                   </button>
                   <input type="text" value={hallInput} onChange={e => setHallInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendHall()} placeholder="輸入訊息..."
-                    style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
+                    style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
                   <button className="sb" onClick={sendHall} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>傳送</button>
                 </div>
               </div>
@@ -1945,7 +1962,7 @@ export default function ChatApp({ user }) {
                   ℹ️ 個人檔案
                 </Link>
               </div>
-              <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0)", backgroundSize: "28px 28px" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0)", backgroundSize: "28px 28px" }}>
                 <div style={{ textAlign: "center", marginBottom: 16 }}>
                   <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={56} />
                   <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{activeFriendProfile.nickname}</div>
@@ -1966,7 +1983,7 @@ export default function ChatApp({ user }) {
                     {privateUploading ? "⏳" : "📎"}
                   </button>
                   <input type="text" value={privateInput} onChange={e => setPrivateInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendPrivate()} placeholder={`傳送訊息給 ${activeFriendProfile.nickname}...`}
-                    style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
+                    style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
                   <button className="sb" onClick={sendPrivate} disabled={!privateInput.trim()}
                     style={{ background: privateInput.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: privateInput.trim() ? "#fff" : "var(--text-dim)", cursor: privateInput.trim() ? "pointer" : "default", fontSize: 14, fontWeight: 600, transition: "all 0.15s" }}>
                     傳送                  </button>
@@ -1988,7 +2005,7 @@ export default function ChatApp({ user }) {
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(activeGroup.members || []).length} 位成員</div>
                 </div>
               </div>
-              <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2 }}>
                 {groupMessages.length === 0 && (
                   <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
                     <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
@@ -2010,7 +2027,7 @@ export default function ChatApp({ user }) {
                     {groupUploading ? "⏳" : "📎"}
                   </button>
                   <input type="text" value={groupInput} onChange={e => setGroupInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendGroup()} placeholder={`傳送訊息給 ${activeGroup.name}...`}
-                    style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
+                    style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
                   <button className="sb" onClick={sendGroup} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>傳送</button>
                 </div>
               </div>
@@ -2034,6 +2051,16 @@ export default function ChatApp({ user }) {
           {activeSpanishNotes && <PageNotes noteKey={activeSpanishNotes.key} pageTitle={activeSpanishNotes.title} />}
           <CalendarMemo uid={uid} />
         </div>
+
+        {isMobile && (
+          <ChatMobileTabBar
+            activeTab={mobileView === 'more' || (mobileView === null && inTool) ? 'more' : 'chat'}
+            onSelectChats={() => { resetAllViews(); setMobileView('list'); }}
+            onSelectMore={() => setMobileView('more')}
+            onOpenProfile={() => setShowProfile(true)}
+            pendingCount={pendingInCount}
+          />
+        )}
       </div>
     </>
   );

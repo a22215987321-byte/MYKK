@@ -350,7 +350,7 @@ export default function Home() {
   const inputStyle = {
     width: '100%', background: 'var(--panel-alt)', border: '1px solid var(--border)',
     borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--text)',
-    fontSize: 14, outline: 'none', boxSizing: 'border-box',
+    fontSize: 16, outline: 'none', boxSizing: 'border-box',
   };
 
   // ── Loading ──

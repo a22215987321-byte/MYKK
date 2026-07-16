@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { lookupWord } from "../lib/dictionary";
 import { loadAllEdits, saveEdit } from "../lib/dictEdits";
+import ClickableSpanishText from "./ClickableSpanishText";
 
 const TAG_LABELS = { zk: "中考", gk: "高考", ky: "考研", cet4: "CET4", cet6: "CET6", ielts: "IELTS", toefl: "TOEFL", gre: "GRE" };
 const GENDER_LABELS = { m: "陽性", f: "陰性", "m-f": "陽/陰性", c: "中性" };
@@ -252,6 +253,14 @@ function WordPopup({ word, data: initialData, loading, pos, lang, onClose }) {
 }
 
 export default function ClickableSentence({ text, style, lang = "en" }) {
+  // 西語走統一的 Grammar Learning Card 引擎（詞性判斷 + 動詞變位 + 文法解釋），
+  // 不再用下面這套只查平面字典的舊邏輯。
+  if (lang === "es") return <ClickableSpanishText text={text} style={style} />;
+
+  return <ClickableSentenceEn text={text} style={style} lang={lang} />;
+}
+
+function ClickableSentenceEn({ text, style, lang = "en" }) {
   const [popup, setPopup] = useState(null);
 
   useEffect(() => { loadAllEdits(); }, []);
