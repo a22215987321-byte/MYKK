@@ -18,6 +18,7 @@ import SpanishGrammar from "./SpanishGrammar";
 import SpanishVerbConjugator from "./SpanishVerbConjugator";
 import EnglishPronunciation from "./EnglishPronunciation";
 import IeltsBand4 from "./IeltsBand4";
+import { ChevronLeft, CalendarDays, Settings, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
 import {
   doc, collection, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
   query, orderBy, limitToLast, serverTimestamp,
@@ -1230,10 +1231,12 @@ export default function ChatApp({ user }) {
           .cr-mobile-topbar {
             display: flex !important;
             align-items: center;
-            gap: 10px;
-            padding: calc(env(safe-area-inset-top) + 8px) 14px 8px;
-            background: var(--panel-alt);
-            border-bottom: 1px solid var(--panel);
+            gap: 8px;
+            min-height: 56px;
+            box-sizing: border-box;
+            padding: calc(env(safe-area-inset-top) + 10px) 12px 10px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
             flex-shrink: 0;
           }
 
@@ -1241,8 +1244,8 @@ export default function ChatApp({ user }) {
           .cr-tabbar {
             display: flex !important;
             flex-shrink: 0;
-            border-top: 1px solid var(--panel);
-            background: var(--panel-alt);
+            border-top: 1px solid var(--border);
+            background: var(--panel);
             padding-bottom: env(safe-area-inset-bottom);
           }
 
@@ -1382,49 +1385,81 @@ export default function ChatApp({ user }) {
         backdropFilter: "var(--shell-blur)", WebkitBackdropFilter: "var(--shell-blur)",
       }}>
 
-        {/* Mobile topbar: back chevron (in-thread/tool only) + title + calendar */}
+        {/* Mobile topbar: back chevron（在聊天串/工具畫面時）+ 標題 + 日曆／設定／登出
+            （在聊天列表首頁時）。全部改用 lucide 圖示，跟桌面版共用邏輯、不共用這個
+            只在 isMobile 才會顯示的元素本身，所以不會影響桌面版。 */}
         <div className="cr-mobile-topbar">
           {mobileView === null ? (
             <button onClick={() => { if (inTool) { setMobileView('more'); } else { resetAllViews(); setMobileView('list'); } }} aria-label="返回"
-              style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 22, padding: 4, lineHeight: 1, flexShrink: 0 }}>
-              ‹
+              style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", padding: 6, margin: "-6px 0", lineHeight: 1, flexShrink: 0, display: "flex" }}>
+              <ChevronLeft size={24} />
             </button>
           ) : (
-            <div style={{ width: 22, flexShrink: 0 }} />
+            <div style={{ width: 24, flexShrink: 0 }} />
           )}
-          <div style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 15, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 17, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {mobileView === 'list' ? "聊天" : mobileView === 'more' ? "更多" : activeGroup ? activeGroup.name : activeFriendProfile ? activeFriendProfile.nickname : "Evonchat"}
           </div>
-          <button onClick={() => setCalendarOpen(true)} aria-label="開啟日曆"
-            style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 20, padding: 4, lineHeight: 1, flexShrink: 0 }}>
-            📅
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+            <button onClick={() => setCalendarOpen(true)} aria-label="開啟日曆"
+              style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", padding: 6, lineHeight: 1, display: "flex" }}>
+              <CalendarDays size={21} />
+            </button>
+            {mobileView === 'list' && (
+              <>
+                <button onClick={() => setShowProfile(true)} aria-label="設定"
+                  style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", padding: 6, lineHeight: 1, display: "flex" }}>
+                  <Settings size={21} />
+                </button>
+                <button onClick={() => auth.signOut()} aria-label="登出"
+                  style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", padding: 6, lineHeight: 1, display: "flex" }}>
+                  <LogOut size={21} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* 側邊欄（手機版＝聊天分頁的列表畫面；桌面版＝常駐側欄） */}
         <div className="cr-sidebar" style={{ width: 280, background: "var(--panel-alt)", borderRight: "1px solid var(--panel)", display: (isMobile && mobileView !== 'list') ? "none" : "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
 
-          {/* My info */}
-          <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--panel)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* My info — 手機版壓縮高度、拿掉桌面版才有的 ThemeToggle/登出（已移到手機版頂部列） */}
+          {isMobile ? (
+            <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border)" }}>
               <button onClick={() => setShowProfile(true)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                <AvatarImg avatarImage={myProfile.avatarImage} avatar={myProfile.avatar} color={myProfile.color} size={42} />
+                <AvatarImg avatarImage={myProfile.avatarImage} avatar={myProfile.avatar} color={myProfile.color} size={40} />
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <Link href={`/profile/${uid}`} style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none", display: "block" }}
-                  onMouseEnter={e => e.currentTarget.style.color = "#93c5fd"}
-                  onMouseLeave={e => e.currentTarget.style.color = "var(--text)"}>
+                <Link href={`/profile/${uid}`} style={{ fontWeight: 700, fontSize: 16, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none", display: "block" }}>
                   {myProfile.nickname}
                 </Link>
-                {myProfile.signature && <div style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: "italic" }}>{myProfile.signature}</div>}
-                {myProfile.statusText && <div style={{ fontSize: 11, color: "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myProfile.statusText}</div>}
-              </div>
-              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <ThemeToggle mode="inline" onOpenProfile={() => setShowProfile(true)} />
-                <button onClick={() => auth.signOut()} title="登出" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>🚪</button>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {myProfile.signature || myProfile.statusText || getStatus(myProfile.status).label}
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--panel)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button onClick={() => setShowProfile(true)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                  <AvatarImg avatarImage={myProfile.avatarImage} avatar={myProfile.avatar} color={myProfile.color} size={42} />
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Link href={`/profile/${uid}`} style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none", display: "block" }}
+                    onMouseEnter={e => e.currentTarget.style.color = "#93c5fd"}
+                    onMouseLeave={e => e.currentTarget.style.color = "var(--text)"}>
+                    {myProfile.nickname}
+                  </Link>
+                  {myProfile.signature && <div style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: "italic" }}>{myProfile.signature}</div>}
+                  {myProfile.statusText && <div style={{ fontSize: 11, color: "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myProfile.statusText}</div>}
+                </div>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <ThemeToggle mode="inline" onOpenProfile={() => setShowProfile(true)} />
+                  <button onClick={() => auth.signOut()} title="登出" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>🚪</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Scrollable nav area */}
           <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
@@ -1442,30 +1477,72 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Friend search box */}
-          <div style={{ padding: "10px 12px 6px" }}>
-            <input type="text" placeholder="搜尋好友..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "7px 12px", color: "var(--text)", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-          </div>
-
-          {/* Feed link */}
-          <div style={{ padding: "4px 10px 0" }}>
-            <Link href="/feed" style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-md)", background: "transparent", color: "var(--text)", textDecoration: "none", transition: "background 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--accent-hover)"}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-              <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#ec4899,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📰</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>動態消息</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>查看好友動態</div>
+          {isMobile ? (
+            <div style={{ padding: "12px 16px 8px" }}>
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <Search size={16} style={{ position: "absolute", left: 14, color: "var(--text-dim)", pointerEvents: "none" }} />
+                <input type="text" placeholder="搜尋好友..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  style={{ width: "100%", height: 44, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "0 14px 0 38px", color: "var(--text)", fontSize: 15, outline: "none", boxSizing: "border-box" }} />
               </div>
-            </Link>
-          </div>
+            </div>
+          ) : (
+            <div style={{ padding: "10px 12px 6px" }}>
+              <input type="text" placeholder="搜尋好友..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "7px 12px", color: "var(--text)", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+            </div>
+          )}
 
-          {/* Hall button */}
-          <div style={{ padding: "4px 10px 0" }}>
-            <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧" mobileTouch
-              active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4}
-              onClick={() => { resetAllViews(); if (isMobile) setMobileView(null); }} />
-          </div>
+          {/* Feed link + Hall button — 手機版統一成同一種「聊天列表卡片」樣式 */}
+          {isMobile ? (
+            <div style={{ padding: "4px 8px 0" }}>
+              <Link href="/feed" style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 8px", borderRadius: 14, background: "transparent", color: "var(--text)", textDecoration: "none" }}>
+                <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,#ec4899,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Newspaper size={22} color="#fff" />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text)" }}>動態消息</div>
+                  <div style={{ fontSize: 13, color: "var(--text-muted)" }}>查看好友動態</div>
+                </div>
+              </Link>
+              {(() => {
+                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4;
+                return (
+                  <button onClick={() => { resetAllViews(); if (isMobile) setMobileView(null); }}
+                    style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 8px", borderRadius: 14, border: "none", background: hallActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,var(--accent-2),#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <MessageCircle size={22} color="#fff" />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text)" }}># 公共大廳</div>
+                      <div style={{ fontSize: 13, color: "var(--text-muted)" }}>和大家聊天吧</div>
+                    </div>
+                  </button>
+                );
+              })()}
+            </div>
+          ) : (
+            <>
+              {/* Feed link */}
+              <div style={{ padding: "4px 10px 0" }}>
+                <Link href="/feed" style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-md)", background: "transparent", color: "var(--text)", textDecoration: "none", transition: "background 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--accent-hover)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#ec4899,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📰</div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>動態消息</div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>查看好友動態</div>
+                  </div>
+                </Link>
+              </div>
+
+              {/* Hall button */}
+              <div style={{ padding: "4px 10px 0" }}>
+                <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧"
+                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4}
+                  onClick={() => { resetAllViews(); }} />
+              </div>
+            </>
+          )}
 
           {!isMobile && (
           <>
@@ -1551,9 +1628,17 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Groups section */}
-          <div style={{ padding: "0 12px 4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>群組 {myGroups.length}</span>
-            <button onClick={() => setShowCreateGroup(true)} title="建立群組" style={{ background: "var(--border)", border: "none", borderRadius: "var(--radius-sm)", padding: "3px 8px", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>+</button>
+          <div style={isMobile
+            ? { padding: "0 16px", marginTop: 8, marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }
+            : { padding: "0 12px 4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={isMobile
+              ? { fontSize: 13, fontWeight: 700, color: "var(--text-muted)" }
+              : { fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>群組 {myGroups.length}</span>
+            <button onClick={() => setShowCreateGroup(true)} title="建立群組" style={isMobile
+              ? { width: 32, height: 32, borderRadius: 16, background: "var(--panel-alt)", border: "1px solid var(--border)", color: "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }
+              : { background: "var(--border)", border: "none", borderRadius: "var(--radius-sm)", padding: "3px 8px", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>
+              {isMobile ? <Plus size={16} /> : "+"}
+            </button>
           </div>
           <div style={{ padding: "0 8px 6px" }}>
             {myGroups.map(group => {
@@ -1575,15 +1660,23 @@ export default function ChatApp({ user }) {
           </div>
 
           {/* Friends header */}
-          <div style={{ padding: "0 12px 4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>好友 {myFriends.length}</span>
-            <div style={{ display: "flex", gap: 4 }}>
+          <div style={isMobile
+            ? { padding: "0 16px", marginTop: 8, marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }
+            : { padding: "0 12px 4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={isMobile
+              ? { fontSize: 13, fontWeight: 700, color: "var(--text-muted)" }
+              : { fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>好友 {myFriends.length}</span>
+            <div style={{ display: "flex", gap: isMobile ? 8 : 4, alignItems: "center" }}>
               {pendingInCount > 0 && (
                 <button onClick={() => setShowFriendReqs(true)} title="好友請求" style={{ background: "#ef4444", border: "none", borderRadius: 20, padding: "2px 8px", color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
                   🔔 {pendingInCount}
                 </button>
               )}
-              <button onClick={() => setShowFriendSearch(true)} title="加好友" style={{ background: "var(--border)", border: "none", borderRadius: "var(--radius-sm)", padding: "3px 8px", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>+</button>
+              <button onClick={() => setShowFriendSearch(true)} title="加好友" style={isMobile
+                ? { width: 32, height: 32, borderRadius: 16, background: "var(--panel-alt)", border: "1px solid var(--border)", color: "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }
+                : { background: "var(--border)", border: "none", borderRadius: "var(--radius-sm)", padding: "3px 8px", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>
+                {isMobile ? <Plus size={16} /> : "+"}
+              </button>
             </div>
           </div>
 
