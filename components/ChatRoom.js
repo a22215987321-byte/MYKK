@@ -18,7 +18,7 @@ import SpanishGrammar from "./SpanishGrammar";
 import SpanishVerbConjugator from "./SpanishVerbConjugator";
 import EnglishPronunciation from "./EnglishPronunciation";
 import IeltsBand4 from "./IeltsBand4";
-import { ChevronLeft, CalendarDays, Settings, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Settings, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
 import {
   doc, collection, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
   query, orderBy, limitToLast, serverTimestamp,
@@ -1437,6 +1437,7 @@ export default function ChatApp({ user }) {
                   {myProfile.signature || myProfile.statusText || getStatus(myProfile.status).label}
                 </div>
               </div>
+              <ChevronRight size={18} color="var(--text-dim)" style={{ flexShrink: 0 }} />
             </div>
           ) : (
             <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--panel)" }}>
@@ -1467,7 +1468,9 @@ export default function ChatApp({ user }) {
           {/* Friend request banner */}
           {pendingInCount > 0 && (
             <button onClick={() => setShowFriendReqs(true)}
-              style={{ margin: "8px 10px 0", display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#dc2626,#b91c1c)", border: "none", borderRadius: "var(--radius-md)", padding: "10px 12px", color: "#fff", cursor: "pointer", width: "calc(100% - 20px)", textAlign: "left" }}>
+              style={isMobile
+                ? { margin: "8px 16px 0", display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#dc2626,#b91c1c)", border: "none", borderRadius: 14, padding: "10px 12px", color: "#fff", cursor: "pointer", width: "calc(100% - 32px)", textAlign: "left" }
+                : { margin: "8px 10px 0", display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#dc2626,#b91c1c)", border: "none", borderRadius: "var(--radius-md)", padding: "10px 12px", color: "#fff", cursor: "pointer", width: "calc(100% - 20px)", textAlign: "left" }}>
               <span style={{ fontSize: 18 }}>🔔</span>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 13 }}>你有 {pendingInCount} 個好友請求</div>
@@ -1494,8 +1497,8 @@ export default function ChatApp({ user }) {
 
           {/* Feed link + Hall button — 手機版統一成同一種「聊天列表卡片」樣式 */}
           {isMobile ? (
-            <div style={{ padding: "4px 8px 0" }}>
-              <Link href="/feed" style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 8px", borderRadius: 14, background: "transparent", color: "var(--text)", textDecoration: "none" }}>
+            <div style={{ padding: "4px 16px 0" }}>
+              <Link href="/feed" style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, background: "transparent", color: "var(--text)", textDecoration: "none" }}>
                 <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,#ec4899,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <Newspaper size={22} color="#fff" />
                 </div>
@@ -1508,7 +1511,7 @@ export default function ChatApp({ user }) {
                 const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4;
                 return (
                   <button onClick={() => { resetAllViews(); if (isMobile) setMobileView(null); }}
-                    style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 8px", borderRadius: 14, border: "none", background: hallActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
+                    style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: hallActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
                     <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,var(--accent-2),#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <MessageCircle size={22} color="#fff" />
                     </div>
@@ -1640,19 +1643,23 @@ export default function ChatApp({ user }) {
               {isMobile ? <Plus size={16} /> : "+"}
             </button>
           </div>
-          <div style={{ padding: "0 8px 6px" }}>
+          <div style={{ padding: isMobile ? "0 16px 4px" : "0 8px 6px" }}>
             {myGroups.map(group => {
               const isActive = activeGroupId === group.id;
               return (
                 <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); if (isMobile) setMobileView(null); }}
                   className={`fb ${isActive ? "act" : ""}`}
-                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s", marginBottom: 2 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,var(--text-dim),var(--border))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                  style={isMobile
+                    ? { width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }
+                    : { width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s", marginBottom: 2 }}>
+                  <div style={isMobile
+                    ? { width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg,var(--text-dim),var(--border))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }
+                    : { width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,var(--text-dim),var(--border))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
                     {group.avatar || "👥"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(group.members || []).length} 人</div>
+                    <div style={{ fontWeight: 600, fontSize: isMobile ? 16 : 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.name}</div>
+                    <div style={{ fontSize: isMobile ? 13 : 11, color: isMobile ? "var(--text-muted)" : "var(--text-faint)" }}>{(group.members || []).length} 人</div>
                   </div>
                 </button>
               );
@@ -1681,7 +1688,7 @@ export default function ChatApp({ user }) {
           </div>
 
           {/* Friend list */}
-          <div style={{ padding: "0 8px 8px" }}>
+          <div style={{ padding: isMobile ? "0 16px 8px" : "0 8px 8px" }}>
             {myFriends.length === 0 && !searchQuery && (
               <div style={{ textAlign: "center", padding: "20px 12px", color: "var(--text-dim)", fontSize: 13 }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>👋</div>
@@ -1706,14 +1713,16 @@ export default function ChatApp({ user }) {
                   onTouchEnd={() => clearTimeout(longPressTimerRef.current)}
                   onTouchMove={() => clearTimeout(longPressTimerRef.current)}
                   className={`fb ${isActive ? "act" : ""}`}
-                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s", marginBottom: 2, WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}>
+                  style={isMobile
+                    ? { width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }
+                    : { width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s", marginBottom: 2, WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}>
                   <div style={{ position: "relative", flexShrink: 0 }}>
-                    <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={36} />
-                    <span style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
+                    <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={isMobile ? 48 : 36} />
+                    <span style={{ position: "absolute", bottom: 1, right: 1, width: isMobile ? 12 : 10, height: isMobile ? 12 : 10, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{friend.nickname}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontWeight: 600, fontSize: isMobile ? 16 : 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{friend.nickname}</div>
+                    <div style={{ fontSize: isMobile ? 13 : 11, color: isMobile ? "var(--text-muted)" : "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {friend.statusText || getStatus(friend.status).label}
                     </div>
                   </div>
