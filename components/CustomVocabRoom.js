@@ -54,11 +54,11 @@ function CreateListModal({ onClose, onCreate }) {
   const valid = title.trim() && language;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 400, border: "1px solid var(--border)", padding: 24 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <div style={{ background: "var(--panel)", borderRadius: 20, width: 400, maxWidth: "92vw", maxHeight: "90vh", overflowY: "auto", border: "1px solid var(--border)", padding: 24, boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ color: "var(--text)", margin: 0, fontSize: 18, fontWeight: 700 }}>建立新詞彙表</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 22 }}>✕</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 22, minWidth: 44, minHeight: 44 }}>✕</button>
         </div>
 
         <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>詞彙表名稱 *</label>
@@ -102,11 +102,11 @@ function WordModal({ word: initWord, onClose, onSave, categories }) {
   const hasCats = categories && categories.length > 0;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 420, maxHeight: "90vh", overflow: "auto", border: "1px solid var(--border)", padding: 24 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <div style={{ background: "var(--panel)", borderRadius: 20, width: 420, maxWidth: "92vw", maxHeight: "90vh", overflow: "auto", border: "1px solid var(--border)", padding: 24, boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ color: "var(--text)", margin: 0, fontSize: 18, fontWeight: 700 }}>{initWord ? "編輯單字" : "新增單字"}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 22 }}>✕</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 22, minWidth: 44, minHeight: 44 }}>✕</button>
         </div>
         <WordField label="單字" value={form.word} onChange={v => set("word", v)} placeholder="輸入單字" required />
         <WordField label="中文翻譯" value={form.cn} onChange={v => set("cn", v)} placeholder="中文意思" required />
@@ -480,6 +480,15 @@ function ManageView({ list, db, onBack, onUpdate }) {
   };
   const handleWordDragEnd = () => { setWordDragIdx(null); setWordDragOver(null); };
 
+  const moveCategory = async (idx, dir) => {
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= categories.length) return;
+    const newCats = [...categories];
+    [newCats[idx], newCats[newIdx]] = [newCats[newIdx], newCats[idx]];
+    await updateDoc(doc(db, "vocabLists", list.id), { categories: newCats });
+    onUpdate({ ...list, categories: newCats });
+  };
+
   const handleCatDragStart = (e, idx) => {
     setCatDragIdx(idx);
     e.dataTransfer.effectAllowed = "move";
@@ -542,8 +551,12 @@ function ManageView({ list, db, onBack, onUpdate }) {
                 transition: "all 0.15s" }}>
               <span style={{ fontSize: 11, color: "var(--text-dim)", marginRight: 2, userSelect: "none" }}>⠿</span>
               <span style={{ fontSize: 13, color: "#a78bfa", fontWeight: 600 }}>{cat}</span>
+              <button onClick={() => moveCategory(ci, -1)} disabled={ci === 0}
+                style={{ background: "none", border: "none", color: ci === 0 ? "var(--border)" : "var(--text-faint)", cursor: ci === 0 ? "default" : "pointer", fontSize: 12, lineHeight: 1, padding: "8px 3px", minHeight: 32 }}>◀</button>
+              <button onClick={() => moveCategory(ci, 1)} disabled={ci === categories.length - 1}
+                style={{ background: "none", border: "none", color: ci === categories.length - 1 ? "var(--border)" : "var(--text-faint)", cursor: ci === categories.length - 1 ? "default" : "pointer", fontSize: 12, lineHeight: 1, padding: "8px 3px", minHeight: 32 }}>▶</button>
               <button onClick={() => deleteCategory(cat)}
-                style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 2px" }}>✕</button>
+                style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "8px 6px", minHeight: 32 }}>✕</button>
             </div>
           ))}
           {showCatInput ? (
@@ -635,7 +648,7 @@ function ManageView({ list, db, onBack, onUpdate }) {
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontWeight: 700, color: "#a78bfa", fontSize: 16 }}>{item.word}</span>
                 <button onClick={() => speakWord(item.word, speechLang)}
-                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#a78bfa", opacity: 0.7, padding: "2px 4px" }}
+                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#a78bfa", opacity: 0.7, padding: "8px", minWidth: 36, minHeight: 36 }}
                   onMouseEnter={e => e.currentTarget.style.opacity = 1}
                   onMouseLeave={e => e.currentTarget.style.opacity = 0.7}>🔊</button>
                 {item.phonetic && <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{item.phonetic}</span>}
@@ -656,11 +669,11 @@ function ManageView({ list, db, onBack, onUpdate }) {
                   style={{ background: "var(--panel)", border: "none", borderRadius: 6, padding: "2px 8px", color: idx === words.length - 1 ? "var(--border)" : "var(--text-muted)", cursor: idx === words.length - 1 ? "default" : "pointer", fontSize: 11 }}>▼</button>
               </div>
             )}
-            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
               <button onClick={() => setEditIdx(idx)}
-                style={{ background: "var(--accent-hover)", border: "none", borderRadius: 8, padding: "5px 10px", color: "#60a5fa", cursor: "pointer", fontSize: 13 }}>✏️</button>
+                style={{ background: "var(--accent-hover)", border: "none", borderRadius: 8, padding: "9px 12px", color: "#60a5fa", cursor: "pointer", fontSize: 14, minWidth: 36, minHeight: 36 }}>✏️</button>
               <button onClick={() => deleteWord(idx)}
-                style={{ background: "#2d1515", border: "none", borderRadius: 8, padding: "5px 10px", color: "#f87171", cursor: "pointer", fontSize: 13 }}>🗑️</button>
+                style={{ background: "#2d1515", border: "none", borderRadius: 8, padding: "9px 12px", color: "#f87171", cursor: "pointer", fontSize: 14, minWidth: 36, minHeight: 36 }}>🗑️</button>
             </div>
           </div>
         ))}

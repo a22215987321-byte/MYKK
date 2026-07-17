@@ -117,6 +117,16 @@ body {
   background: var(--page-bg);
   color: var(--text);
   font-family: var(--font-body);
+  overflow-wrap: break-word;
+}
+
+/* Prevent oversized media/tables from forcing horizontal overflow on narrow screens */
+img, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+table {
+  max-width: 100%;
 }
 
 html[data-theme="neon"] .glow-frame {

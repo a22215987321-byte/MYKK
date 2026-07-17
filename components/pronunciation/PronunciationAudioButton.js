@@ -42,7 +42,7 @@ export default function PronunciationAudioButton({
   if (!canPlay) {
     return (
       <button disabled title={unavailableLabel}
-        style={{ width: 28, height: 28, borderRadius: 8, background: "var(--panel-alt)", border: "1px solid var(--border)", cursor: "not-allowed", fontSize: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.45 }}>
+        style={{ width: 36, height: 36, borderRadius: 8, background: "var(--panel-alt)", border: "1px solid var(--border)", cursor: "not-allowed", fontSize: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.45 }}>
         {v.icon}
       </button>
     );
@@ -51,7 +51,7 @@ export default function PronunciationAudioButton({
   return (
     <button onClick={handleClick} title={title || (variant === "slow" ? "慢速" : "正常速度")}
       style={{
-        width: 28, height: 28, borderRadius: 8,
+        width: 36, height: 36, borderRadius: 8,
         background: playing ? (accentBg || v.bg) : (accentBg || v.bg),
         border: `1px solid ${accentBorder || v.border}`,
         cursor: "pointer", fontSize: 13, flexShrink: 0,

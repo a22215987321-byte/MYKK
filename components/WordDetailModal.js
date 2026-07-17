@@ -69,14 +69,14 @@ export default function WordDetailModal({ word, data, lang, onClose, onEdit }) {
       <div onClick={e => e.stopPropagation()}
         style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20,
           width: 560, maxWidth: "96vw", boxShadow: "0 24px 60px rgba(0,0,0,0.7)",
-          display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 48px)", overflow: "hidden" }}>
+          display: "flex", flexDirection: "column", maxHeight: "min(calc(100vh - 48px), calc(100dvh - 48px))", overflow: "hidden" }}>
 
         {/* Header */}
         <div style={{ padding: "18px 22px 14px", borderBottom: "1px solid var(--panel)",
           display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <button onClick={onClose}
             style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer",
-              fontSize: 20, lineHeight: 1, padding: "2px 4px", borderRadius: 4 }}>✕</button>
+              fontSize: 20, lineHeight: 1, padding: 10, minWidth: 40, minHeight: 40, borderRadius: 4 }}>✕</button>
           <span style={{ fontWeight: 800, fontSize: 22, color: "#a78bfa", flex: 1 }}>{word}</span>
           <button onClick={() => speak(word, lang)} title="發音"
             style={{ background: "none", border: "none", cursor: "pointer",

@@ -96,7 +96,7 @@ export default function GrammarLearningCard({ word, onClose, onAddVocab }) {
         <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           {stack.length > 1 && (
             <button onClick={popWord} title="返回上一個詞"
-              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 20, padding: 0, lineHeight: 1, flexShrink: 0 }}>
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 20, padding: 0, minWidth: 44, minHeight: 44, lineHeight: 1, flexShrink: 0 }}>
               ‹
             </button>
           )}
@@ -150,7 +150,7 @@ export default function GrammarLearningCard({ word, onClose, onAddVocab }) {
             )}
           </div>
           <button onClick={onClose} title="關閉"
-            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 22, lineHeight: 1, flexShrink: 0 }}>✕</button>
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 22, lineHeight: 1, minWidth: 44, minHeight: 44, flexShrink: 0 }}>✕</button>
         </div>
 
         {/* Body */}

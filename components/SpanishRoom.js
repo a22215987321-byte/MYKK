@@ -309,7 +309,7 @@ export default function SpanishRoom({ user, db }) {
                       <button
                         onClick={() => speakSpanish(item.word)}
                         title="聽西班牙語發音"
-                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: "2px 4px", borderRadius: 6, color: "#f87171", opacity: 0.7 }}
+                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: "8px", minWidth: 36, minHeight: 36, borderRadius: 6, color: "#f87171", opacity: 0.7 }}
                         onMouseEnter={e => e.currentTarget.style.opacity = 1}
                         onMouseLeave={e => e.currentTarget.style.opacity = 0.7}
                       >🔊</button>
@@ -324,8 +324,8 @@ export default function SpanishRoom({ user, db }) {
                     <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2, lineHeight: 1.5 }}>{item.exampleCn}</div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, marginLeft: 10 }}>
-                    <button onClick={() => toggleBookmark(item.word)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, lineHeight: 1, opacity: bookmarkedWords.has(item.word) ? 1 : 0.3, transition: "opacity 0.15s" }} title="書籤">⭐</button>
-                    <button onClick={() => toggleLearned(item.word)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, lineHeight: 1, opacity: learnedWords.has(item.word) ? 1 : 0.3, transition: "opacity 0.15s" }} title="標記已學">✅</button>
+                    <button onClick={() => toggleBookmark(item.word)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 8, minWidth: 36, minHeight: 36, opacity: bookmarkedWords.has(item.word) ? 1 : 0.3, transition: "opacity 0.15s" }} title="書籤">⭐</button>
+                    <button onClick={() => toggleLearned(item.word)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 8, minWidth: 36, minHeight: 36, opacity: learnedWords.has(item.word) ? 1 : 0.3, transition: "opacity 0.15s" }} title="標記已學">✅</button>
                   </div>
                 </div>
               </div>

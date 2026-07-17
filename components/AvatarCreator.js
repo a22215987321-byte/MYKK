@@ -209,17 +209,28 @@ export default function AvatarCreator({ myProfile, onClose }) {
   );
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }}>
-      <div style={{ background: "var(--panel)", borderRadius: 20, width: 560, maxHeight: "92vh", overflow: "hidden", border: "1px solid var(--border)", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <style>{`
+        .ac-modal { width: 560px; max-height: 92vh; }
+        .ac-body { flex-direction: row; overflow: hidden; }
+        .ac-left { width: 200px; border-right: 1px solid var(--border); border-bottom: none; }
+        @media (max-width: 600px) {
+          .ac-modal { width: calc(100% - 20px); max-width: 100%; max-height: calc(100dvh - 20px); border-radius: 16px; }
+          .ac-body { flex-direction: column; overflow-y: auto; }
+          .ac-left { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+          .ac-close-btn { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+        }
+      `}</style>
+      <div className="ac-modal" style={{ background: "var(--panel)", borderRadius: 20, overflow: "hidden", border: "1px solid var(--border)", display: "flex", flexDirection: "column", boxSizing: "border-box" }}>
         {/* Header */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 17, color: "var(--text)" }}>🎨 設計我的頭像</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 22 }}>✕</button>
+          <button onClick={onClose} className="ac-close-btn" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 22 }}>✕</button>
         </div>
 
-        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        <div className="ac-body" style={{ display: "flex", flex: 1 }}>
           {/* Left: Preview */}
-          <div style={{ width: 200, padding: "20px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14, flexShrink: 0, borderRight: "1px solid var(--border)", background: "var(--panel-alt)" }}>
+          <div className="ac-left" style={{ padding: "20px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14, flexShrink: 0, background: "var(--panel-alt)" }}>
             <canvas ref={canvasRef} width={200} height={200}
               style={{ borderRadius: 14, border: "2px solid var(--border)", width: 168, height: 168 }} />
 

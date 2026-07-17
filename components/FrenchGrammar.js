@@ -283,7 +283,7 @@ export default function FrenchGrammar({ user, db, onNav }) {
         </div>
 
         {/* Table */}
-        <div style={{ marginBottom: 22, borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden" }}>
+        <div style={{ marginBottom: 22, borderRadius: 14, border: "1px solid var(--border)", overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>

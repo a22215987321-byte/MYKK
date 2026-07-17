@@ -24,7 +24,7 @@ function PlayButton({ text, sm }) {
   }
   return (
     <button onClick={handle} title="播放發音"
-      style={{ width: sm ? 26 : 30, height: sm ? 26 : 30, borderRadius: 8, flexShrink: 0,
+      style={{ width: sm ? 32 : 36, height: sm ? 32 : 36, borderRadius: 8, flexShrink: 0,
         border: `1px solid ${active ? "#dc2626" : "var(--border)"}`, background: active ? "rgba(220,38,38,0.12)" : "var(--panel-alt)",
         color: active ? "#ef4444" : "var(--text-faint)", cursor: "pointer", fontSize: sm ? 11 : 13,
         display: "flex", alignItems: "center", justifyContent: "center" }}>

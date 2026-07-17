@@ -6,6 +6,7 @@ import CalendarMemo from "./CalendarMemo";
 import PageNotes from "./PageNotes";
 import ThemeToggle from "./ThemeToggle";
 import NavItem from "./nav/NavItem";
+import NavLinkItem from "./nav/NavLinkItem";
 import ChatMoreMenu from "./ChatMoreMenu";
 import ChatMobileTabBar from "./ChatMobileTabBar";
 import VocabRoom from "./VocabRoom";
@@ -1617,6 +1618,20 @@ export default function ChatApp({ user }) {
           <div style={{ padding: "0 10px 6px" }}>
             <NavItem compact icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢"
               active={showSpanishVerbs} onClick={() => { resetAllViews(); setShowSpanishVerbs(true); }} />
+          </div>
+
+          {/* French section label */}
+          <div style={{ padding: "4px 12px 2px" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>🇫🇷 法語學習</span>
+          </div>
+          <div style={{ padding: "0 10px 2px" }}>
+            <NavLinkItem compact href="/french/pronunciation" icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="法語發音" sublabel="母音・鼻母音・子音" />
+          </div>
+          <div style={{ padding: "0 10px 2px" }}>
+            <NavLinkItem compact href="/french/grammar" icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="法語文法" sublabel="核心文法規則" />
+          </div>
+          <div style={{ padding: "0 10px 6px" }}>
+            <NavLinkItem compact href="/french/a1" icon="🗺️" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="法語 A1" sublabel="A1 常用詞彙" />
           </div>
 
           {/* Custom vocab button */}

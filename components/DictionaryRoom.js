@@ -38,9 +38,9 @@ function ExpandedCard({ word, data, lang, onClose, onSpeak, onAddToVocab }) {
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
         <span style={{ fontWeight: 700, fontSize: 15, color: "#a78bfa", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{word}</span>
         <button onClick={onSpeak} title="發音"
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#60a5fa", fontSize: 15, padding: "2px 3px", flexShrink: 0, lineHeight: 1 }}>🔊</button>
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#60a5fa", fontSize: 15, padding: 8, minWidth: 32, minHeight: 32, flexShrink: 0, lineHeight: 1 }}>🔊</button>
         <button onClick={onClose} title="關閉"
-          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 13, padding: "2px 3px", flexShrink: 0, lineHeight: 1 }}>✕</button>
+          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 13, padding: 8, minWidth: 32, minHeight: 32, flexShrink: 0, lineHeight: 1 }}>✕</button>
       </div>
       {/* Badges */}
       <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", flexShrink: 0 }}>
@@ -178,10 +178,10 @@ function WordCard({ word, data, lang, onWordClick, onEdit, onAddToVocab }) {
         <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
           <button onClick={() => onEdit(word, data)} title="編輯"
             style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)",
-              fontSize: 14, padding: "2px 4px", borderRadius: 4 }}>✏️</button>
+              fontSize: 14, padding: 8, minWidth: 36, minHeight: 36, borderRadius: 4 }}>✏️</button>
           <button onClick={() => speak(word, lang, data.audioUrl)} title="發音"
             style={{ background: "none", border: "none", cursor: "pointer", color: "#60a5fa",
-              fontSize: 18, padding: "2px 4px", borderRadius: 6 }}>🔊</button>
+              fontSize: 18, padding: 8, minWidth: 36, minHeight: 36, borderRadius: 6 }}>🔊</button>
         </div>
         <button onClick={() => onAddToVocab(word, data)} title="加入詞彙表"
           style={{ background: "#0a1e14", border: "1px solid #166534", borderRadius: 6,

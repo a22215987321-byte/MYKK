@@ -322,7 +322,7 @@ export default function VocabRoom({ user, db }) {
                       <button
                         onClick={() => speakWord(item.word)}
                         title="聽發音"
-                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "2px 4px", borderRadius: 6, color: "#60a5fa", opacity: 0.7 }}
+                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "8px", minWidth: 36, minHeight: 36, borderRadius: 6, color: "#60a5fa", opacity: 0.7 }}
                         onMouseEnter={e => e.currentTarget.style.opacity = 1}
                         onMouseLeave={e => e.currentTarget.style.opacity = 0.7}
                       >🔊</button>
@@ -360,6 +360,9 @@ export default function VocabRoom({ user, db }) {
                         cursor: "pointer",
                         fontSize: 18,
                         lineHeight: 1,
+                        padding: 8,
+                        minWidth: 36,
+                        minHeight: 36,
                         opacity: bookmarkedWords.has(item.word) ? 1 : 0.3,
                         transition: "opacity 0.15s",
                       }}
@@ -373,6 +376,9 @@ export default function VocabRoom({ user, db }) {
                         cursor: "pointer",
                         fontSize: 18,
                         lineHeight: 1,
+                        padding: 8,
+                        minWidth: 36,
+                        minHeight: 36,
                         opacity: learnedWords.has(item.word) ? 1 : 0.3,
                         transition: "opacity 0.15s",
                       }}

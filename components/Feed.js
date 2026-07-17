@@ -315,7 +315,7 @@ export default function FeedApp({ user }) {
 
   if (!myProfile) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ minHeight: "100dvh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ color: "var(--text-faint)" }}>載入中...</div>
       </div>
     );
@@ -338,7 +338,7 @@ export default function FeedApp({ user }) {
           .feed-action-btn { padding: 8px 4px !important; }
         }
       `}</style>
-      <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "'Inter','Helvetica Neue',sans-serif" }}>
+      <div style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", fontFamily: "'Inter','Helvetica Neue',sans-serif" }}>
 
         {/* Top Nav */}
         <div className="feed-topnav" style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 20px", height: 56 }}>

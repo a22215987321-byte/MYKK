@@ -1,4 +1,5 @@
 import NavItem from "./nav/NavItem";
+import NavLinkItem from "./nav/NavLinkItem";
 
 // Mobile-only "更多" tab: collects the non-chat features that live in the
 // desktop sidebar (leaderboard, cinema, language-learning tools, dictionary).
@@ -52,6 +53,19 @@ export default function ChatMoreMenu({ state, setters, onOpen }) {
       <div style={{ padding: "0 10px 10px" }}>
         <NavItem icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢" mobileTouch
           active={state.showSpanishVerbs} onClick={() => onOpen(setters.setShowSpanishVerbs)} />
+      </div>
+
+      <div style={{ padding: "4px 14px 4px" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>🇫🇷 法語學習</span>
+      </div>
+      <div style={{ padding: "0 10px 6px" }}>
+        <NavLinkItem href="/french/pronunciation" icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="法語發音" sublabel="母音・鼻母音・子音" />
+      </div>
+      <div style={{ padding: "0 10px 6px" }}>
+        <NavLinkItem href="/french/grammar" icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="法語文法" sublabel="核心文法規則" />
+      </div>
+      <div style={{ padding: "0 10px 10px" }}>
+        <NavLinkItem href="/french/a1" icon="🗺️" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="法語 A1" sublabel="A1 常用詞彙" />
       </div>
 
       <div style={{ padding: "0 10px 6px" }}>
