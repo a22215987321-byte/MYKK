@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { auth, db } from "../../lib/firebase";
+import MobileTabBarLayout from "../../components/MobileTabBarLayout";
 import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 
 async function uploadToR2(file) {
@@ -251,6 +252,7 @@ export default function ProfilePublicPage() {
           .pp-banner { height: 140px !important; }
           .pp-avatar { width: 84px !important; height: 84px !important; }
           .pp-avatar-row { margin-top: -42px !important; }
+          .pp-root { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
         }
       `}</style>
 
@@ -267,7 +269,7 @@ export default function ProfilePublicPage() {
         </div>
       )}
 
-      <div style={{ minHeight: "100vh", background: "var(--panel-alt)", color: "var(--text)", fontFamily: "'Inter','Helvetica Neue',sans-serif" }}>
+      <div className="pp-root" style={{ minHeight: "100vh", background: "var(--panel-alt)", color: "var(--text)", fontFamily: "'Inter','Helvetica Neue',sans-serif", boxSizing: "border-box" }}>
 
         {/* Sticky top bar */}
         <div style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,23,42,0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 16, padding: "0 16px", height: 52 }}>
@@ -450,6 +452,7 @@ export default function ProfilePublicPage() {
           )}
         </div>
       </div>
+      <MobileTabBarLayout activeTab={isOwner ? "me" : undefined} />
     </>
   );
 }

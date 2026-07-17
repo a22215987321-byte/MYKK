@@ -6,6 +6,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 import Link from "next/link";
+import MobileTabBarLayout from "./MobileTabBarLayout";
 
 async function uploadToR2(file) {
   const base64 = await new Promise((resolve, reject) => {
@@ -336,9 +337,10 @@ export default function FeedApp({ user }) {
           .feed-topnav { padding: 0 14px !important; }
           .feed-media img, .feed-media video { max-height: 320px !important; }
           .feed-action-btn { padding: 8px 4px !important; }
+          .feed-page-root { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
         }
       `}</style>
-      <div style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", fontFamily: "'Inter','Helvetica Neue',sans-serif" }}>
+      <div className="feed-page-root" style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", fontFamily: "'Inter','Helvetica Neue',sans-serif", boxSizing: "border-box" }}>
 
         {/* Top Nav */}
         <div className="feed-topnav" style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 20px", height: 56 }}>
@@ -373,6 +375,7 @@ export default function FeedApp({ user }) {
           ))}
         </div>
       </div>
+      <MobileTabBarLayout activeTab="feed" pendingCount={(myProfile.pendingIn || []).length} />
     </>
   );
 }

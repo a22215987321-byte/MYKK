@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { MessageCircle, Newspaper, Compass, Smile } from "lucide-react";
+import { auth } from "../lib/firebase";
 
 function TabButton({ Icon, label, active, onClick, badge }) {
   return (
@@ -21,19 +23,42 @@ function TabButton({ Icon, label, active, onClick, badge }) {
   );
 }
 
+// activeTab/onSelectChats/onSelectMore/onOpenProfile are all optional: when this bar
+// is docked inside ChatRoom, ChatRoom passes explicit callbacks that just flip local
+// SPA state. When it's mounted standalone (via MobileTabBarLayout, on pages like
+// /feed or /profile/[uid] that live outside ChatRoom entirely), none of those callbacks
+// exist — the router-based fallbacks below take over so the bar is still fully usable.
 export default function ChatMobileTabBar({ activeTab, onSelectChats, onSelectMore, onOpenProfile, pendingCount = 0 }) {
+  const router = useRouter();
+  const goChats = onSelectChats || (() => router.push('/?view=list'));
+  const goMore = onSelectMore || (() => router.push('/?view=more'));
+  const goProfile = onOpenProfile || (() => router.push(`/profile/${auth.currentUser?.uid || ''}`));
+
   return (
     <div className="cr-tabbar">
-      <TabButton Icon={MessageCircle} label="聊天" active={activeTab === 'chat'} onClick={onSelectChats} badge={pendingCount} />
+      <style>{`
+        .cr-tabbar { display: none; }
+        @media (max-width: 767px) {
+          .cr-tabbar {
+            display: flex !important;
+            flex-shrink: 0;
+            border-top: 1px solid var(--border);
+            background: var(--panel);
+            padding-bottom: env(safe-area-inset-bottom);
+          }
+        }
+      `}</style>
+      <TabButton Icon={MessageCircle} label="聊天" active={activeTab === 'chat'} onClick={goChats} badge={pendingCount} />
       <Link href="/feed" style={{
         flex: 1, minHeight: 56, display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", gap: 3, textDecoration: "none", color: "var(--text-dim)", padding: "6px 0",
+        justifyContent: "center", gap: 3, textDecoration: "none",
+        color: activeTab === 'feed' ? "var(--accent)" : "var(--text-dim)", padding: "6px 0",
       }}>
-        <Newspaper size={22} strokeWidth={2} />
-        <span style={{ fontSize: 12, fontWeight: 500 }}>動態消息</span>
+        <Newspaper size={22} strokeWidth={activeTab === 'feed' ? 2.4 : 2} />
+        <span style={{ fontSize: 12, fontWeight: activeTab === 'feed' ? 700 : 500 }}>動態消息</span>
       </Link>
-      <TabButton Icon={Compass} label="更多" active={activeTab === 'more'} onClick={onSelectMore} />
-      <TabButton Icon={Smile} label="我" active={false} onClick={onOpenProfile} />
+      <TabButton Icon={Compass} label="更多" active={activeTab === 'more'} onClick={goMore} />
+      <TabButton Icon={Smile} label="我" active={activeTab === 'me'} onClick={goProfile} />
     </div>
   );
 }

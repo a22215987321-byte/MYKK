@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/router';
 import ChatRoom from '../components/ChatRoom';
 import { auth, db, googleProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -263,6 +264,7 @@ function getErrorMessage(code) {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [user, setUser] = useState(null);
   const [step, setStep] = useState('loading'); // loading | login | setup | chat
 
@@ -287,7 +289,10 @@ export default function Home() {
       setUser(u);
       const snap = await getDoc(doc(db, 'users', u.uid));
       if (snap.exists()) {
-        setStep('splash');
+        // Arriving via the mobile tab bar's ?view= redirect (from /feed or
+        // /profile/[uid], which live outside ChatRoom) should drop straight
+        // into chat, not replay the splash screen every time.
+        setStep(router.query.view ? 'chat' : 'splash');
       } else {
         setSetupNickname(u.displayName || '');
         setStep('setup');

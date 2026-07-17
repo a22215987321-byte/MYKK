@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { auth, db } from "../lib/firebase";
 import AvatarCreator from "./AvatarCreator";
 import CalendarMemo from "./CalendarMemo";
 import PageNotes from "./PageNotes";
 import ThemeToggle from "./ThemeToggle";
 import NavItem from "./nav/NavItem";
-import NavLinkItem from "./nav/NavLinkItem";
 import ChatMoreMenu from "./ChatMoreMenu";
 import ChatMobileTabBar from "./ChatMobileTabBar";
 import VocabRoom from "./VocabRoom";
@@ -617,6 +617,7 @@ function DonateModal({ myProfile, onClose }) {
 // Main ChatApp
 
 export default function ChatApp({ user }) {
+  const router = useRouter();
   const uid = user.uid;
 
   const [myProfile,      setMyProfile]      = useState(null);
@@ -666,6 +667,7 @@ export default function ChatApp({ user }) {
   const [isMobile,       setIsMobile]       = useState(false);
   const [calendarOpen,   setCalendarOpen]   = useState(false);
   const [mobileView,     setMobileView]     = useState(null); // 'list' | 'more' | null (content-driven)
+  const [dragX,          setDragX]          = useState(null); // live px offset while swipe-dragging cr-main/cr-sidebar; null = not dragging
 
   const resetAllViews = useCallback(() => {
     setActiveFriendId(null); setActiveGroupId(null);
@@ -702,7 +704,9 @@ export default function ChatApp({ user }) {
   const peerConnectionsRef = useRef({});
   const myPeerRef = useRef(null);
   const cinemaCommentsEndRef = useRef(null);
-  const mainTouchRef = useRef(null); // 手機版：從內容區域向右滑，回到聊天列表/更多選單
+  const mainTouchRef = useRef(null); // 手機版：從內容區域向右滑，回到聊天列表；{ x, y, locked: null|true|false }
+  const dragRafRef = useRef(null);
+  const latestDxRef = useRef(0);
   const signalUnsubRef = useRef(null);
   const commentsUnsubRef = useRef(null);
   const viewersUnsubRef = useRef(null);
@@ -806,6 +810,19 @@ export default function ChatApp({ user }) {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  // Standalone pages outside this SPA (e.g. /feed, /profile/[uid]) send the
+  // mobile tab bar's "聊天"/"更多" taps back here as /?view=list|more, since
+  // mobileView is local state they have no other way to reach. Consume it once
+  // and strip it so it doesn't linger in the URL/history.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const v = router.query.view;
+    if (v === "list" || v === "more") {
+      setMobileView(v);
+      router.replace("/", undefined, { shallow: true });
+    }
+  }, [router.isReady]);
 
   // Escape to close calendar overlay
   useEffect(() => {
@@ -1135,23 +1152,40 @@ export default function ChatApp({ user }) {
     showEnglishPron || showIeltsBand4;
   const inThread = !!activeFriendId || !!activeGroupId;
 
-  // 手機版：在內容區域（聊天串/工具畫面）向右滑，回到左側導覽（聊天列表或更多選單），
-  // 跟頂部返回鍵是同一個動作，只是多一種手勢觸發方式。用水平位移為主的門檻避免誤觸垂直捲動。
+  // 手機版：在內容區域（聊天串/工具畫面）向右滑，畫面即時跟著手指移動，放開後
+  // 依拖曳距離決定要滑回聊天列表，還是彈回原位。跟頂部返回鍵是同一個目的地，
+  // 只是多一種手勢觸發方式。用水平位移為主的門檻避免誤觸垂直捲動。
   function handleMainTouchStart(e) {
     if (!isMobile || mobileView !== null) return;
     const t = e.touches[0];
-    mainTouchRef.current = { x: t.clientX, y: t.clientY };
+    mainTouchRef.current = { x: t.clientX, y: t.clientY, locked: null };
   }
-  function handleMainTouchEnd(e) {
+  function handleMainTouchMove(e) {
     const start = mainTouchRef.current;
-    mainTouchRef.current = null;
-    if (!start || !isMobile || mobileView !== null) return;
-    const t = e.changedTouches[0];
+    if (!start) return;
+    const t = e.touches[0];
     const dx = t.clientX - start.x;
     const dy = t.clientY - start.y;
-    if (dx < 70 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    if (inTool) setMobileView('more');
-    else { resetAllViews(); setMobileView('list'); }
+    if (start.locked === null) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      start.locked = Math.abs(dx) >= Math.abs(dy) * 1.5;
+    }
+    if (!start.locked) return;
+    latestDxRef.current = Math.max(0, Math.min(dx, window.innerWidth));
+    if (dragRafRef.current == null) {
+      dragRafRef.current = requestAnimationFrame(() => {
+        setDragX(latestDxRef.current);
+        dragRafRef.current = null;
+      });
+    }
+  }
+  function handleMainTouchEnd() {
+    if (dragRafRef.current != null) { cancelAnimationFrame(dragRafRef.current); dragRafRef.current = null; }
+    const start = mainTouchRef.current;
+    mainTouchRef.current = null;
+    if (!start || !isMobile || mobileView !== null || !start.locked) { setDragX(null); return; }
+    if (latestDxRef.current >= 70) { resetAllViews(); setMobileView('list'); }
+    setDragX(null);
   }
 
   const leaderboard = Object.values(
@@ -1189,9 +1223,6 @@ export default function ChatApp({ user }) {
         /* ── Mobile topbar: hidden on desktop ── */
         .cr-mobile-topbar { display: none; }
 
-        /* ── Mobile tab bar: hidden on desktop ── */
-        .cr-tabbar { display: none; }
-
         /* ── Calendar overlay ── */
         .cr-cal { flex-shrink: 0; }
 
@@ -1207,25 +1238,38 @@ export default function ChatApp({ user }) {
             flex-direction: column !important;
           }
 
-          /* Sidebar (聊天分頁): full-width panel, shown/hidden via JS display toggle */
+          /* cr-swipe-stage：側邊欄跟主要區域改用絕對定位疊在一起，靠 transform
+             即時位移做出「手指滑多少、畫面跟著移多少」的抽屜效果（見 handleMainTouchMove）。 */
+          .cr-swipe-stage {
+            position: relative;
+            overflow: hidden;
+          }
+
+          /* Sidebar (聊天分頁): full-width panel, position driven by transform (JS) */
           .cr-sidebar {
+            position: absolute !important;
+            inset: 0 !important;
             width: 100% !important;
+            height: 100% !important;
             border-right: none !important;
             padding-top: env(safe-area-inset-top) !important;
           }
 
-          /* Main area: always full width */
+          /* Main area: always full width, position driven by transform (JS) */
           .cr-main {
+            position: absolute !important;
+            inset: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
             min-width: 0 !important;
-            flex: 1 !important;
+            height: 100% !important;
             /* 沒有 min-height:0，flex 子項目預設 min-height:auto 會撐開超過可用空間，
                導致內容被 .cr-shell 的 overflow:hidden 直接裁掉，而不是自己捲動——
                這是各個「room」（西語課程/字典/大廳訊息等）在手機版滑不動的根本原因。 */
             min-height: 0 !important;
             overflow-x: hidden !important;
             overflow-y: hidden !important;
+            touch-action: pan-y;
           }
 
           /* Mobile topbar shown */
@@ -1239,15 +1283,6 @@ export default function ChatApp({ user }) {
             background: var(--panel);
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
-          }
-
-          /* Bottom tab bar shown */
-          .cr-tabbar {
-            display: flex !important;
-            flex-shrink: 0;
-            border-top: 1px solid var(--border);
-            background: var(--panel);
-            padding-bottom: env(safe-area-inset-bottom);
           }
 
           /* Calendar: full-screen overlay */
@@ -1421,8 +1456,16 @@ export default function ChatApp({ user }) {
           </div>
         </div>
 
+        {/* cr-swipe-stage：包住側邊欄與主要區域，讓手機版向右滑手勢可以同時、即時地
+            拖動兩者（沙發抽屜效果），桌面版則只是個透明的橫向容器，跟以前一樣並排。 */}
+        <div className="cr-swipe-stage" style={{ display: (isMobile && mobileView === 'more') ? "none" : "flex", flex: 1, minWidth: 0, minHeight: 0 }}>
+
         {/* 側邊欄（手機版＝聊天分頁的列表畫面；桌面版＝常駐側欄） */}
-        <div className="cr-sidebar" style={{ width: 280, background: "var(--panel-alt)", borderRight: "1px solid var(--panel)", display: (isMobile && mobileView !== 'list') ? "none" : "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+        <div className="cr-sidebar" style={{
+          width: 280, background: "var(--panel-alt)", borderRight: "1px solid var(--panel)", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden",
+          transform: !isMobile ? "none" : dragX !== null ? `translateX(calc(-100% + ${dragX}px))` : (mobileView === 'list' ? "translateX(0)" : "translateX(-100%)"),
+          transition: !isMobile ? "none" : (dragX !== null ? "none" : "transform 0.25s ease"),
+        }}>
 
           {/* My info — 手機版壓縮高度、拿掉桌面版才有的 ThemeToggle/登出（已移到手機版頂部列） */}
           {isMobile ? (
@@ -1620,20 +1663,6 @@ export default function ChatApp({ user }) {
               active={showSpanishVerbs} onClick={() => { resetAllViews(); setShowSpanishVerbs(true); }} />
           </div>
 
-          {/* French section label */}
-          <div style={{ padding: "4px 12px 2px" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>🇫🇷 法語學習</span>
-          </div>
-          <div style={{ padding: "0 10px 2px" }}>
-            <NavLinkItem compact href="/french/pronunciation" icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="法語發音" sublabel="母音・鼻母音・子音" />
-          </div>
-          <div style={{ padding: "0 10px 2px" }}>
-            <NavLinkItem compact href="/french/grammar" icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="法語文法" sublabel="核心文法規則" />
-          </div>
-          <div style={{ padding: "0 10px 6px" }}>
-            <NavLinkItem compact href="/french/a1" icon="🗺️" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="法語 A1" sublabel="A1 常用詞彙" />
-          </div>
-
           {/* Custom vocab button */}
           <div style={{ padding: "0 10px 6px" }}>
             <NavItem icon="✏️" iconBg="linear-gradient(135deg,var(--accent-hover),#7c3aed)" label="自定詞彙" sublabel="建立個人單字本"
@@ -1748,18 +1777,13 @@ export default function ChatApp({ user }) {
           </div>
         </div>
 
-        {/* 更多選單（手機版「更多」分頁） */}
-        {isMobile && mobileView === 'more' && (
-          <ChatMoreMenu
-            state={{ showLeaderboard, showCinema, showEnglishPron, showIeltsBand4, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showCustomVocab, showDict }}
-            setters={{ setShowLeaderboard, setShowCinema, setShowEnglishPron, setShowIeltsBand4, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowCustomVocab, setShowDict }}
-            onOpen={(setter) => { resetAllViews(); setter(true); setMobileView(null); }}
-          />
-        )}
-
         {/* 主要區域 */}
-        <div className="cr-main" onTouchStart={handleMainTouchStart} onTouchEnd={handleMainTouchEnd}
-          style={{ flex: 1, display: (isMobile && mobileView !== null) ? "none" : "flex", flexDirection: "column", background: "var(--bg)", minWidth: 0, minHeight: 0 }}>
+        <div className="cr-main" onTouchStart={handleMainTouchStart} onTouchMove={handleMainTouchMove} onTouchEnd={handleMainTouchEnd}
+          style={{
+            flex: 1, display: "flex", flexDirection: "column", background: "var(--bg)", minWidth: 0, minHeight: 0,
+            transform: !isMobile ? "none" : dragX !== null ? `translateX(${dragX}px)` : (mobileView === null ? "translateX(0)" : "translateX(100%)"),
+            transition: !isMobile ? "none" : (dragX !== null ? "none" : "transform 0.25s ease"),
+          }}>
 
           {/* Leaderboard view */}
           {showLeaderboard && !activeFriendId && !activeGroupId && (
@@ -2156,6 +2180,16 @@ export default function ChatApp({ user }) {
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)" }}>載入中...</div>
           )}
         </div>
+        </div>
+
+        {/* 更多選單（手機版「更多」分頁）－不屬於 cr-swipe-stage，向右滑手勢不會動到它 */}
+        {isMobile && mobileView === 'more' && (
+          <ChatMoreMenu
+            state={{ showLeaderboard, showCinema, showEnglishPron, showIeltsBand4, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showCustomVocab, showDict }}
+            setters={{ setShowLeaderboard, setShowCinema, setShowEnglishPron, setShowIeltsBand4, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowCustomVocab, setShowDict }}
+            onOpen={(setter) => { resetAllViews(); setter(true); setMobileView(null); }}
+          />
+        )}
 
         {/* Right panel: calendar overlay on mobile, sidebar on desktop */}
         <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{ width: 252, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", borderLeft: "1px solid var(--panel)" }}>
@@ -2174,7 +2208,6 @@ export default function ChatApp({ user }) {
             activeTab={mobileView === 'more' || (mobileView === null && inTool) ? 'more' : 'chat'}
             onSelectChats={() => { resetAllViews(); setMobileView('list'); }}
             onSelectMore={() => setMobileView('more')}
-            onOpenProfile={() => setShowProfile(true)}
             pendingCount={pendingInCount}
           />
         )}
