@@ -72,32 +72,59 @@ function NewPostForm({ profile, onPosted }) {
   };
 
   const submit = async () => {
-    if (!text.trim() && !mediaFile) return;
+    if (!text.trim() && !mediaFile) { alert("請輸入內容"); return; }
+    if (!auth.currentUser || !profile?.uid) {
+      console.error("[ProfilePage.NewPostForm] submit blocked: no authenticated user", { authCurrentUser: auth.currentUser, profileUid: profile?.uid });
+      alert("請先登入後再發布");
+      return;
+    }
+    if (auth.currentUser.uid !== profile.uid) {
+      console.error("[ProfilePage.NewPostForm] submit blocked: viewing another user's profile", { authUid: auth.currentUser.uid, profileUid: profile.uid });
+      alert("發布失敗：沒有發布權限，請檢查登入狀態");
+      return;
+    }
     setPosting(true);
+    const payload = {
+      userId: profile.uid,
+      userNickname: profile.nickname,
+      userAvatar: profile.avatar || "😊",
+      userColor: profile.color || "var(--accent)",
+      text: text.trim(),
+      imageUrl: null,
+      videoUrl: null,
+      likes: [],
+      createdAt: serverTimestamp(),
+    };
     try {
-      let imageUrl = null;
-      let videoUrl = null;
       if (mediaFile) {
+        console.log("[ProfilePage.NewPostForm] uploading media", { name: mediaFile.name, type: mediaFile.type, size: mediaFile.size });
         const url = await uploadToR2(mediaFile);
-        if (mediaType === "video") videoUrl = url;
-        else imageUrl = url;
+        if (mediaType === "video") payload.videoUrl = url;
+        else payload.imageUrl = url;
       }
-      await addDoc(collection(db, "posts"), {
-        userId: profile.uid,
-        userNickname: profile.nickname,
-        userAvatar: profile.avatar || "😊",
-        userColor: profile.color || "var(--accent)",
-        text: text.trim(),
-        imageUrl,
-        videoUrl,
-        likes: [],
-        createdAt: serverTimestamp(),
+      console.log("[ProfilePage.NewPostForm] submitting post", {
+        uid: auth.currentUser.uid, hasImage: !!payload.imageUrl, hasVideo: !!payload.videoUrl,
+        textLength: payload.text.length, payload,
       });
+      const ref = await addDoc(collection(db, "posts"), payload);
+      console.log("[ProfilePage.NewPostForm] post created", { id: ref.id });
       setText("");
       removeMedia();
       onPosted?.();
-    } catch {
-      alert("發佈失敗，請重試");
+    } catch (err) {
+      console.error("[ProfilePage.NewPostForm] publish failed", {
+        code: err?.code, message: err?.message, name: err?.name, stack: err?.stack,
+        uid: auth.currentUser?.uid, payload,
+      });
+      if (err?.code === "permission-denied") {
+        alert("發布失敗：沒有發布權限，請檢查登入狀態");
+      } else if (err?.code === "unavailable" || err?.message?.includes("network")) {
+        alert("網絡錯誤，請稍後再試");
+      } else if (err?.code) {
+        alert(`發布失敗：資料庫寫入失敗 (${err.code})`);
+      } else {
+        alert("發布失敗，請重試");
+      }
     } finally {
       setPosting(false);
     }
