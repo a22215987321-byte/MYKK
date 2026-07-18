@@ -1178,11 +1178,20 @@ export default function ChatApp({ user }) {
     showEnglishPron || showIeltsBand4;
   const inThread = !!activeFriendId || !!activeGroupId;
 
-  // 手機版側邊抽屜：iOS 邊緣返回手勢風格，1:1 跟手拖曳（見頂部 sidebarElRef 等 ref 的說明）。
-  const DRAWER_EDGE_ZONE = 24;      // 關閉狀態下，只有從螢幕左邊 <=24px 開始按才會觸發拖曳
-  const DRAWER_OPEN_PROGRESS = 0.45; // 放開時，拖曳超過抽屜寬度的 45% 就視為「要打開」
-  const DRAWER_OPEN_VELOCITY = 0.45; // px/ms，快速右滑（即使沒拖過 45%）也視為「要打開」
+  // 手機版側邊抽屜：從內容區「中間」開始跟手拖曳，不是邊緣手勢。
+  // 這裡刻意不做「只有貼著螢幕左邊才觸發」的邊緣手勢——iPhone Safari 把貼著螢幕
+  // 最左邊（大約 20px 內）的右滑當成瀏覽器「返回上一頁」，如果我們的拖曳判定也
+  // 用同一塊起手區，兩邊會搶手勢，使用者感覺起來就像「右滑變成返回上一頁」。
+  // 所以改成：起手點只要不是落在最左邊那條窄窄的安全帶（交給 Safari 自己處理），
+  // 聊天內容區中間、任何地方都可以按著往右拖出抽屜。
+  const DRAWER_EDGE_SAFE_ZONE = 24; // 起手點落在螢幕最左邊 <=24px 一律不接手（讓給 Safari 的返回手勢）
+  const DRAWER_DEAD_ZONE = 12;      // 手指移動要超過這個距離才判斷方向
+  const DRAWER_DIRECTION_RATIO = 1.4; // |dx| 要大於 |dy| 的這個倍數才鎖定成水平拖曳
+  const DRAWER_OPEN_PROGRESS = 0.5;  // 放開時，拖曳超過抽屜寬度的 50% 就視為「要打開」
+  const DRAWER_OPEN_VELOCITY = 0.45; // px/ms，快速右滑（即使沒拖過 50%）也視為「要打開」
   const DRAWER_CLOSE_VELOCITY = -0.45; // 快速左滑視為「要關閉」
+  // 這些元素上按著不應該啟動抽屜手勢（輸入、按鈕、連結……），避免誤觸打字/點擊。
+  const DRAWER_SWIPE_EXCLUDE_SELECTOR = 'input, textarea, button, a, select, [data-disable-drawer-swipe="true"]';
 
   // 直接寫 DOM style，不透過 setState／re-render，確保每一幀都跟手指同步。
   function applyDrawerTransform(dragX, drawerWidth, animate) {
@@ -1204,7 +1213,7 @@ export default function ChatApp({ user }) {
   }
 
   function measuredDrawerWidth() {
-    return sidebarElRef.current ? sidebarElRef.current.getBoundingClientRect().width : Math.min(window.innerWidth * 0.82, 340);
+    return sidebarElRef.current ? sidebarElRef.current.getBoundingClientRect().width : Math.min(window.innerWidth * 0.84, 320);
   }
 
   // 拖曳結束（或非拖曳觸發，例如點 tab／選單項目）收斂到最終開/關狀態，
@@ -1219,8 +1228,13 @@ export default function ChatApp({ user }) {
   }
 
   function handleShellPointerDown(e) {
-    if (!isMobile || e.pointerType === "mouse" && e.button !== 0) return;
-    if (!sidebarOpen && e.clientX > DRAWER_EDGE_ZONE) return;
+    if (!isMobile || (e.pointerType === "mouse" && e.button !== 0)) return;
+    // 關閉狀態下，起手點貼著螢幕最左邊那條窄窄的安全帶——讓給 Safari 自己的返回
+    // 手勢，不要跟它搶（這條就是使用者反映「右滑變成返回上一頁」的根本原因）。
+    // 除此之外，聊天內容區中間、任何地方都可以是起手點。
+    if (!sidebarOpen && e.clientX < DRAWER_EDGE_SAFE_ZONE) return;
+    // 輸入框、按鈕、連結等互動元件上按著，不要啟動抽屜手勢（否則會吃掉點擊/打字）。
+    if (e.target.closest && e.target.closest(DRAWER_SWIPE_EXCLUDE_SELECTOR)) return;
     dragStateRef.current = {
       dragging: true, pointerId: e.pointerId,
       startX: e.clientX, startY: e.clientY,
@@ -1234,8 +1248,12 @@ export default function ChatApp({ user }) {
     const deltaX = e.clientX - st.startX;
     const deltaY = e.clientY - st.startY;
     if (st.locked === null) {
-      if (Math.abs(deltaX) <= 8 && Math.abs(deltaY) <= 8) return;
-      st.locked = Math.abs(deltaX) > Math.abs(deltaY) * 1.2;
+      if (Math.abs(deltaX) <= DRAWER_DEAD_ZONE && Math.abs(deltaY) <= DRAWER_DEAD_ZONE) return;
+      // 沒開著的時候，這個手勢只負責「打開」，所以只鎖定向右的水平拖曳；
+      // 已經開著時，左右都要能拖（左拖收回、右拖沒意義但不影響）。
+      const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY) * DRAWER_DIRECTION_RATIO;
+      const isRightward = deltaX > 0;
+      st.locked = isHorizontal && (st.wasOpen || isRightward);
       if (!st.locked) { st.dragging = false; return; }
       try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
     }
@@ -1325,8 +1343,8 @@ export default function ChatApp({ user }) {
             top: 0 !important;
             left: 0 !important;
             bottom: 0 !important;
-            width: min(82vw, 340px) !important;
-            max-width: min(82vw, 340px) !important;
+            width: min(84vw, 320px) !important;
+            max-width: min(84vw, 320px) !important;
             height: 100dvh !important;
             z-index: 430 !important;
             border-right: none !important;
