@@ -2289,8 +2289,8 @@ export default function ChatApp({ user }) {
                     😊
                   </button>
                   <input type="text" value={hallInput} onChange={e => setHallInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendHall()} placeholder="輸入訊息..."
-                    style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
-                  <button className="sb" onClick={sendHall} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>傳送</button>
+                    style={{ flex: 1, minWidth: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
+                  <button className="sb" onClick={sendHall} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>傳送</button>
                 </div>
                 {emojiPickerOpen === 'hall' && (
                   <EmojiStickerPicker isMobile={isMobile} anchorRef={hallEmojiBtnRef} uid={uid}
@@ -2347,9 +2347,9 @@ export default function ChatApp({ user }) {
                     😊
                   </button>
                   <input type="text" value={privateInput} onChange={e => setPrivateInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendPrivate()} placeholder={`傳送訊息給 ${activeFriendProfile.nickname}...`}
-                    style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
+                    style={{ flex: 1, minWidth: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
                   <button className="sb" onClick={sendPrivate} disabled={!privateInput.trim()}
-                    style={{ background: privateInput.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: privateInput.trim() ? "#fff" : "var(--text-dim)", cursor: privateInput.trim() ? "pointer" : "default", fontSize: 14, fontWeight: 600, transition: "all 0.15s" }}>
+                    style={{ background: privateInput.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: privateInput.trim() ? "#fff" : "var(--text-dim)", cursor: privateInput.trim() ? "pointer" : "default", fontSize: 14, fontWeight: 600, transition: "all 0.15s", flexShrink: 0, whiteSpace: "nowrap" }}>
                     傳送                  </button>
                 </div>
                 {emojiPickerOpen === 'private' && (
@@ -2401,8 +2401,8 @@ export default function ChatApp({ user }) {
                     😊
                   </button>
                   <input type="text" value={groupInput} onChange={e => setGroupInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendGroup()} placeholder={`傳送訊息給 ${activeGroup.name}...`}
-                    style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
-                  <button className="sb" onClick={sendGroup} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>傳送</button>
+                    style={{ flex: 1, minWidth: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
+                  <button className="sb" onClick={sendGroup} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>傳送</button>
                 </div>
                 {emojiPickerOpen === 'group' && (
                   <EmojiStickerPicker isMobile={isMobile} anchorRef={groupEmojiBtnRef} uid={uid}

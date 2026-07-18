@@ -101,8 +101,8 @@ export default function EmojiStickerPicker({ isMobile, onClose, onInsertEmoji, o
 
   const categories = [
     { id: "recent", name: "常用", icon: "🕐" },
-    ...gesturePacks.map(p => ({ id: p.id, name: p.name, icon: p.icon })),
     { id: "custom", name: "我的貼圖", icon: "🖼️" },
+    ...gesturePacks.map(p => ({ id: p.id, name: p.name, icon: p.icon })),
   ];
 
   const activeItems = activeCat === "recent" ? recent : (gesturePacks.find(p => p.id === activeCat)?.items || []);

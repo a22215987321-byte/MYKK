@@ -97,15 +97,6 @@ export const gesturePacks = [
       { id: "monkey",  type: "emoji", label: "猴子", emoji: "🐵", keywords: ["猴子", "monkey"] },
     ],
   },
-  {
-    id: "custom-stickers",
-    name: "自訂貼圖",
-    icon: "🖼️",
-    items: [
-      // 預留：之後放大型手勢/自訂貼圖圖片時，改成 type:"sticker" + src，例如：
-      // { id: "thumbs-up-sticker", type: "sticker", label: "大拇指", src: "/stickers/gestures/thumbs-up.png", keywords: ["讚", "like"] }
-    ],
-  },
 ];
 
 // 手機聊天輸入欄快速反應（長按訊息 / hover 訊息時顯示的預設 7 個）。
