@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, addDoc, collection, getDocs, query, where, serverTimestamp } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { auth, db } from "../lib/firebase";
 import { uploadToR2 } from "../lib/uploadToR2";
 import { fileToImage, renderSticker, blobToFile, generateStickerId } from "../lib/stickerImage";
 
@@ -78,34 +78,72 @@ export default function StickerMaker({ uid, isMobile, onClose, onSaved }) {
   const save = async () => {
     if (!img || saving) return;
     if (!name.trim()) { setError("請輸入貼圖名稱"); return; }
+
+    // 保存前先確認登入狀態，且目前登入的 uid 要跟這個面板拿到的 uid 一致
+    // （避免 token 過期或元件拿到舊的 uid prop 卻沒發現）。
+    const currentUser = auth.currentUser;
+    console.log("[StickerMaker] save() pre-check", {
+      hasCurrentUser: !!currentUser, currentUserUid: currentUser?.uid, propUid: uid,
+      stickerName: name.trim(), whiteBorder, rounded,
+    });
+    if (!currentUser || !uid || currentUser.uid !== uid) {
+      setError("請先登入後再保存貼圖");
+      return;
+    }
+
     setSaving(true);
     setError("");
-    try {
-      const ratio = 512 / PREVIEW_SIZE;
-      const { mainBlob, thumbBlob, mainType } = await renderSticker(img, {
-        offsetX: pan.x * ratio, offsetY: pan.y * ratio, scale: zoom, whiteBorder, rounded,
-      });
-      const stickerId = generateStickerId();
-      const mainFile = blobToFile(mainBlob, `${stickerId}`, mainType);
-      const thumbFile = blobToFile(thumbBlob, `${stickerId}_thumb`, mainType);
-      console.log("[StickerMaker] uploading", { stickerId, mainBytes: mainBlob.size, thumbBytes: thumbBlob.size });
-      const [src, thumbnailSrc] = await Promise.all([uploadToR2(mainFile), uploadToR2(thumbFile)]);
 
-      const docData = {
-        id: stickerId, userId: uid, packId: "default", packName: "我的貼圖",
-        name: name.trim(), type: "custom-sticker",
-        src, thumbnailSrc, width: 512, height: 512,
-        status: "active",
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      };
+    const ratio = 512 / PREVIEW_SIZE;
+    const { mainBlob, thumbBlob, mainType } = await renderSticker(img, {
+      offsetX: pan.x * ratio, offsetY: pan.y * ratio, scale: zoom, whiteBorder, rounded,
+    });
+    const stickerId = generateStickerId();
+    const mainFile = blobToFile(mainBlob, `${stickerId}`, mainType);
+    const thumbFile = blobToFile(thumbBlob, `${stickerId}_thumb`, mainType);
+
+    console.log("[StickerMaker] uploading to R2", {
+      uid, stickerId, stickerName: name.trim(),
+      mainFileName: mainFile.name, mainBytes: mainBlob.size,
+      thumbFileName: thumbFile.name, thumbBytes: thumbBlob.size,
+      uploadEndpoint: "/api/upload",
+    });
+
+    let src, thumbnailSrc;
+    try {
+      [src, thumbnailSrc] = await Promise.all([uploadToR2(mainFile), uploadToR2(thumbFile)]);
+    } catch (err) {
+      console.error("[StickerMaker] R2 upload failed", { message: err?.message, stickerId, uid });
+      setError(`圖片上傳失敗：${err?.message || "請重試"}`);
+      setSaving(false);
+      return;
+    }
+
+    const docData = {
+      id: stickerId, userId: uid, packId: "default", packName: "我的貼圖",
+      name: name.trim(), type: "custom-sticker",
+      src, thumbnailSrc, width: 512, height: 512,
+      status: "active",
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    };
+    console.log("[StickerMaker] writing sticker doc to Firestore", { collection: "stickers", docData });
+
+    try {
       const ref = await addDoc(collection(db, "stickers"), docData);
       console.log("[StickerMaker] saved sticker doc", { id: ref.id });
       onSaved?.({ id: ref.id, ...docData });
       onClose();
     } catch (err) {
-      console.error("[StickerMaker] save failed", { code: err?.code, message: err?.message });
-      if (err?.code === "permission-denied") setError("儲存失敗：沒有權限，請檢查登入狀態");
-      else setError(err?.message || "上傳失敗，請重試");
+      console.error("[StickerMaker] Firestore write failed", {
+        code: err?.code, message: err?.message, uid, stickerId,
+      });
+      if (err?.code === "permission-denied") {
+        setError("貼圖資料寫入權限不足（資料庫規則尚未設定），請聯絡管理員");
+      } else if (err?.code === "unavailable" || /network/i.test(err?.message || "")) {
+        setError("網絡錯誤，請稍後再試");
+      } else {
+        setError(`貼圖資料儲存失敗${err?.code ? `（${err.code}）` : ""}，請重試`);
+      }
     } finally {
       setSaving(false);
     }
