@@ -202,7 +202,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
             {isEmojiMsg ? (
               <span style={{ fontSize: 42, lineHeight: 1, display: "block" }}>{msg.text}</span>
             ) : isStickerMsg ? (
-              <div onClick={e => { e.stopPropagation(); setPreview(true); }}
+              <div onClick={e => { e.stopPropagation(); setPreview(true); }} data-sticker-message={msg.stickerId || ""}
                 style={{ width: 160, height: 160, maxWidth: 160, maxHeight: 160, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in" }}>
                 {msg.stickerSrc
                   ? <img src={msg.stickerSrc} alt={msg.text} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
@@ -2293,7 +2293,7 @@ export default function ChatApp({ user }) {
                   <button className="sb" onClick={sendHall} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>傳送</button>
                 </div>
                 {emojiPickerOpen === 'hall' && (
-                  <EmojiStickerPicker isMobile={isMobile} anchorRef={hallEmojiBtnRef}
+                  <EmojiStickerPicker isMobile={isMobile} anchorRef={hallEmojiBtnRef} uid={uid}
                     onClose={() => setEmojiPickerOpen(null)}
                     onInsertEmoji={ch => setHallInput(v => v + ch)}
                     onSendItem={item => sendHallItem(item)} />
@@ -2353,7 +2353,7 @@ export default function ChatApp({ user }) {
                     傳送                  </button>
                 </div>
                 {emojiPickerOpen === 'private' && (
-                  <EmojiStickerPicker isMobile={isMobile} anchorRef={privateEmojiBtnRef}
+                  <EmojiStickerPicker isMobile={isMobile} anchorRef={privateEmojiBtnRef} uid={uid}
                     onClose={() => setEmojiPickerOpen(null)}
                     onInsertEmoji={ch => setPrivateInput(v => v + ch)}
                     onSendItem={item => sendPrivateItem(item)} />
@@ -2405,7 +2405,7 @@ export default function ChatApp({ user }) {
                   <button className="sb" onClick={sendGroup} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>傳送</button>
                 </div>
                 {emojiPickerOpen === 'group' && (
-                  <EmojiStickerPicker isMobile={isMobile} anchorRef={groupEmojiBtnRef}
+                  <EmojiStickerPicker isMobile={isMobile} anchorRef={groupEmojiBtnRef} uid={uid}
                     onClose={() => setEmojiPickerOpen(null)}
                     onInsertEmoji={ch => setGroupInput(v => v + ch)}
                     onSendItem={item => sendGroupItem(item)} />

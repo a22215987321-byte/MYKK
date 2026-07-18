@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gesturePacks, searchGestureItems } from "../data/chat/gesturePacks";
 import { getRecentEmojis, addRecentEmoji } from "../lib/recentEmojis";
+import MyStickersPanel from "./MyStickersPanel";
 
 function StickerItemButton({ item, onClick, size = 40 }) {
   return (
@@ -25,7 +26,8 @@ function StickerItemButton({ item, onClick, size = 40 }) {
 // isMobile：手機版用 bottom sheet（貼底、45-55vh、下滑關閉）；桌面版用貼在觸發按鈕上方的 popover。
 // onInsertEmoji(char)：一般表情，插入輸入框，不關閉面板（可以連續插入多個）。
 // onSendItem(item)：手勢分類 / 真的貼圖（type:"sticker"），直接送出一則訊息，並關閉面板。
-export default function EmojiStickerPicker({ isMobile, onClose, onInsertEmoji, onSendItem, anchorRef }) {
+// uid：目前登入用戶，用來讀取/管理「我的貼圖」（自製貼圖是跨聊天室共用的，同一個 uid 在哪個聊天頁都看得到）。
+export default function EmojiStickerPicker({ isMobile, onClose, onInsertEmoji, onSendItem, anchorRef, uid }) {
   const [activeCat, setActiveCat] = useState("recent");
   const [query, setQuery] = useState("");
   const [recent, setRecent] = useState([]);
@@ -68,6 +70,14 @@ export default function EmojiStickerPicker({ isMobile, onClose, onInsertEmoji, o
     }
   }
 
+  function handleSendCustomSticker(sticker) {
+    onSendItem({
+      id: sticker.id, type: "sticker", packId: sticker.packId || "custom",
+      src: sticker.src, label: sticker.name || "貼圖",
+    });
+    onClose();
+  }
+
   function handleSheetTouchStart(e) {
     dragStartYRef.current = e.touches[0].clientY;
   }
@@ -92,6 +102,7 @@ export default function EmojiStickerPicker({ isMobile, onClose, onInsertEmoji, o
   const categories = [
     { id: "recent", name: "常用", icon: "🕐" },
     ...gesturePacks.map(p => ({ id: p.id, name: p.name, icon: p.icon })),
+    { id: "custom", name: "我的貼圖", icon: "🖼️" },
   ];
 
   const activeItems = activeCat === "recent" ? recent : (gesturePacks.find(p => p.id === activeCat)?.items || []);
@@ -132,7 +143,7 @@ export default function EmojiStickerPicker({ isMobile, onClose, onInsertEmoji, o
       {!searchResults && (
         <div style={{ display: "flex", gap: 2, padding: "0 8px 6px", overflowX: "auto", flexShrink: 0 }}>
           {categories.map(cat => (
-            <button key={cat.id} onClick={() => setActiveCat(cat.id)}
+            <button key={cat.id} onClick={() => setActiveCat(cat.id)} data-cat-tab={cat.id}
               style={{
                 flexShrink: 0, padding: "6px 10px", borderRadius: 10, border: "none", cursor: "pointer",
                 background: activeCat === cat.id ? "var(--accent-active)" : "none",
@@ -159,6 +170,8 @@ export default function EmojiStickerPicker({ isMobile, onClose, onInsertEmoji, o
           )
         ) : activeCat === "recent" && recent.length === 0 ? (
           <div style={{ textAlign: "center", padding: "30px 0", color: "var(--text-faint)", fontSize: 13 }}>還沒有常用表情<br />點過的表情會顯示在這裡</div>
+        ) : activeCat === "custom" ? (
+          <MyStickersPanel uid={uid} isMobile={isMobile} onSend={handleSendCustomSticker} />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(40px, 1fr))", gap: 2 }}>
             {activeItems.map(item => (

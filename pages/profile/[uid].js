@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import { auth, db } from "../../lib/firebase";
 import MobileTabBarLayout from "../../components/MobileTabBarLayout";
+import MyStickersPanel from "../../components/MyStickersPanel";
 import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 
 async function uploadToR2(file) {
@@ -187,6 +188,7 @@ export default function ProfilePublicPage() {
   const [avatarHover, setAvatarHover] = useState(false);
   const [hoveredMedia, setHoveredMedia] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [stickersPanelOpen, setStickersPanelOpen] = useState(false);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -296,6 +298,21 @@ export default function ProfilePublicPage() {
         </div>
       )}
 
+      {/* 我的貼圖包 — 個人頁的次要入口，主要入口是聊天表情選單的「我的貼圖」分頁 */}
+      {stickersPanelOpen && isOwner && (
+        <div onClick={() => setStickersPanelOpen(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: "var(--panel)", borderRadius: 16, padding: 20, width: 420, maxWidth: "100%", maxHeight: "80vh", overflowY: "auto", boxSizing: "border-box" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>🖼️ 我的貼圖包</div>
+              <button onClick={() => setStickersPanelOpen(false)} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 20 }}>✕</button>
+            </div>
+            <MyStickersPanel uid={uid} isMobile={false} />
+          </div>
+        </div>
+      )}
+
       <div className="pp-root" style={{ minHeight: "100vh", background: "var(--panel-alt)", color: "var(--text)", fontFamily: "'Inter','Helvetica Neue',sans-serif", boxSizing: "border-box" }}>
 
         {/* Sticky top bar */}
@@ -333,11 +350,19 @@ export default function ProfilePublicPage() {
             </div>
 
             {isOwner ? (
-              <Link href="/" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 16px", color: "var(--text)", textDecoration: "none", fontSize: 14, fontWeight: 700, marginBottom: 8, display: "inline-block" }}
-                onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
-                onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
-                ⚙️ 編輯個人資料
-              </Link>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                <Link href="/" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 16px", color: "var(--text)", textDecoration: "none", fontSize: 14, fontWeight: 700, display: "inline-block" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
+                  ⚙️ 編輯個人資料
+                </Link>
+                <button onClick={() => setStickersPanelOpen(true)}
+                  style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 16px", color: "var(--text)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
+                  🖼️ 我的貼圖包
+                </button>
+              </div>
             ) : (
               <Link href={`/?chat=${uid}`} style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 18px", color: "#fff", textDecoration: "none", fontSize: 14, fontWeight: 700, marginBottom: 8, transition: "background 0.15s", display: "inline-block" }}
                 onMouseEnter={e => e.currentTarget.style.background = "#2563eb"}
