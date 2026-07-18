@@ -19,6 +19,8 @@ import SpanishGrammar from "./SpanishGrammar";
 import SpanishVerbConjugator from "./SpanishVerbConjugator";
 import EnglishPronunciation from "./EnglishPronunciation";
 import IeltsBand4 from "./IeltsBand4";
+import EmojiStickerPicker from "./EmojiStickerPicker";
+import { QUICK_REACTIONS } from "../data/chat/gesturePacks";
 import { ChevronLeft, ChevronRight, CalendarDays, Settings, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
 import {
   doc, collection, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
@@ -26,7 +28,7 @@ import {
   arrayUnion, arrayRemove, getDocs, where, limit, getDoc,
 } from "firebase/firestore";
 
-const EMOJI_QUICK  = ["👍","❤️","😂","😮","😢","🙏"];
+const EMOJI_QUICK  = QUICK_REACTIONS;
 const PROFILE_GRADIENTS = [
   "linear-gradient(135deg,#1e3a5f,#2d1f6e)",
   "linear-gradient(135deg,#f59e0b,#ef4444)",
@@ -93,12 +95,25 @@ function AvatarImg({ avatarImage, avatar, color, size = 36 }) {
 // MessageBubble
 
 function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
-  const [reactions, setReactions] = useState({});
   const [showPicker, setShowPicker] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [tapped, setTapped] = useState(false);
+  const [preview, setPreview] = useState(false);
   const showActions = hovered || tapped;
-  const addReaction = (e) => { setReactions(r => ({ ...r, [e]: (r[e]||0)+1 })); setShowPicker(false); };
+  const longPressRef = useRef(null);
+
+  const toggleReaction = async (emoji) => {
+    setShowPicker(false);
+    if (!collectionPath) return;
+    const already = (msg.reactions?.[emoji] || []).includes(myUid);
+    try {
+      await updateDoc(doc(db, ...collectionPath), {
+        [`reactions.${emoji}`]: already ? arrayRemove(myUid) : arrayUnion(myUid),
+      });
+    } catch (e) {
+      console.error("[MessageBubble] toggleReaction failed", { code: e?.code, message: e?.message, emoji, msgId: msg.id });
+    }
+  };
 
   const recallMsg = async () => {
     if (!collectionPath) return;
@@ -108,6 +123,13 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
     } catch (e) {
       alert("撤回失敗，請重試");
     }
+  };
+
+  const handleLongPressStart = () => {
+    longPressRef.current = setTimeout(() => setShowPicker(true), 500);
+  };
+  const handleLongPressCancel = () => {
+    if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
   };
 
   if (msg.recalled) {
@@ -125,20 +147,41 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
   }
 
   const hasMedia = msg.imageUrl || msg.videoUrl;
+  const isEmojiMsg = msg.type === "emoji";
+  const isStickerMsg = msg.type === "sticker";
+  const activeReactions = Object.entries(msg.reactions || {}).filter(([, uids]) => uids?.length > 0);
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={() => { if (isMine) setTapped(v => !v); }}
+      onClick={() => setTapped(v => !v)}
+      onTouchStart={handleLongPressStart}
+      onTouchEnd={handleLongPressCancel}
+      onTouchMove={handleLongPressCancel}
       style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start", marginBottom: 2, position: "relative" }}
     >
-      {isMine && showActions && (
-        <button onClick={e => { e.stopPropagation(); recallMsg(); }} style={{ position: "absolute", top: 0, right: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "2px 8px", fontSize: 11, color: "var(--text-muted)", cursor: "pointer", zIndex: 5, whiteSpace: "nowrap" }}>
-          撤回
-        </button>
+      {preview && (isStickerMsg || isEmojiMsg) && (
+        <div onClick={e => { e.stopPropagation(); setPreview(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
+          {msg.stickerSrc
+            ? <img src={msg.stickerSrc} alt={msg.text} style={{ maxWidth: "80vw", maxHeight: "80vh", objectFit: "contain" }} />
+            : <span style={{ fontSize: 160, lineHeight: 1 }}>{msg.text}</span>}
+        </div>
       )}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, maxWidth: "72%", marginTop: isMine && showActions ? 22 : 0 }}>
+      {showActions && (
+        <div style={{ position: "absolute", top: 0, [isMine ? "right" : "left"]: 0, display: "flex", gap: 4, zIndex: 5 }}>
+          <button onClick={e => { e.stopPropagation(); setShowPicker(v => !v); }} title="加反應"
+            style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "2px 7px", fontSize: 13, color: "var(--text-muted)", cursor: "pointer", whiteSpace: "nowrap" }}>
+            😊+
+          </button>
+          {isMine && (
+            <button onClick={e => { e.stopPropagation(); recallMsg(); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "2px 8px", fontSize: 11, color: "var(--text-muted)", cursor: "pointer", whiteSpace: "nowrap" }}>
+              撤回
+            </button>
+          )}
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, maxWidth: "72%", marginTop: showActions ? 22 : 0 }}>
         {!isMine && showSender && (
           <div style={{ flexShrink: 0 }}>
             <AvatarImg avatarImage={msg.senderAvatarImage} avatar={msg.avatar || msg.sender?.[0]} color="var(--accent-2)" size={30} />
@@ -148,34 +191,52 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start" }}>
           {!isMine && showSender && <span style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 3, marginLeft: 2 }}>{msg.sender}</span>}
           <div onDoubleClick={() => setShowPicker(v => !v)} style={{
-            padding: hasMedia && !msg.text ? "4px" : "9px 14px",
-            borderRadius: isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-            background: isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)",
+            padding: isEmojiMsg ? 0 : isStickerMsg ? 4 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
+            borderRadius: isEmojiMsg ? 0 : (isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px"),
+            background: isEmojiMsg ? "none" : isStickerMsg ? "var(--panel-alt)" : (isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)"),
             color: isMine ? "#fff" : "var(--text)", fontSize: 14, lineHeight: 1.5, cursor: "default",
-            border: isMine ? "none" : "1px solid var(--border)",
-            backdropFilter: "var(--panel-blur)", WebkitBackdropFilter: "var(--panel-blur)",
+            border: isEmojiMsg ? "none" : isStickerMsg ? "1px solid var(--border)" : (isMine ? "none" : "1px solid var(--border)"),
+            backdropFilter: isEmojiMsg ? "none" : "var(--panel-blur)", WebkitBackdropFilter: isEmojiMsg ? "none" : "var(--panel-blur)",
             overflow: "hidden",
           }}>
-            {msg.videoUrl && (
-              <video src={msg.videoUrl} controls style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
+            {isEmojiMsg ? (
+              <span style={{ fontSize: 42, lineHeight: 1, display: "block" }}>{msg.text}</span>
+            ) : isStickerMsg ? (
+              <div onClick={e => { e.stopPropagation(); setPreview(true); }}
+                style={{ width: 160, height: 160, maxWidth: 160, maxHeight: 160, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in" }}>
+                {msg.stickerSrc
+                  ? <img src={msg.stickerSrc} alt={msg.text} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                  : <span style={{ fontSize: 84, lineHeight: 1 }}>{msg.text}</span>}
+              </div>
+            ) : (
+              <>
+                {msg.videoUrl && (
+                  <video src={msg.videoUrl} controls style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
+                )}
+                {msg.imageUrl && (
+                  <img src={msg.imageUrl} alt="圖片" style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
+                )}
+                {msg.text}
+              </>
             )}
-            {msg.imageUrl && (
-              <img src={msg.imageUrl} alt="圖片" style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
-            )}
-            {msg.text}
           </div>
-          {Object.keys(reactions).length > 0 && (
+          {activeReactions.length > 0 && (
             <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
-              {Object.entries(reactions).map(([emoji, count]) => (
-                <button key={emoji} onClick={() => addReaction(emoji)} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "2px 8px", fontSize: 12, color: "var(--text)", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
-                  {emoji} <span style={{ color: "var(--text-faint)" }}>{count}</span>
+              {activeReactions.map(([emoji, uids]) => (
+                <button key={emoji} data-reaction-pill={emoji} onClick={e => { e.stopPropagation(); toggleReaction(emoji); }}
+                  style={{
+                    background: uids.includes(myUid) ? "var(--accent-active)" : "var(--panel)",
+                    border: `1px solid ${uids.includes(myUid) ? "var(--accent)" : "var(--border)"}`,
+                    borderRadius: 20, padding: "2px 8px", fontSize: 12, color: "var(--text)", cursor: "pointer", display: "flex", alignItems: "center", gap: 3,
+                  }}>
+                  {emoji} <span style={{ color: "var(--text-faint)" }}>{uids.length}</span>
                 </button>
               ))}
             </div>
           )}
           {showPicker && (
-            <div style={{ position: "absolute", [isMine ? "right" : "left"]: 0, bottom: "calc(100% + 6px)", background: "var(--panel)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", padding: "6px 8px", display: "flex", gap: 6, zIndex: 10 }}>
-              {EMOJI_QUICK.map(e => <button key={e} onClick={() => addReaction(e)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20 }}>{e}</button>)}
+            <div onClick={e => e.stopPropagation()} style={{ position: "absolute", [isMine ? "right" : "left"]: 0, bottom: "calc(100% + 6px)", background: "var(--panel)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", padding: "6px 8px", display: "flex", gap: 6, zIndex: 10, boxShadow: "0 6px 20px rgba(0,0,0,0.25)" }}>
+              {EMOJI_QUICK.map(e => <button key={e} data-reaction-option={e} onClick={() => toggleReaction(e)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, padding: 4, minWidth: 36, minHeight: 36 }}>{e}</button>)}
             </div>
           )}
         </div>
@@ -627,6 +688,7 @@ export default function ChatApp({ user }) {
   const [activeFriendId, setActiveFriendId] = useState(null);
   const [hallInput,      setHallInput]      = useState("");
   const [privateInput,   setPrivateInput]   = useState("");
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(null); // null | 'hall' | 'private' | 'group'
   const [hallUploading,  setHallUploading]  = useState(false);
   const [privateUploading, setPrivateUploading] = useState(false);
   const [showProfile,    setShowProfile]    = useState(false);
@@ -697,6 +759,9 @@ export default function ChatApp({ user }) {
   const longPressTimerRef = useRef(null);
   const longPressFiredRef = useRef(false);
   const hallFileRef = useRef(null);
+  const hallEmojiBtnRef = useRef(null);
+  const privateEmojiBtnRef = useRef(null);
+  const groupEmojiBtnRef = useRef(null);
   const privateFileRef = useRef(null);
   const groupFileRef = useRef(null);
   const localVideoRef = useRef(null);
@@ -972,6 +1037,46 @@ export default function ChatApp({ user }) {
       setGroupUploading(false);
     }
   }, [activeGroupId, myProfile, uid]);
+
+  // 表情/手勢貼圖：item 來自 EmojiStickerPicker 的 onSendItem（手勢分類或真的貼圖會直接發送，
+  // 不像一般 emoji 插入輸入框）。第一版全部 type:"emoji"，之後換成 PNG 貼圖只要 item.type
+  // 變成 "sticker" 並帶 item.src，這裡就會自動把 stickerSrc 一起存進訊息文件。
+  const buildItemMessage = useCallback((item) => ({
+    senderId: uid, sender: myProfile?.nickname, avatar: myProfile?.avatar,
+    senderAvatarImage: myProfile?.avatarImage || "",
+    type: item.type === "sticker" ? "sticker" : "emoji",
+    text: item.emoji || "", imageUrl: "", videoUrl: "",
+    stickerId: item.id, stickerPackId: item.packId || null,
+    stickerSrc: item.src || null,
+    createdAt: serverTimestamp(),
+  }), [myProfile, uid]);
+
+  const sendHallItem = useCallback(async (item) => {
+    if (!myProfile) return;
+    try {
+      await addDoc(collection(db, 'hall_messages'), buildItemMessage(item));
+    } catch (e) {
+      console.error("[sendHallItem] failed", { code: e?.code, message: e?.message, item });
+    }
+  }, [myProfile, buildItemMessage]);
+
+  const sendPrivateItem = useCallback(async (item) => {
+    if (!activeFriendId || !myProfile) return;
+    try {
+      await addDoc(collection(db, 'private_chats', chatId, 'messages'), buildItemMessage(item));
+    } catch (e) {
+      console.error("[sendPrivateItem] failed", { code: e?.code, message: e?.message, item });
+    }
+  }, [activeFriendId, myProfile, chatId, buildItemMessage]);
+
+  const sendGroupItem = useCallback(async (item) => {
+    if (!activeGroupId || !myProfile) return;
+    try {
+      await addDoc(collection(db, 'groups', activeGroupId, 'messages'), buildItemMessage(item));
+    } catch (e) {
+      console.error("[sendGroupItem] failed", { code: e?.code, message: e?.message, item });
+    }
+  }, [activeGroupId, myProfile, buildItemMessage]);
 
   const handleSaveProfile = useCallback(async (patch) => {
     await updateDoc(doc(db, 'users', uid), patch);
@@ -2172,17 +2277,27 @@ export default function ChatApp({ user }) {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0 }}>
+              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0, position: "relative" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input ref={hallFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendHallMedia(f); e.target.value = ""; } }} />
                   <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片/影片"
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", cursor: hallUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                     {hallUploading ? "⏳" : "📎"}
                   </button>
+                  <button ref={hallEmojiBtnRef} onClick={() => { if (isMobile && document.activeElement?.blur) document.activeElement.blur(); setEmojiPickerOpen(v => v === 'hall' ? null : 'hall'); }} title="表情/手勢"
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", cursor: "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
+                    😊
+                  </button>
                   <input type="text" value={hallInput} onChange={e => setHallInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendHall()} placeholder="輸入訊息..."
                     style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
                   <button className="sb" onClick={sendHall} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>傳送</button>
                 </div>
+                {emojiPickerOpen === 'hall' && (
+                  <EmojiStickerPicker isMobile={isMobile} anchorRef={hallEmojiBtnRef}
+                    onClose={() => setEmojiPickerOpen(null)}
+                    onInsertEmoji={ch => setHallInput(v => v + ch)}
+                    onSendItem={item => sendHallItem(item)} />
+                )}
               </div>
             </>
           )}
@@ -2220,12 +2335,16 @@ export default function ChatApp({ user }) {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0 }}>
+              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0, position: "relative" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input ref={privateFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendPrivateMedia(f); e.target.value = ""; } }} />
                   <button onClick={() => privateFileRef.current?.click()} disabled={privateUploading} title="上傳圖片/影片"
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", cursor: privateUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                     {privateUploading ? "⏳" : "📎"}
+                  </button>
+                  <button ref={privateEmojiBtnRef} onClick={() => { if (isMobile && document.activeElement?.blur) document.activeElement.blur(); setEmojiPickerOpen(v => v === 'private' ? null : 'private'); }} title="表情/手勢"
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", cursor: "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
+                    😊
                   </button>
                   <input type="text" value={privateInput} onChange={e => setPrivateInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendPrivate()} placeholder={`傳送訊息給 ${activeFriendProfile.nickname}...`}
                     style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
@@ -2233,6 +2352,12 @@ export default function ChatApp({ user }) {
                     style={{ background: privateInput.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: privateInput.trim() ? "#fff" : "var(--text-dim)", cursor: privateInput.trim() ? "pointer" : "default", fontSize: 14, fontWeight: 600, transition: "all 0.15s" }}>
                     傳送                  </button>
                 </div>
+                {emojiPickerOpen === 'private' && (
+                  <EmojiStickerPicker isMobile={isMobile} anchorRef={privateEmojiBtnRef}
+                    onClose={() => setEmojiPickerOpen(null)}
+                    onInsertEmoji={ch => setPrivateInput(v => v + ch)}
+                    onSendItem={item => sendPrivateItem(item)} />
+                )}
                 <div style={{ textAlign: "right", fontSize: 11, color: "var(--border)", marginTop: 4 }}>私訊只有你們兩人看得到 · 雙方都可以撤回訊息</div>
               </div>
             </>
@@ -2264,17 +2389,27 @@ export default function ChatApp({ user }) {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0 }}>
+              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0, position: "relative" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input ref={groupFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendGroupMedia(f); e.target.value = ""; } }} />
                   <button onClick={() => groupFileRef.current?.click()} disabled={groupUploading} title="上傳圖片/影片"
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", cursor: groupUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                     {groupUploading ? "⏳" : "📎"}
                   </button>
+                  <button ref={groupEmojiBtnRef} onClick={() => { if (isMobile && document.activeElement?.blur) document.activeElement.blur(); setEmojiPickerOpen(v => v === 'group' ? null : 'group'); }} title="表情/手勢"
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", cursor: "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
+                    😊
+                  </button>
                   <input type="text" value={groupInput} onChange={e => setGroupInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendGroup()} placeholder={`傳送訊息給 ${activeGroup.name}...`}
                     style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
                   <button className="sb" onClick={sendGroup} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>傳送</button>
                 </div>
+                {emojiPickerOpen === 'group' && (
+                  <EmojiStickerPicker isMobile={isMobile} anchorRef={groupEmojiBtnRef}
+                    onClose={() => setEmojiPickerOpen(null)}
+                    onInsertEmoji={ch => setGroupInput(v => v + ch)}
+                    onSendItem={item => sendGroupItem(item)} />
+                )}
               </div>
             </>
           )}
