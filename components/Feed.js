@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { auth, db } from "../lib/firebase";
 import {
   collection, addDoc, onSnapshot, query, orderBy,
-  doc, updateDoc, arrayUnion, arrayRemove, serverTimestamp,
-  getDoc,
+  doc, updateDoc, deleteDoc, arrayUnion, arrayRemove, serverTimestamp,
 } from "firebase/firestore";
 import Link from "next/link";
 import MobileTabBarLayout from "./MobileTabBarLayout";
@@ -34,6 +33,70 @@ function formatDate(ts) {
   if (diff < 3600) return `${Math.floor(diff / 60)} 分鐘前`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} 小時前`;
   return d.toLocaleDateString("zh-TW", { month: "long", day: "numeric" });
+}
+
+function isToday(ts) {
+  if (!ts?.toDate) return false;
+  const d = ts.toDate();
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+
+const HASHTAG_RE = /#[\p{L}\p{N}_]+/gu;
+function extractHashtags(text) {
+  if (!text) return [];
+  return [...new Set((text.match(HASHTAG_RE) || []))];
+}
+
+// 輕量 markdown：只處理 **粗體**、# 標籤高亮、## / ### 標題、- 清單，
+// 不引入額外套件，滿足「AI 貼文不要顯示醜陋 ** 符號」的需求就好。
+function renderInline(str, keyPrefix) {
+  const parts = [];
+  const re = /(\*\*[^*]+\*\*|#[\p{L}\p{N}_]+)/gu;
+  let last = 0, m, i = 0;
+  while ((m = re.exec(str))) {
+    if (m.index > last) parts.push(str.slice(last, m.index));
+    const token = m[0];
+    if (token.startsWith("**")) {
+      parts.push(<strong key={`${keyPrefix}-b${i++}`}>{token.slice(2, -2)}</strong>);
+    } else {
+      parts.push(<span key={`${keyPrefix}-h${i++}`} style={{ color: "var(--accent)", fontWeight: 600 }}>{token}</span>);
+    }
+    last = re.lastIndex;
+  }
+  if (last < str.length) parts.push(str.slice(last));
+  return parts;
+}
+
+function renderMarkdownLite(text) {
+  if (!text) return null;
+  const lines = text.split("\n");
+  const blocks = [];
+  let list = null;
+  const flushList = (key) => {
+    if (list) { blocks.push(<ul key={`ul-${key}`} style={{ margin: "4px 0 8px", paddingLeft: 20 }}>{list}</ul>); list = null; }
+  };
+  lines.forEach((line, i) => {
+    const t = line.trim();
+    if (/^###\s+/.test(t)) {
+      flushList(i);
+      blocks.push(<h4 key={i} style={{ fontSize: 15, fontWeight: 800, margin: "10px 0 4px", color: "var(--text)" }}>{renderInline(t.replace(/^###\s+/, ""), i)}</h4>);
+    } else if (/^##\s+/.test(t)) {
+      flushList(i);
+      blocks.push(<h3 key={i} style={{ fontSize: 16, fontWeight: 800, margin: "12px 0 6px", color: "var(--text)" }}>{renderInline(t.replace(/^##\s+/, ""), i)}</h3>);
+    } else if (/^[-*]\s+/.test(t)) {
+      if (!list) list = [];
+      list.push(<li key={i} style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text)" }}>{renderInline(t.replace(/^[-*]\s+/, ""), i)}</li>);
+    } else if (t === "") {
+      flushList(i);
+      blocks.push(<div key={i} style={{ height: 6 }} />);
+    } else {
+      flushList(i);
+      blocks.push(<p key={i} style={{ margin: "2px 0", fontSize: 15, lineHeight: 1.6, color: "var(--text)" }}>{renderInline(line, i)}</p>);
+    }
+  });
+  flushList("end");
+  return blocks;
 }
 
 function Avatar({ avatar, color, size = 40 }) {
@@ -99,12 +162,12 @@ function CommentSection({ postId, myProfile }) {
             onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === "Enter" && submit()}
             placeholder="留言..."
-            style={{ flex: 1, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "6px 12px", color: "var(--text)", fontSize: 13, outline: "none" }}
+            style={{ flex: 1, minWidth: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "6px 12px", color: "var(--text)", fontSize: 13, outline: "none" }}
           />
           <button
             onClick={submit}
             disabled={!text.trim() || sending}
-            style={{ background: text.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: 20, padding: "6px 14px", color: text.trim() ? "#fff" : "var(--text-dim)", cursor: text.trim() ? "pointer" : "default", fontSize: 13, fontWeight: 600 }}
+            style={{ background: text.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: 20, padding: "6px 14px", color: text.trim() ? "#fff" : "var(--text-dim)", cursor: text.trim() ? "pointer" : "default", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
           >
             送出
           </button>
@@ -114,34 +177,117 @@ function CommentSection({ postId, myProfile }) {
   );
 }
 
+const LONG_POST_THRESHOLD = 260;
+
 function PostCard({ post, myUid, myProfile }) {
   const [showComments, setShowComments] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const liked = (post.likes || []).includes(myUid);
+  const bookmarked = (post.bookmarks || []).includes(myUid);
+  const isMine = post.userId === myUid;
+  const tags = useMemo(() => extractHashtags(post.text), [post.text]);
+  const isLong = (post.text || "").length > LONG_POST_THRESHOLD;
 
   const toggleLike = async () => {
     const ref = doc(db, "posts", post.id);
-    if (liked) {
-      await updateDoc(ref, { likes: arrayRemove(myUid) });
-    } else {
-      await updateDoc(ref, { likes: arrayUnion(myUid) });
+    try {
+      await updateDoc(ref, { likes: liked ? arrayRemove(myUid) : arrayUnion(myUid) });
+    } catch (err) {
+      console.error("[Feed.PostCard] toggleLike failed", { code: err?.code, message: err?.message, postId: post.id });
     }
+  };
+
+  const toggleBookmark = async () => {
+    const ref = doc(db, "posts", post.id);
+    try {
+      await updateDoc(ref, { bookmarks: bookmarked ? arrayRemove(myUid) : arrayUnion(myUid) });
+    } catch (err) {
+      console.error("[Feed.PostCard] toggleBookmark failed", { code: err?.code, message: err?.message, postId: post.id });
+    }
+  };
+
+  const share = async () => {
+    const url = `${window.location.origin}/feed#${post.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "EVONCHAT 動態", text: post.text?.slice(0, 80) || "", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        alert("連結已複製");
+      }
+    } catch { /* 使用者取消分享，不用處理 */ }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("確定要刪除這篇貼文嗎？")) return;
+    try {
+      await deleteDoc(doc(db, "posts", post.id));
+    } catch (err) {
+      console.error("[Feed.PostCard] delete failed", { code: err?.code, message: err?.message, postId: post.id });
+      alert("刪除失敗，請重試");
+    }
+    setMenuOpen(false);
   };
 
   return (
     <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16, overflow: "hidden" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", position: "relative" }}>
         <Avatar avatar={post.userAvatar} color={post.userColor} size={40} />
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.userNickname}</div>
           <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{formatDate(post.createdAt)}</div>
         </div>
+        {isMine && (
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setMenuOpen(v => !v)}
+              style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 6 }}>
+              ⋯
+            </button>
+            {menuOpen && (
+              <>
+                <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+                <div style={{ position: "absolute", top: "100%", right: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 61, minWidth: 120, overflow: "hidden" }}>
+                  <button onClick={handleDelete} style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "10px 14px", color: "#ef4444", cursor: "pointer", fontSize: 13 }}>
+                    🗑️ 刪除貼文
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Tags */}
+      {tags.length > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: "0 16px 8px" }}>
+          {tags.map(tag => (
+            <span key={tag} style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", background: "var(--accent-active)", borderRadius: 20, padding: "2px 10px" }}>{tag}</span>
+          ))}
+        </div>
+      )}
 
       {/* Text */}
       {post.text && (
-        <div style={{ padding: "0 16px 12px", fontSize: 15, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-          {post.text}
+        <div style={{ padding: "0 16px 12px", wordBreak: "break-word" }}>
+          {isLong && !expanded ? (
+            <div style={{ fontSize: 15, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+              {post.text.slice(0, LONG_POST_THRESHOLD)}…{" "}
+              <button onClick={() => setExpanded(true)} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, fontWeight: 700, padding: 0 }}>
+                展開全文
+              </button>
+            </div>
+          ) : (
+            <>
+              {renderMarkdownLite(post.text)}
+              {isLong && (
+                <button onClick={() => setExpanded(false)} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, padding: 0, marginTop: 4 }}>
+                  收合
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -164,22 +310,24 @@ function PostCard({ post, myUid, myProfile }) {
       )}
 
       {/* Actions */}
-      <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 16, borderTop: "1px solid var(--panel)" }}>
-        <button
-          onClick={toggleLike}
-          className="feed-action-btn"
-          style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: liked ? "#ef4444" : "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}
-        >
+      <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 18, borderTop: "1px solid var(--panel)" }}>
+        <button onClick={toggleLike} className="feed-action-btn"
+          style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: liked ? "#ef4444" : "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}>
           <span style={{ fontSize: 18 }}>{liked ? "❤️" : "🤍"}</span>
           {(post.likes || []).length > 0 && <span>{(post.likes || []).length}</span>}
         </button>
-        <button
-          onClick={() => setShowComments(v => !v)}
-          className="feed-action-btn"
-          style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}
-        >
+        <button onClick={() => setShowComments(v => !v)} className="feed-action-btn"
+          style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}>
           <span style={{ fontSize: 18 }}>💬</span>
           留言
+        </button>
+        <button onClick={share} className="feed-action-btn"
+          style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}>
+          <span style={{ fontSize: 18 }}>↗</span>
+        </button>
+        <button onClick={toggleBookmark} className="feed-action-btn"
+          style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: bookmarked ? "var(--accent)" : "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0, marginLeft: "auto" }}>
+          <span style={{ fontSize: 18 }}>{bookmarked ? "🔖" : "📑"}</span>
         </button>
       </div>
 
@@ -193,13 +341,17 @@ function PostCard({ post, myUid, myProfile }) {
   );
 }
 
+const QUICK_TOPICS = ["今日學到", "西語問題", "法語發音", "IELTS 練習", "生活分享"];
+
 function NewPostForm({ myProfile, onPosted }) {
+  const [expanded, setExpanded] = useState(false);
   const [text, setText] = useState("");
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaType, setMediaType] = useState(null);
   const [preview, setPreview] = useState(null);
   const [posting, setPosting] = useState(false);
   const fileRef = useRef();
+  const textareaRef = useRef();
 
   const onFile = (e) => {
     const file = e.target.files[0];
@@ -207,6 +359,7 @@ function NewPostForm({ myProfile, onPosted }) {
     setMediaFile(file);
     setMediaType(file.type.startsWith("video/") ? "video" : "image");
     setPreview(URL.createObjectURL(file));
+    setExpanded(true);
   };
 
   const removeMedia = () => {
@@ -214,6 +367,13 @@ function NewPostForm({ myProfile, onPosted }) {
     setMediaType(null);
     setPreview(null);
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const insertTopic = (topic) => {
+    const tag = `#${topic} `;
+    setText(v => (v.startsWith(tag) ? v : tag + v));
+    setExpanded(true);
+    textareaRef.current?.focus();
   };
 
   const submit = async () => {
@@ -233,6 +393,7 @@ function NewPostForm({ myProfile, onPosted }) {
       imageUrl: null,
       videoUrl: null,
       likes: [],
+      bookmarks: [],
       createdAt: serverTimestamp(),
     };
     try {
@@ -250,6 +411,7 @@ function NewPostForm({ myProfile, onPosted }) {
       console.log("[Feed.NewPostForm] post created", { id: ref.id });
       setText("");
       removeMedia();
+      setExpanded(false);
       onPosted?.();
     } catch (err) {
       console.error("[Feed.NewPostForm] publish failed", {
@@ -276,14 +438,35 @@ function NewPostForm({ myProfile, onPosted }) {
     <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", padding: 16, marginBottom: 20 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         <Avatar avatar={myProfile.avatar} color={myProfile.color} size={40} />
-        <div style={{ flex: 1 }}>
-          <textarea
-            value={text}
-            onChange={e => setText(e.target.value)}
-            placeholder="分享你的想法..."
-            rows={3}
-            style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", resize: "none", boxSizing: "border-box", lineHeight: 1.5 }}
-          />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {expanded ? (
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="分享你的想法…"
+              rows={3}
+              autoFocus
+              style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", resize: "none", boxSizing: "border-box", lineHeight: 1.5 }}
+            />
+          ) : (
+            <button onClick={() => setExpanded(true)}
+              style={{ width: "100%", textAlign: "left", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px", color: "var(--text-faint)", fontSize: 14, cursor: "text" }}>
+              分享你的想法…
+            </button>
+          )}
+
+          {expanded && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+              {QUICK_TOPICS.map(topic => (
+                <button key={topic} onClick={() => insertTopic(topic)}
+                  style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "4px 12px", color: "var(--text-muted)", fontSize: 12, cursor: "pointer" }}>
+                  #{topic}
+                </button>
+              ))}
+            </div>
+          )}
+
           {preview && (
             <div style={{ position: "relative", marginTop: 8, borderRadius: 10, overflow: "hidden", display: "inline-block" }}>
               {mediaType === "video"
@@ -296,24 +479,118 @@ function NewPostForm({ myProfile, onPosted }) {
               >✕</button>
             </div>
           )}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-            <button
-              onClick={() => fileRef.current?.click()}
-              style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}
-            >
-              📎 加入圖片/影片
-            </button>
-            <input ref={fileRef} type="file" accept="image/*,video/*" onChange={onFile} style={{ display: "none" }} />
-            <button
-              onClick={submit}
-              disabled={!canPost}
-              style={{ background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: "8px 20px", color: canPost ? "#fff" : "var(--text-dim)", cursor: canPost ? "pointer" : "default", fontSize: 14, fontWeight: 700 }}
-            >
-              {posting ? "發佈中..." : "發佈"}
-            </button>
-          </div>
+
+          {expanded && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+              <button
+                onClick={() => fileRef.current?.click()}
+                style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}
+              >
+                📎 加入圖片/影片
+              </button>
+              <input ref={fileRef} type="file" accept="image/*,video/*" onChange={onFile} style={{ display: "none" }} />
+              <button
+                onClick={submit}
+                disabled={!canPost}
+                style={{ background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: "8px 20px", color: canPost ? "#fff" : "var(--text-dim)", cursor: canPost ? "pointer" : "default", fontSize: 14, fontWeight: 700 }}
+              >
+                {posting ? "發佈中..." : "發佈"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+const CATEGORY_TABS = [
+  { id: "all", label: "全部" },
+  { id: "friends", label: "好友" },
+  { id: "mine", label: "我的" },
+  { id: "hot", label: "熱門" },
+  { id: "media", label: "圖片" },
+];
+
+function CategoryTabs({ active, onChange }) {
+  return (
+    <div style={{ display: "flex", gap: 4, overflowX: "auto", padding: "2px 0 4px", marginBottom: 16 }}>
+      {CATEGORY_TABS.map(tab => (
+        <button key={tab.id} onClick={() => onChange(tab.id)}
+          style={{
+            flexShrink: 0, padding: "7px 16px", borderRadius: 20, border: "none", cursor: "pointer",
+            background: active === tab.id ? "var(--accent)" : "var(--panel)",
+            color: active === tab.id ? "#fff" : "var(--text-faint)",
+            fontSize: 13, fontWeight: active === tab.id ? 700 : 500,
+          }}>
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// 桌面版精簡導覽軌：不是複製整個聊天室 sidebar（維護成本高、容易跟聊天室走鐘），
+// 只留「回到聊天室的明確入口 + 目前在哪一頁」的最小語意，讓 /feed 不會像孤立頁。
+function DesktopRail({ pendingCount }) {
+  return (
+    <div style={{ width: 220, flexShrink: 0, borderRight: "1px solid var(--panel)", padding: "24px 16px", position: "sticky", top: 0, height: "100vh", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 8px", marginBottom: 20 }}>
+        <span style={{ fontSize: 22 }}>💬</span>
+        <span style={{ fontWeight: 800, fontSize: 16, color: "var(--text)" }}>EVONCHAT</span>
+      </div>
+      <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600 }}
+        onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+        onMouseLeave={e => e.currentTarget.style.background = "none"}>
+        <span style={{ fontSize: 18 }}>←</span> 返回聊天室
+      </Link>
+      <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600 }}
+        onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+        onMouseLeave={e => e.currentTarget.style.background = "none"}>
+        <span style={{ fontSize: 18 }}>#</span> 公共大廳
+      </Link>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, background: "var(--accent-active)", color: "var(--accent)", fontSize: 14, fontWeight: 700 }}>
+        <span style={{ fontSize: 18 }}>📋</span> 動態消息
+      </div>
+      <Link href="/?view=more" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600, position: "relative" }}
+        onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+        onMouseLeave={e => e.currentTarget.style.background = "none"}>
+        <span style={{ fontSize: 18 }}>😊</span> 我
+        {pendingCount > 0 && (
+          <span style={{ position: "absolute", right: 10, background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px" }}>{pendingCount}</span>
+        )}
+      </Link>
+    </div>
+  );
+}
+
+function RightRail({ posts, myProfile }) {
+  const topTags = useMemo(() => {
+    const freq = new Map();
+    posts.forEach(p => extractHashtags(p.text).forEach(tag => freq.set(tag, (freq.get(tag) || 0) + 1)));
+    return [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  }, [posts]);
+  const myPostCount = posts.filter(p => p.userId === myProfile.uid).length;
+
+  return (
+    <div style={{ width: 280, flexShrink: 0, padding: "24px 16px", position: "sticky", top: 0, height: "100vh", boxSizing: "border-box", overflowY: "auto" }}>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-faint)", marginBottom: 10 }}>📊 我的動態</div>
+        <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text)" }}>{myPostCount}</div>
+        <div style={{ fontSize: 12, color: "var(--text-faint)" }}>篇貼文</div>
+      </div>
+      {topTags.length > 0 && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-faint)", marginBottom: 10 }}>🔥 熱門標籤</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {topTags.map(([tag, count]) => (
+              <span key={tag} style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", background: "var(--accent-active)", borderRadius: 20, padding: "3px 10px" }}>
+                {tag} <span style={{ opacity: 0.6 }}>{count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -321,6 +598,7 @@ function NewPostForm({ myProfile, onPosted }) {
 export default function FeedApp({ user }) {
   const [myProfile, setMyProfile] = useState(null);
   const [posts, setPosts] = useState([]);
+  const [activeTab, setActiveTab] = useState("all");
   const topRef = useRef();
 
   useEffect(() => {
@@ -335,6 +613,20 @@ export default function FeedApp({ user }) {
       setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   }, []);
+
+  const filteredPosts = useMemo(() => {
+    if (!myProfile) return [];
+    let list = posts;
+    if (activeTab === "mine") list = list.filter(p => p.userId === user.uid);
+    else if (activeTab === "friends") list = list.filter(p => (myProfile.friends || []).includes(p.userId));
+    else if (activeTab === "media") list = list.filter(p => p.imageUrl || p.videoUrl);
+    else if (activeTab === "hot") list = [...list].sort((a, b) => (b.likes?.length || 0) - (a.likes?.length || 0));
+    return list;
+  }, [posts, activeTab, user.uid, myProfile]);
+
+  const todayCount = useMemo(() => posts.filter(p => isToday(p.createdAt)).length, [posts]);
+  const friendsCount = useMemo(() => myProfile ? posts.filter(p => (myProfile.friends || []).includes(p.userId)).length : 0, [posts, myProfile]);
+  const notesCount = useMemo(() => posts.filter(p => extractHashtags(p.text).length > 0).length, [posts]);
 
   if (!myProfile) {
     return (
@@ -352,6 +644,18 @@ export default function FeedApp({ user }) {
         * { box-sizing: border-box; }
         html, body { overflow-x: hidden; }
 
+        .feed-shell { display: flex; }
+        .feed-main-col { flex: 1; min-width: 0; }
+        .feed-desktop-rail, .feed-right-rail { display: none; }
+
+        @media (min-width: 768px) {
+          .feed-desktop-rail { display: flex; }
+          .feed-mobile-topnav { display: none !important; }
+        }
+        @media (min-width: 1100px) {
+          .feed-right-rail { display: block; }
+        }
+
         @media (max-width: 767px) {
           /* Prevent iOS Safari auto-zoom on input focus (needs >=16px) */
           input, textarea, select { font-size: 16px !important; }
@@ -364,37 +668,64 @@ export default function FeedApp({ user }) {
       `}</style>
       <div className="feed-page-root" style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", fontFamily: "'Inter','Helvetica Neue',sans-serif", boxSizing: "border-box" }}>
 
-        {/* Top Nav */}
-        <div className="feed-topnav" style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 20px", height: 56 }}>
-          <div style={{ fontSize: 20 }}>📋</div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text)", flex: 1 }}>動態消息</div>
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "6px 14px", color: "var(--text-muted)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-            💬 聊天室
+        {/* Mobile top nav — 清楚的「← 聊天」返回，不依賴瀏覽器返回鍵 */}
+        <div className="feed-mobile-topnav feed-topnav" style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, padding: "0 12px", height: 52 }}>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)", textDecoration: "none", fontSize: 15, fontWeight: 700, flexShrink: 0 }}>
+            <span style={{ fontSize: 20 }}>←</span> 聊天
           </Link>
-          <button
-            onClick={() => auth.signOut()}
-            style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4 }}
-            title="登出"
-          >
-            🚪
-          </button>
+          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", flex: 1, textAlign: "center", marginRight: 40 }}>動態消息</div>
         </div>
 
-        {/* Content */}
-        <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 16px" }} ref={topRef}>
-          <NewPostForm myProfile={myProfile} />
+        <div className="feed-shell">
+          <div className="feed-desktop-rail">
+            <DesktopRail pendingCount={(myProfile.pendingIn || []).length} />
+          </div>
 
-          {posts.length === 0 && (
-            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-dim)" }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
-              <div style={{ fontSize: 16 }}>還沒有任何貼文</div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>成為第一個分享的人吧！</div>
+          <div className="feed-main-col">
+            <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px" }} ref={topRef}>
+              {/* Hero */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>動態消息</div>
+                    <div style={{ fontSize: 13, color: "var(--text-faint)", marginTop: 2 }}>看看朋友近況，分享你的想法</div>
+                  </div>
+                  <button onClick={() => auth.signOut()}
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-faint)", cursor: "pointer", fontSize: 12, padding: "5px 10px" }}>
+                    🚪 登出
+                  </button>
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+                  {[["今日動態", todayCount], ["好友分享", friendsCount], ["學習筆記", notesCount]].map(([label, count]) => (
+                    <div key={label} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "8px 14px", flex: "1 1 100px", minWidth: 100 }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text)" }}>{count}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <NewPostForm myProfile={myProfile} />
+
+              <CategoryTabs active={activeTab} onChange={setActiveTab} />
+
+              {filteredPosts.length === 0 && (
+                <div style={{ textAlign: "center", padding: "60px 20px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16 }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>還沒有動態</div>
+                  <div style={{ fontSize: 13, color: "var(--text-faint)", marginTop: 4 }}>分享你的第一篇學習筆記吧！</div>
+                </div>
+              )}
+
+              {filteredPosts.map(post => (
+                <PostCard key={post.id} post={post} myUid={user.uid} myProfile={myProfile} />
+              ))}
             </div>
-          )}
+          </div>
 
-          {posts.map(post => (
-            <PostCard key={post.id} post={post} myUid={user.uid} myProfile={myProfile} />
-          ))}
+          <div className="feed-right-rail">
+            <RightRail posts={posts} myProfile={myProfile} />
+          </div>
         </div>
       </div>
       <MobileTabBarLayout activeTab="feed" pendingCount={(myProfile.pendingIn || []).length} />
