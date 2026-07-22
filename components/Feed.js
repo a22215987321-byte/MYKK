@@ -6,41 +6,10 @@ import {
 } from "firebase/firestore";
 import Link from "next/link";
 import MobileTabBarLayout from "./MobileTabBarLayout";
-
-async function uploadToR2(file) {
-  const base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-  const res = await fetch("/api/upload", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fileName: file.name, fileType: file.type, fileData: base64 }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "上傳失敗");
-  return data.url;
-}
-
-function formatDate(ts) {
-  if (!ts) return "";
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  const now = new Date();
-  const diff = Math.floor((now - d) / 1000);
-  if (diff < 60) return "剛剛";
-  if (diff < 3600) return `${Math.floor(diff / 60)} 分鐘前`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} 小時前`;
-  return d.toLocaleDateString("zh-TW", { month: "long", day: "numeric" });
-}
-
-function isToday(ts) {
-  if (!ts?.toDate) return false;
-  const d = ts.toDate();
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-}
+import LoadingState from "./LoadingState";
+import { uploadToR2 } from "../lib/uploadToR2";
+import { formatDate } from "../lib/format";
+import { toast } from "../lib/toast";
 
 const HASHTAG_RE = /#[\p{L}\p{N}_]+/gu;
 function extractHashtags(text) {
@@ -214,7 +183,7 @@ function PostCard({ post, myUid, myProfile }) {
         await navigator.share({ title: "EVONCHAT 動態", text: post.text?.slice(0, 80) || "", url });
       } else {
         await navigator.clipboard.writeText(url);
-        alert("連結已複製");
+        toast("連結已複製", "success");
       }
     } catch { /* 使用者取消分享，不用處理 */ }
   };
@@ -225,7 +194,7 @@ function PostCard({ post, myUid, myProfile }) {
       await deleteDoc(doc(db, "posts", post.id));
     } catch (err) {
       console.error("[Feed.PostCard] delete failed", { code: err?.code, message: err?.message, postId: post.id });
-      alert("刪除失敗，請重試");
+      toast("刪除失敗，請重試");
     }
     setMenuOpen(false);
   };
@@ -377,10 +346,10 @@ function NewPostForm({ myProfile, onPosted }) {
   };
 
   const submit = async () => {
-    if (!text.trim() && !mediaFile) { alert("請輸入內容"); return; }
+    if (!text.trim() && !mediaFile) { toast("請輸入內容"); return; }
     if (!auth.currentUser || !myProfile?.uid) {
       console.error("[Feed.NewPostForm] submit blocked: no authenticated user", { authCurrentUser: auth.currentUser, myProfile });
-      alert("請先登入後再發布");
+      toast("請先登入後再發布");
       return;
     }
     setPosting(true);
@@ -419,13 +388,13 @@ function NewPostForm({ myProfile, onPosted }) {
         uid: auth.currentUser?.uid, payload,
       });
       if (err?.code === "permission-denied") {
-        alert("發布失敗：沒有發布權限，請檢查登入狀態");
+        toast("發布失敗：沒有發布權限，請檢查登入狀態");
       } else if (err?.code === "unavailable" || err?.message?.includes("network")) {
-        alert("網絡錯誤，請稍後再試");
+        toast("網絡錯誤，請稍後再試");
       } else if (err?.code) {
-        alert(`發布失敗：資料庫寫入失敗 (${err.code})`);
+        toast(`發布失敗：資料庫寫入失敗 (${err.code})`);
       } else {
-        alert("發布失敗，請重試");
+        toast("發布失敗，請重試");
       }
     } finally {
       setPosting(false);
@@ -504,28 +473,26 @@ function NewPostForm({ myProfile, onPosted }) {
   );
 }
 
-const CATEGORY_TABS = [
-  { id: "all", label: "全部" },
-  { id: "friends", label: "好友" },
-  { id: "mine", label: "我的" },
-  { id: "hot", label: "熱門" },
-  { id: "media", label: "圖片" },
-];
-
-function CategoryTabs({ active, onChange }) {
+function MarqueeRow({ items, direction }) {
+  const doubled = [...items, ...items];
   return (
-    <div style={{ display: "flex", gap: 4, overflowX: "auto", padding: "2px 0 4px", marginBottom: 16 }}>
-      {CATEGORY_TABS.map(tab => (
-        <button key={tab.id} onClick={() => onChange(tab.id)}
-          style={{
-            flexShrink: 0, padding: "7px 16px", borderRadius: 20, border: "none", cursor: "pointer",
-            background: active === tab.id ? "var(--accent)" : "var(--panel)",
-            color: active === tab.id ? "#fff" : "var(--text-faint)",
-            fontSize: 13, fontWeight: active === tab.id ? 700 : 500,
-          }}>
-          {tab.label}
-        </button>
-      ))}
+    <div style={{ overflow: "hidden", width: "100%" }}>
+      <div className={`feed-marquee-track feed-marquee-${direction}`} style={{ display: "flex", gap: 10, width: "max-content" }}>
+        {doubled.map((item, i) => (
+          <span key={i} style={{ flexShrink: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "6px 16px", fontSize: 13, fontWeight: 600, color: "var(--text-faint)" }}>
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TopMarquee() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+      <MarqueeRow items={QUICK_TOPICS} direction="left" />
+      <MarqueeRow items={QUICK_TOPICS} direction="right" />
     </div>
   );
 }
@@ -597,42 +564,47 @@ function RightRail({ posts, myProfile }) {
 
 export default function FeedApp({ user }) {
   const [myProfile, setMyProfile] = useState(null);
+  const [myProfileError, setMyProfileError] = useState('');
   const [posts, setPosts] = useState([]);
-  const [activeTab, setActiveTab] = useState("all");
   const topRef = useRef();
 
   useEffect(() => {
     return onSnapshot(doc(db, "users", user.uid), snap => {
       if (snap.exists()) setMyProfile({ uid: user.uid, ...snap.data() });
+    }, (e) => {
+      console.error('[Feed] profile snapshot failed', e);
+      setMyProfileError('無法載入你的個人資料，請檢查網路連線');
     });
   }, [user.uid]);
+
+  // Safety net for a listener that neither errors nor ever delivers data.
+  useEffect(() => {
+    if (myProfile) return;
+    const t = setTimeout(() => {
+      setMyProfileError(prev => prev || '載入時間過長，可能是網路連線問題');
+    }, 12000);
+    return () => clearTimeout(t);
+  }, [myProfile]);
 
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
     return onSnapshot(q, snap => {
       setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => {
+      console.error('[Feed] posts snapshot failed', e);
     });
   }, []);
 
-  const filteredPosts = useMemo(() => {
-    if (!myProfile) return [];
-    let list = posts;
-    if (activeTab === "mine") list = list.filter(p => p.userId === user.uid);
-    else if (activeTab === "friends") list = list.filter(p => (myProfile.friends || []).includes(p.userId));
-    else if (activeTab === "media") list = list.filter(p => p.imageUrl || p.videoUrl);
-    else if (activeTab === "hot") list = [...list].sort((a, b) => (b.likes?.length || 0) - (a.likes?.length || 0));
-    return list;
-  }, [posts, activeTab, user.uid, myProfile]);
-
-  const todayCount = useMemo(() => posts.filter(p => isToday(p.createdAt)).length, [posts]);
-  const friendsCount = useMemo(() => myProfile ? posts.filter(p => (myProfile.friends || []).includes(p.userId)).length : 0, [posts, myProfile]);
-  const notesCount = useMemo(() => posts.filter(p => extractHashtags(p.text).length > 0).length, [posts]);
+  const filteredPosts = useMemo(() => (myProfile ? posts : []), [posts, myProfile]);
 
   if (!myProfile) {
     return (
-      <div style={{ minHeight: "100dvh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "var(--text-faint)" }}>載入中...</div>
-      </div>
+      <LoadingState
+        label="載入中..."
+        minHeight="100dvh"
+        error={myProfileError || undefined}
+        onRetry={myProfileError ? () => window.location.reload() : undefined}
+      />
     );
   }
 
@@ -647,6 +619,18 @@ export default function FeedApp({ user }) {
         .feed-shell { display: flex; }
         .feed-main-col { flex: 1; min-width: 0; }
         .feed-desktop-rail, .feed-right-rail { display: none; }
+
+        .feed-marquee-left { animation: feed-marquee-scroll-left 24s linear infinite; }
+        .feed-marquee-right { animation: feed-marquee-scroll-right 24s linear infinite; }
+        .feed-marquee-track:hover { animation-play-state: paused; }
+        @keyframes feed-marquee-scroll-left {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        @keyframes feed-marquee-scroll-right {
+          from { transform: translateX(-50%); }
+          to { transform: translateX(0); }
+        }
 
         @media (min-width: 768px) {
           .feed-desktop-rail { display: flex; }
@@ -663,51 +647,35 @@ export default function FeedApp({ user }) {
           .feed-topnav { padding: 0 14px !important; }
           .feed-media img, .feed-media video { max-height: 320px !important; }
           .feed-action-btn { padding: 8px 4px !important; }
-          .feed-page-root { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
+          .feed-page-root { padding-bottom: calc(var(--mobile-tabbar-h) + env(safe-area-inset-bottom)); }
         }
       `}</style>
-      <div className="feed-page-root" style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", fontFamily: "'Inter','Helvetica Neue',sans-serif", boxSizing: "border-box" }}>
+      <div className="feed-page-root" style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-body)", boxSizing: "border-box" }}>
 
         {/* Mobile top nav — 清楚的「← 聊天」返回，不依賴瀏覽器返回鍵 */}
-        <div className="feed-mobile-topnav feed-topnav" style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, padding: "0 12px", height: 52 }}>
+        <header className="feed-mobile-topnav feed-topnav" style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, padding: "0 12px", height: 52 }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)", textDecoration: "none", fontSize: 15, fontWeight: 700, flexShrink: 0 }}>
-            <span style={{ fontSize: 20 }}>←</span> 聊天
+            <span aria-hidden="true" style={{ fontSize: 20 }}>←</span> 聊天
           </Link>
           <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", flex: 1, textAlign: "center", marginRight: 40 }}>動態消息</div>
-        </div>
+        </header>
 
         <div className="feed-shell">
-          <div className="feed-desktop-rail">
+          <nav className="feed-desktop-rail" aria-label="動態消息導覽">
             <DesktopRail pendingCount={(myProfile.pendingIn || []).length} />
-          </div>
+          </nav>
 
-          <div className="feed-main-col">
+          <main className="feed-main-col">
             <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px" }} ref={topRef}>
               {/* Hero */}
               <div style={{ marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>動態消息</div>
-                    <div style={{ fontSize: 13, color: "var(--text-faint)", marginTop: 2 }}>看看朋友近況，分享你的想法</div>
-                  </div>
-                  <button onClick={() => auth.signOut()}
-                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-faint)", cursor: "pointer", fontSize: 12, padding: "5px 10px" }}>
-                    🚪 登出
-                  </button>
-                </div>
-                <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-                  {[["今日動態", todayCount], ["好友分享", friendsCount], ["學習筆記", notesCount]].map(([label, count]) => (
-                    <div key={label} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "8px 14px", flex: "1 1 100px", minWidth: 100 }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text)" }}>{count}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{label}</div>
-                    </div>
-                  ))}
-                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>動態消息</div>
+                <div style={{ fontSize: 13, color: "var(--text-faint)", marginTop: 2 }}>看看朋友近況，分享你的想法</div>
               </div>
 
               <NewPostForm myProfile={myProfile} />
 
-              <CategoryTabs active={activeTab} onChange={setActiveTab} />
+              <TopMarquee />
 
               {filteredPosts.length === 0 && (
                 <div style={{ textAlign: "center", padding: "60px 20px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16 }}>
@@ -721,11 +689,11 @@ export default function FeedApp({ user }) {
                 <PostCard key={post.id} post={post} myUid={user.uid} myProfile={myProfile} />
               ))}
             </div>
-          </div>
+          </main>
 
-          <div className="feed-right-rail">
+          <aside className="feed-right-rail">
             <RightRail posts={posts} myProfile={myProfile} />
-          </div>
+          </aside>
         </div>
       </div>
       <MobileTabBarLayout activeTab="feed" pendingCount={(myProfile.pendingIn || []).length} />
