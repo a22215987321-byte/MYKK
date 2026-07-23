@@ -617,7 +617,21 @@ function RightRail({ posts, myProfile }) {
   );
 }
 
-export default function FeedApp({ user }) {
+// Shared between the standalone /feed page and the embedded view rendered
+// inside ChatRoom's main pane — kept out of the page-chrome-only <style>
+// block below so embedding never leaks the global scrollbar/box-sizing
+// resets into the rest of the chat room.
+const FEED_INTERACTION_CSS = `
+  .feed-tags-row::-webkit-scrollbar { height: 0; }
+  .feed-action-btn { transition: transform .15s ease, opacity .15s ease; }
+  .feed-action-btn:hover { opacity: 0.7; transform: scale(1.08); }
+  .feed-action-btn:active { transform: scale(0.92); }
+  .feed-tag-chip { transition: transform .15s ease, opacity .15s ease; }
+  .feed-tag-chip:hover { opacity: 0.85; }
+  .feed-tag-chip:active { transform: scale(0.96); }
+`;
+
+export default function FeedApp({ user, embedded = false }) {
   const [myProfile, setMyProfile] = useState(null);
   const [myProfileError, setMyProfileError] = useState('');
   const [posts, setPosts] = useState([]);
@@ -671,10 +685,73 @@ export default function FeedApp({ user }) {
     return (
       <LoadingState
         label="載入中..."
-        minHeight="100dvh"
+        minHeight={embedded ? "100%" : "100dvh"}
         error={myProfileError || undefined}
         onRetry={myProfileError ? () => window.location.reload() : undefined}
       />
+    );
+  }
+
+  const content = (
+    <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px" }} ref={topRef}>
+      {/* Hero */}
+      <div style={{ marginBottom: 20, display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>動態消息</div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>看看朋友近況，分享你的想法</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ position: "relative" }}>
+            <Icon name="search" size={15} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }} />
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="搜尋貼文..."
+              style={{ width: 160, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 12px 7px 30px", color: "var(--text)", fontSize: 13, outline: "none" }}
+            />
+          </div>
+          <div style={{ display: "flex", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 3, gap: 2 }}>
+            {[["latest", "最新"], ["hot", "熱門"]].map(([mode, label]) => (
+              <button key={mode} onClick={() => setSortMode(mode)}
+                style={{
+                  border: "none", borderRadius: 16, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  background: sortMode === mode ? "var(--accent)" : "transparent",
+                  color: sortMode === mode ? "#fff" : "var(--text-muted)",
+                }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <NewPostForm myProfile={myProfile} />
+
+      <TopicTagsBar topics={QUICK_TOPICS} selected={selectedTopic} onToggle={toggleTopic} />
+
+      {filteredPosts.length === 0 && (
+        <div style={{ textAlign: "center", padding: "60px 20px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>還沒有動態</div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>分享你的第一篇學習筆記吧！</div>
+        </div>
+      )}
+
+      {filteredPosts.map(post => (
+        <PostCard key={post.id} post={post} myUid={user.uid} myProfile={myProfile} />
+      ))}
+    </div>
+  );
+
+  // Embedded inside ChatRoom's main pane (see the "動態消息" nav item there) —
+  // no page shell, no duplicate sidebar/right-rail/mobile tab bar, and no
+  // page-level CSS resets that would leak into the rest of the chat room.
+  if (embedded) {
+    return (
+      <>
+        <style>{FEED_INTERACTION_CSS}</style>
+        {content}
+      </>
     );
   }
 
@@ -690,15 +767,7 @@ export default function FeedApp({ user }) {
         .feed-main-col { flex: 1; min-width: 0; }
         .feed-desktop-rail, .feed-right-rail { display: none; }
 
-        .feed-tags-row::-webkit-scrollbar { height: 0; }
-
-        .feed-action-btn { transition: transform .15s ease, opacity .15s ease; }
-        .feed-action-btn:hover { opacity: 0.7; transform: scale(1.08); }
-        .feed-action-btn:active { transform: scale(0.92); }
-
-        .feed-tag-chip { transition: transform .15s ease, opacity .15s ease; }
-        .feed-tag-chip:hover { opacity: 0.85; }
-        .feed-tag-chip:active { transform: scale(0.96); }
+        ${FEED_INTERACTION_CSS}
 
         @media (min-width: 768px) {
           .feed-desktop-rail { display: flex; }
@@ -734,54 +803,7 @@ export default function FeedApp({ user }) {
           </nav>
 
           <main className="feed-main-col">
-            <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px" }} ref={topRef}>
-              {/* Hero */}
-              <div style={{ marginBottom: 20, display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>動態消息</div>
-                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>看看朋友近況，分享你的想法</div>
-                </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <div style={{ position: "relative" }}>
-                    <Icon name="search" size={15} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }} />
-                    <input
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="搜尋貼文..."
-                      style={{ width: 160, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 12px 7px 30px", color: "var(--text)", fontSize: 13, outline: "none" }}
-                    />
-                  </div>
-                  <div style={{ display: "flex", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 3, gap: 2 }}>
-                    {[["latest", "最新"], ["hot", "熱門"]].map(([mode, label]) => (
-                      <button key={mode} onClick={() => setSortMode(mode)}
-                        style={{
-                          border: "none", borderRadius: 16, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                          background: sortMode === mode ? "var(--accent)" : "transparent",
-                          color: sortMode === mode ? "#fff" : "var(--text-muted)",
-                        }}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <NewPostForm myProfile={myProfile} />
-
-              <TopicTagsBar topics={QUICK_TOPICS} selected={selectedTopic} onToggle={toggleTopic} />
-
-              {filteredPosts.length === 0 && (
-                <div style={{ textAlign: "center", padding: "60px 20px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16 }}>
-                  <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>還沒有動態</div>
-                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>分享你的第一篇學習筆記吧！</div>
-                </div>
-              )}
-
-              {filteredPosts.map(post => (
-                <PostCard key={post.id} post={post} myUid={user.uid} myProfile={myProfile} />
-              ))}
-            </div>
+            {content}
           </main>
 
           <aside className="feed-right-rail">

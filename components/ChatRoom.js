@@ -14,6 +14,7 @@ import SpanishRoom from "./SpanishRoom";
 import SpanishCourseRoom from "./SpanishCourseRoom";
 import CustomVocabRoom from "./CustomVocabRoom";
 import DictionaryRoom from "./DictionaryRoom";
+import FeedApp from "./Feed";
 import SpanishPronunciation from "./SpanishPronunciation";
 import SpanishGrammar from "./SpanishGrammar";
 import SpanishVerbConjugator from "./SpanishVerbConjugator";
@@ -724,6 +725,7 @@ export default function ChatApp({ user }) {
   const [spanishCourseNoteContext, setSpanishCourseNoteContext] = useState(null); // {key, title} reported by SpanishCourseRoom's current lesson
   const [showEnglishPron,    setShowEnglishPron]    = useState(false);
   const [showIeltsBand4,     setShowIeltsBand4]     = useState(false);
+  const [showFeed,           setShowFeed]           = useState(false);
 
   // Mobile / sidebar states
   const [isMobile,       setIsMobile]       = useState(false);
@@ -738,6 +740,7 @@ export default function ChatApp({ user }) {
     setShowCustomVocab(false); setShowDict(false); setFrenchView(null);
     setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false);
     setShowEnglishPron(false); setShowIeltsBand4(false);
+    setShowFeed(false);
   }, []);
 
   // Cinema states
@@ -1752,7 +1755,8 @@ export default function ChatApp({ user }) {
           {/* Feed link + Hall button — 手機版統一成同一種「聊天列表卡片」樣式 */}
           {isMobile ? (
             <div style={{ padding: "4px 16px 0" }}>
-              <Link href="/feed" style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, background: "transparent", color: "var(--text)", textDecoration: "none" }}>
+              <button onClick={() => { resetAllViews(); setShowFeed(true); if (isMobile) settleDrawer(false); }}
+                style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: showFeed ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
                 <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,#ec4899,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <Newspaper size={22} color="#fff" />
                 </div>
@@ -1760,9 +1764,9 @@ export default function ChatApp({ user }) {
                   <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text)" }}>動態消息</div>
                   <div style={{ fontSize: 13, color: "var(--text-muted)" }}>查看好友動態</div>
                 </div>
-              </Link>
+              </button>
               {(() => {
-                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4;
+                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed;
                 return (
                   <button onClick={() => { resetAllViews(); if (isMobile) settleDrawer(false); }}
                     style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: hallActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
@@ -1779,23 +1783,17 @@ export default function ChatApp({ user }) {
             </div>
           ) : (
             <>
-              {/* Feed link */}
+              {/* Feed view */}
               <div style={{ padding: "4px 10px 0" }}>
-                <Link href="/feed" style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-md)", background: "transparent", color: "var(--text)", textDecoration: "none", transition: "background 0.15s" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "var(--accent-hover)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <div style={{ width: 34, height: 34, borderRadius: "var(--radius-md)", background: "linear-gradient(135deg,#ec4899,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📰</div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>動態消息</div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>查看好友動態</div>
-                  </div>
-                </Link>
+                <NavItem icon="📰" iconBg="linear-gradient(135deg,#ec4899,#f59e0b)" label="動態消息" sublabel="查看好友動態"
+                  active={showFeed}
+                  onClick={() => { resetAllViews(); setShowFeed(true); }} />
               </div>
 
               {/* Hall button */}
               <div style={{ padding: "4px 10px 0" }}>
                 <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧"
-                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4}
+                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed}
                   onClick={() => { resetAllViews(); }} />
               </div>
             </>
@@ -1994,8 +1992,15 @@ export default function ChatApp({ user }) {
             flex: 1, display: (isMobile && mobileView === 'more') ? "none" : "flex", flexDirection: "column", background: "var(--bg)", minWidth: 0, minHeight: 0,
           }}>
 
+          {/* Feed view — embedded so switching here never leaves this SPA */}
+          {showFeed && !activeFriendId && !activeGroupId && (
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+              <FeedApp user={user} embedded />
+            </div>
+          )}
+
           {/* Leaderboard view */}
-          {showLeaderboard && !activeFriendId && !activeGroupId && (
+          {showLeaderboard && !activeFriendId && !activeGroupId && !showFeed && (
             <>
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "linear-gradient(180deg,#08091a 0%,#0d0a28 60%,var(--bg) 100%)", padding: "36px 28px 24px" }}>
                 {/* Title */}
@@ -2068,7 +2073,7 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Cinema view */}
-          {showCinema && !activeFriendId && !activeGroupId && !showLeaderboard && (
+          {showCinema && !activeFriendId && !activeGroupId && !showLeaderboard && !showFeed && (
             <>
               {cinemaView === 'list' && (
                 <>
@@ -2196,57 +2201,57 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Vocab view */}
-          {showVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && (
+          {showVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && (
             <VocabRoom user={user} db={db} />
           )}
 
           {/* Spanish view */}
-          {showSpanish && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && (
+          {showSpanish && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showFeed && (
             <SpanishRoom user={user} db={db} />
           )}
 
           {/* Spanish Course view */}
-          {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && (
+          {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showFeed && (
             <SpanishCourseRoom user={user} db={db} onContextChange={setSpanishCourseNoteContext} />
           )}
 
           {/* Spanish Pronunciation view */}
-          {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && (
+          {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishPronunciation onNav={() => { setShowSpanishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Grammar view */}
-          {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && (
+          {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishGrammar onNav={() => { setShowSpanishGrammar(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Verb Conjugator view */}
-          {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && (
+          {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && (
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><SpanishVerbConjugator onNav={() => { setShowSpanishVerbs(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* English Pronunciation view */}
-          {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && (
+          {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishPronunciation user={user} db={db} onNav={() => { setShowEnglishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Custom vocab view */}
-          {showCustomVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && (
+          {showCustomVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showFeed && (
             <CustomVocabRoom user={myProfile || user} db={db} />
           )}
 
           {/* Dictionary view */}
-          {showDict && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && (
+          {showDict && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showFeed && (
             <DictionaryRoom />
           )}
 
           {/* Public hall */}
           {/* IELTS Band 4 view */}
-          {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && (
+          {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showFeed && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><IeltsBand4 onNav={() => { setShowIeltsBand4(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
-          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && (
+          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && (
             <>
               <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
                 <span style={{ fontSize: 20 }}>💬</span>
