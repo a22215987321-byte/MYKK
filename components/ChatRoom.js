@@ -869,7 +869,7 @@ export default function ChatApp({ user }) {
   useEffect(() => {
     const onVisibility = () => {
       const s = document.visibilityState === "hidden" ? "offline" : "online";
-      updateDoc(doc(db, "users", uid), { status: s });
+      updateDoc(doc(db, "users", uid), s === "online" ? { status: s } : { status: s, lastActiveAt: serverTimestamp() });
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
@@ -892,8 +892,21 @@ export default function ChatApp({ user }) {
     const v = router.query.view;
     if (v === "list") settleDrawer(true);
     else if (v === "more") setMobileView("more");
-    if (v === "list" || v === "more") router.replace("/", undefined, { shallow: true });
+    else if (v === "editProfile") setShowProfile(true);
+    if (v === "list" || v === "more" || v === "editProfile") router.replace("/", undefined, { shallow: true });
   }, [router.isReady]);
+
+  // 個人頁「傳訊息」按鈕送過來的 /?chat=<uid>，直接開對應的私訊視窗
+  // （這條路徑先前完全沒接，該按鈕只會回首頁不會真的開聊天）。
+  useEffect(() => {
+    if (!router.isReady) return;
+    const target = router.query.chat;
+    if (typeof target === "string" && target && target !== uid) {
+      resetAllViews();
+      setActiveFriendId(target);
+      router.replace("/", undefined, { shallow: true });
+    }
+  }, [router.isReady, router.query.chat]);
 
   // 手機版側邊抽屜：非拖曳觸發的開關（點 tab bar／選單項目／遮罩）統一經過這裡套用
   // transform，跟拖曳中直接寫 DOM style 用的是同一個 applyDrawerTransform，行為一致。
@@ -944,7 +957,7 @@ export default function ChatApp({ user }) {
     const reset = () => {
       clearTimeout(timer);
       if (isAway) { isAway = false; updateDoc(doc(db, "users", uid), { status: "online" }); }
-      timer = setTimeout(() => { isAway = true; updateDoc(doc(db, "users", uid), { status: "away" }); }, AWAY_MS);
+      timer = setTimeout(() => { isAway = true; updateDoc(doc(db, "users", uid), { status: "away", lastActiveAt: serverTimestamp() }); }, AWAY_MS);
     };
     const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
     events.forEach(e => document.addEventListener(e, reset));
