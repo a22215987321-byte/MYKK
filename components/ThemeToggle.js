@@ -14,7 +14,7 @@ function applyTheme(next) {
   else document.documentElement.setAttribute("data-theme", next);
 }
 
-export default function ThemeToggle({ mode = "floating", onOpenProfile }) {
+export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp = false }) {
   const [theme, setTheme] = useState("default");
   const [open, setOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
@@ -22,7 +22,16 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
-    setTheme(THEMES.some(t => t.id === saved) ? saved : "default");
+    if (THEMES.some(t => t.id === saved)) {
+      setTheme(saved);
+    } else {
+      // Mirrors the inline script in pages/_document.js: with no explicit
+      // choice saved, the OS dark-mode preference decides what's actually
+      // showing, so reflect that here instead of always showing "淺色預設"
+      // as checked.
+      const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+      setTheme(prefersDark ? "neon" : "default");
+    }
   }, []);
 
   useEffect(() => onAuthStateChanged(auth, u => setLoggedIn(!!u)), []);
@@ -77,7 +86,9 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile }) {
         <div
           style={{
             position: "absolute",
-            top: mode === "floating" ? 46 : 26,
+            ...(openUp
+              ? { bottom: mode === "floating" ? 46 : 26 }
+              : { top: mode === "floating" ? 46 : 26 }),
             right: 0,
             minWidth: 190,
             background: "var(--panel)",

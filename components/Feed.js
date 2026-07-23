@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import Link from "next/link";
 import MobileTabBarLayout from "./MobileTabBarLayout";
+import ThemeToggle from "./ThemeToggle";
 import LoadingState from "./LoadingState";
 import { uploadToR2 } from "../lib/uploadToR2";
 import { formatDate, formatFullDate } from "../lib/format";
@@ -102,7 +103,10 @@ function Icon({ name, size = 18, style }) {
   );
 }
 
-function Avatar({ avatar, color, size = 40 }) {
+function Avatar({ avatar, avatarImage, color, size = 40 }) {
+  if (avatarImage) {
+    return <img src={avatarImage} alt="頭像" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, display: "block" }} />;
+  }
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%",
@@ -135,6 +139,7 @@ function CommentSection({ postId, myProfile }) {
         userId: myProfile.uid,
         userNickname: myProfile.nickname,
         userAvatar: myProfile.avatar,
+        userAvatarImage: myProfile.avatarImage || "",
         userColor: myProfile.color,
         text: text.trim(),
         createdAt: serverTimestamp(),
@@ -149,7 +154,7 @@ function CommentSection({ postId, myProfile }) {
     <div style={{ marginTop: 12, borderTop: "1px solid var(--panel)", paddingTop: 12 }}>
       {comments.map(c => (
         <div key={c.id} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-start" }}>
-          <Avatar avatar={c.userAvatar} color={c.userColor} size={28} />
+          <Avatar avatar={c.userAvatar} avatarImage={c.userAvatarImage} color={c.userColor} size={28} />
           <div style={{ background: "var(--panel-alt)", borderRadius: 10, padding: "6px 10px", flex: 1 }}>
             <span style={{ fontWeight: 700, fontSize: 12, color: "var(--text-muted)", marginRight: 6 }}>{c.userNickname}</span>
             <span style={{ fontSize: 13, color: "var(--text)" }}>{c.text}</span>
@@ -158,7 +163,7 @@ function CommentSection({ postId, myProfile }) {
         </div>
       ))}
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-        <Avatar avatar={myProfile.avatar} color={myProfile.color} size={28} />
+        <Avatar avatar={myProfile.avatar} avatarImage={myProfile.avatarImage} color={myProfile.color} size={28} />
         <div style={{ flex: 1, display: "flex", gap: 6 }}>
           <input
             value={text}
@@ -243,7 +248,7 @@ function PostCard({ post, myUid, myProfile }) {
     <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", marginBottom: 16, overflow: "hidden" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", position: "relative" }}>
-        <Avatar avatar={post.userAvatar} color={post.userColor} size={40} />
+        <Avatar avatar={post.userAvatar} avatarImage={post.userAvatarImage} color={post.userColor} size={40} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.userNickname}</div>
           <div style={{ fontSize: 11, color: "var(--text-muted)" }} title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</div>
@@ -397,6 +402,7 @@ function NewPostForm({ myProfile, onPosted }) {
       userId: myProfile.uid,
       userNickname: myProfile.nickname,
       userAvatar: myProfile.avatar,
+      userAvatarImage: myProfile.avatarImage || "",
       userColor: myProfile.color,
       text: text.trim(),
       imageUrl: null,
@@ -446,7 +452,7 @@ function NewPostForm({ myProfile, onPosted }) {
   return (
     <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", padding: 16, marginBottom: 20 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-        <Avatar avatar={myProfile.avatar} color={myProfile.color} size={40} />
+        <Avatar avatar={myProfile.avatar} avatarImage={myProfile.avatarImage} color={myProfile.color} size={40} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             <textarea
@@ -540,34 +546,42 @@ function TopicTagsBar({ topics, selected, onToggle }) {
 
 // 桌面版精簡導覽軌：不是複製整個聊天室 sidebar（維護成本高、容易跟聊天室走鐘），
 // 只留「回到聊天室的明確入口 + 目前在哪一頁」的最小語意，讓 /feed 不會像孤立頁。
-function DesktopRail({ pendingCount }) {
+function DesktopRail({ pendingCount, myProfile }) {
   return (
-    <div style={{ width: 220, flexShrink: 0, borderRight: "1px solid var(--panel)", padding: "24px 16px", position: "sticky", top: 0, height: "100vh", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 4 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 8px", marginBottom: 20 }}>
-        <span style={{ fontSize: 22 }}>💬</span>
-        <span style={{ fontWeight: 800, fontSize: 16, color: "var(--text)" }}>EVONCHAT</span>
+    <div style={{ width: 220, flexShrink: 0, borderRight: "1px solid var(--panel)", position: "sticky", top: 0, height: "100vh", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "24px 16px 4px", display: "flex", flexDirection: "column", gap: 4, flex: 1, minHeight: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 8px", marginBottom: 20 }}>
+          <span style={{ fontSize: 22 }}>💬</span>
+          <span style={{ fontWeight: 800, fontSize: 16, color: "var(--text)" }}>EVONCHAT</span>
+        </div>
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600 }}
+          onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+          onMouseLeave={e => e.currentTarget.style.background = "none"}>
+          <Icon name="back" /> 返回聊天室
+        </Link>
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600 }}
+          onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+          onMouseLeave={e => e.currentTarget.style.background = "none"}>
+          <Icon name="hash" /> 公共大廳
+        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, background: "var(--accent-active)", color: "var(--accent)", fontSize: 14, fontWeight: 700 }}>
+          <Icon name="feed" /> 動態消息
+        </div>
       </div>
-      <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600 }}
-        onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
-        onMouseLeave={e => e.currentTarget.style.background = "none"}>
-        <Icon name="back" /> 返回聊天室
-      </Link>
-      <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600 }}
-        onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
-        onMouseLeave={e => e.currentTarget.style.background = "none"}>
-        <Icon name="hash" /> 公共大廳
-      </Link>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, background: "var(--accent-active)", color: "var(--accent)", fontSize: 14, fontWeight: 700 }}>
-        <Icon name="feed" /> 動態消息
+
+      {/* Profile footer — mirrors ChatRoom's sidebar identity block (real avatar photo,
+          nickname, theme toggle) instead of a bare emoji link, so this rail doesn't feel
+          like an afterthought next to the chat room's fuller sidebar. */}
+      <div style={{ borderTop: "1px solid var(--panel)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+        <Link href="/?view=more" style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, textDecoration: "none", position: "relative" }}>
+          <Avatar avatar={myProfile.avatar} avatarImage={myProfile.avatarImage} color={myProfile.color} size={36} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myProfile.nickname}</span>
+          {pendingCount > 0 && (
+            <span style={{ position: "absolute", top: -4, left: 24, background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px" }}>{pendingCount}</span>
+          )}
+        </Link>
+        <ThemeToggle mode="inline" openUp />
       </div>
-      <Link href="/?view=more" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600, position: "relative" }}
-        onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
-        onMouseLeave={e => e.currentTarget.style.background = "none"}>
-        <span style={{ fontSize: 18 }}>😊</span> 我
-        {pendingCount > 0 && (
-          <span style={{ position: "absolute", right: 10, background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px" }}>{pendingCount}</span>
-        )}
-      </Link>
     </div>
   );
 }
@@ -716,7 +730,7 @@ export default function FeedApp({ user }) {
 
         <div className="feed-shell">
           <nav className="feed-desktop-rail" aria-label="動態消息導覽">
-            <DesktopRail pendingCount={(myProfile.pendingIn || []).length} />
+            <DesktopRail pendingCount={(myProfile.pendingIn || []).length} myProfile={myProfile} />
           </nav>
 
           <main className="feed-main-col">
