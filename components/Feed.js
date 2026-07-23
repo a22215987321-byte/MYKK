@@ -8,7 +8,7 @@ import Link from "next/link";
 import MobileTabBarLayout from "./MobileTabBarLayout";
 import LoadingState from "./LoadingState";
 import { uploadToR2 } from "../lib/uploadToR2";
-import { formatDate } from "../lib/format";
+import { formatDate, formatFullDate } from "../lib/format";
 import { toast } from "../lib/toast";
 
 const HASHTAG_RE = /#[\p{L}\p{N}_]+/gu;
@@ -68,6 +68,40 @@ function renderMarkdownLite(text) {
   return blocks;
 }
 
+// One line-icon set shared by the desktop rail and post actions, so
+// functional icons read as one consistent style instead of mixed emoji.
+const ICON_PATHS = {
+  back: <path d="M15 18l-6-6 6-6" />,
+  hash: <>
+    <line x1="4" y1="9" x2="20" y2="9" />
+    <line x1="4" y1="15" x2="20" y2="15" />
+    <line x1="10" y1="3" x2="8" y2="21" />
+    <line x1="16" y1="3" x2="14" y2="21" />
+  </>,
+  feed: <>
+    <rect x="4" y="4" width="16" height="16" rx="3" />
+    <line x1="8" y1="9" x2="16" y2="9" />
+    <line x1="8" y1="13" x2="16" y2="13" />
+    <line x1="8" y1="17" x2="12" y2="17" />
+  </>,
+  send: <>
+    <line x1="22" y1="2" x2="11" y2="13" />
+    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+  </>,
+  search: <>
+    <circle cx="11" cy="11" r="7" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </>,
+};
+function Icon({ name, size = 18, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, ...style }} aria-hidden="true">
+      {ICON_PATHS[name]}
+    </svg>
+  );
+}
+
 function Avatar({ avatar, color, size = 40 }) {
   return (
     <div style={{
@@ -119,7 +153,7 @@ function CommentSection({ postId, myProfile }) {
           <div style={{ background: "var(--panel-alt)", borderRadius: 10, padding: "6px 10px", flex: 1 }}>
             <span style={{ fontWeight: 700, fontSize: 12, color: "var(--text-muted)", marginRight: 6 }}>{c.userNickname}</span>
             <span style={{ fontSize: 13, color: "var(--text)" }}>{c.text}</span>
-            <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{formatDate(c.createdAt)}</div>
+            <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }} title={formatFullDate(c.createdAt)}>{formatDate(c.createdAt)}</div>
           </div>
         </div>
       ))}
@@ -152,11 +186,17 @@ function PostCard({ post, myUid, myProfile }) {
   const [showComments, setShowComments] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
   const liked = (post.likes || []).includes(myUid);
   const bookmarked = (post.bookmarks || []).includes(myUid);
   const isMine = post.userId === myUid;
   const tags = useMemo(() => extractHashtags(post.text), [post.text]);
   const isLong = (post.text || "").length > LONG_POST_THRESHOLD;
+
+  useEffect(() => {
+    const q = collection(db, "posts", post.id, "comments");
+    return onSnapshot(q, snap => setCommentCount(snap.size));
+  }, [post.id]);
 
   const toggleLike = async () => {
     const ref = doc(db, "posts", post.id);
@@ -200,13 +240,13 @@ function PostCard({ post, myUid, myProfile }) {
   };
 
   return (
-    <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16, overflow: "hidden" }}>
+    <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", marginBottom: 16, overflow: "hidden" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", position: "relative" }}>
         <Avatar avatar={post.userAvatar} color={post.userColor} size={40} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.userNickname}</div>
-          <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{formatDate(post.createdAt)}</div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)" }} title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</div>
         </div>
         {isMine && (
           <div style={{ position: "relative" }}>
@@ -283,16 +323,16 @@ function PostCard({ post, myUid, myProfile }) {
         <button onClick={toggleLike} className="feed-action-btn"
           style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: liked ? "#ef4444" : "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}>
           <span style={{ fontSize: 18 }}>{liked ? "❤️" : "🤍"}</span>
-          {(post.likes || []).length > 0 && <span>{(post.likes || []).length}</span>}
+          <span>{(post.likes || []).length}</span>
         </button>
         <button onClick={() => setShowComments(v => !v)} className="feed-action-btn"
           style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}>
           <span style={{ fontSize: 18 }}>💬</span>
-          留言
+          <span>{commentCount}</span>
         </button>
         <button onClick={share} className="feed-action-btn"
           style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}>
-          <span style={{ fontSize: 18 }}>↗</span>
+          <Icon name="send" size={17} />
         </button>
         <button onClick={toggleBookmark} className="feed-action-btn"
           style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: bookmarked ? "var(--accent)" : "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0, marginLeft: "auto" }}>
@@ -404,26 +444,28 @@ function NewPostForm({ myProfile, onPosted }) {
   const canPost = (text.trim() || mediaFile) && !posting;
 
   return (
-    <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", padding: 16, marginBottom: 20 }}>
+    <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", padding: 16, marginBottom: 20 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         <Avatar avatar={myProfile.avatar} color={myProfile.color} size={40} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          {expanded ? (
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             <textarea
               ref={textareaRef}
               value={text}
               onChange={e => setText(e.target.value)}
+              onFocus={() => setExpanded(true)}
               placeholder="分享你的想法…"
-              rows={3}
-              autoFocus
-              style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", resize: "none", boxSizing: "border-box", lineHeight: 1.5 }}
+              rows={expanded ? 3 : 1}
+              style={{ flex: 1, minWidth: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", resize: "none", boxSizing: "border-box", lineHeight: 1.5 }}
             />
-          ) : (
-            <button onClick={() => setExpanded(true)}
-              style={{ width: "100%", textAlign: "left", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px", color: "var(--text-faint)", fontSize: 14, cursor: "text" }}>
-              分享你的想法…
+            <button
+              onClick={submit}
+              disabled={!canPost}
+              style={{ flexShrink: 0, background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel-alt)", border: canPost ? "none" : "1px solid var(--border)", borderRadius: 10, padding: "10px 18px", color: canPost ? "#fff" : "var(--text-dim)", cursor: canPost ? "pointer" : "not-allowed", fontSize: 14, fontWeight: 700 }}
+            >
+              {posting ? "發佈中..." : "發佈"}
             </button>
-          )}
+          </div>
 
           {expanded && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
@@ -450,7 +492,7 @@ function NewPostForm({ myProfile, onPosted }) {
           )}
 
           {expanded && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+            <div style={{ marginTop: 10 }}>
               <button
                 onClick={() => fileRef.current?.click()}
                 style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}
@@ -458,13 +500,6 @@ function NewPostForm({ myProfile, onPosted }) {
                 📎 加入圖片/影片
               </button>
               <input ref={fileRef} type="file" accept="image/*,video/*" onChange={onFile} style={{ display: "none" }} />
-              <button
-                onClick={submit}
-                disabled={!canPost}
-                style={{ background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: "8px 20px", color: canPost ? "#fff" : "var(--text-dim)", cursor: canPost ? "pointer" : "default", fontSize: 14, fontWeight: 700 }}
-              >
-                {posting ? "發佈中..." : "發佈"}
-              </button>
             </div>
           )}
         </div>
@@ -473,26 +508,32 @@ function NewPostForm({ myProfile, onPosted }) {
   );
 }
 
-function MarqueeRow({ items, direction }) {
-  const doubled = [...items, ...items];
+// Single deduplicated row of topic tags — horizontally scrollable so an
+// overflowing list never needs a second row. Each tag toggles as a filter:
+// selected = filled, unselected = outline only.
+function TopicTagsBar({ topics, selected, onToggle }) {
+  const unique = useMemo(() => [...new Set(topics)], [topics]);
   return (
-    <div style={{ overflow: "hidden", width: "100%" }}>
-      <div className={`feed-marquee-track feed-marquee-${direction}`} style={{ display: "flex", gap: 10, width: "max-content" }}>
-        {doubled.map((item, i) => (
-          <span key={i} style={{ flexShrink: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "6px 16px", fontSize: 13, fontWeight: 600, color: "var(--text-faint)" }}>
-            {item}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TopMarquee() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-      <MarqueeRow items={QUICK_TOPICS} direction="left" />
-      <MarqueeRow items={QUICK_TOPICS} direction="right" />
+    <div className="feed-tags-row" style={{ display: "flex", gap: 8, overflowX: "auto", padding: "2px 2px 8px", marginBottom: 20 }}>
+      {unique.map(topic => {
+        const isSelected = selected === topic;
+        return (
+          <button
+            key={topic}
+            onClick={() => onToggle(topic)}
+            className="feed-tag-chip"
+            aria-pressed={isSelected}
+            style={{
+              flexShrink: 0, padding: "7px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer",
+              background: isSelected ? "var(--accent)" : "transparent",
+              color: isSelected ? "#fff" : "var(--text-muted)",
+              border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+            }}
+          >
+            #{topic}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -509,15 +550,15 @@ function DesktopRail({ pendingCount }) {
       <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600 }}
         onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
         onMouseLeave={e => e.currentTarget.style.background = "none"}>
-        <span style={{ fontSize: 18 }}>←</span> 返回聊天室
+        <Icon name="back" /> 返回聊天室
       </Link>
       <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600 }}
         onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
         onMouseLeave={e => e.currentTarget.style.background = "none"}>
-        <span style={{ fontSize: 18 }}>#</span> 公共大廳
+        <Icon name="hash" /> 公共大廳
       </Link>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, background: "var(--accent-active)", color: "var(--accent)", fontSize: 14, fontWeight: 700 }}>
-        <span style={{ fontSize: 18 }}>📋</span> 動態消息
+        <Icon name="feed" /> 動態消息
       </div>
       <Link href="/?view=more" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, color: "var(--text-muted)", textDecoration: "none", fontSize: 14, fontWeight: 600, position: "relative" }}
         onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
@@ -541,14 +582,14 @@ function RightRail({ posts, myProfile }) {
 
   return (
     <div style={{ width: 280, flexShrink: 0, padding: "24px 16px", position: "sticky", top: 0, height: "100vh", boxSizing: "border-box", overflowY: "auto" }}>
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16, marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-faint)", marginBottom: 10 }}>📊 我的動態</div>
+      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--card-shadow)", padding: 16, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)", marginBottom: 10 }}>📊 我的動態</div>
         <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text)" }}>{myPostCount}</div>
-        <div style={{ fontSize: 12, color: "var(--text-faint)" }}>篇貼文</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>篇貼文</div>
       </div>
       {topTags.length > 0 && (
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-faint)", marginBottom: 10 }}>🔥 熱門標籤</div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--card-shadow)", padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)", marginBottom: 10 }}>🔥 熱門標籤</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {topTags.map(([tag, count]) => (
               <span key={tag} style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", background: "var(--accent-active)", borderRadius: 20, padding: "3px 10px" }}>
@@ -566,6 +607,9 @@ export default function FeedApp({ user }) {
   const [myProfile, setMyProfile] = useState(null);
   const [myProfileError, setMyProfileError] = useState('');
   const [posts, setPosts] = useState([]);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortMode, setSortMode] = useState("latest");
   const topRef = useRef();
 
   useEffect(() => {
@@ -595,7 +639,19 @@ export default function FeedApp({ user }) {
     });
   }, []);
 
-  const filteredPosts = useMemo(() => (myProfile ? posts : []), [posts, myProfile]);
+  const filteredPosts = useMemo(() => {
+    if (!myProfile) return [];
+    let list = posts;
+    if (selectedTopic) list = list.filter(p => (p.text || "").includes(`#${selectedTopic}`));
+    const q = searchQuery.trim().toLowerCase();
+    if (q) list = list.filter(p => (p.text || "").toLowerCase().includes(q) || (p.userNickname || "").toLowerCase().includes(q));
+    if (sortMode === "hot") list = [...list].sort((a, b) => (b.likes?.length || 0) - (a.likes?.length || 0));
+    return list;
+  }, [posts, myProfile, selectedTopic, searchQuery, sortMode]);
+
+  const toggleTopic = useCallback((topic) => {
+    setSelectedTopic(prev => (prev === topic ? null : topic));
+  }, []);
 
   if (!myProfile) {
     return (
@@ -620,17 +676,15 @@ export default function FeedApp({ user }) {
         .feed-main-col { flex: 1; min-width: 0; }
         .feed-desktop-rail, .feed-right-rail { display: none; }
 
-        .feed-marquee-left { animation: feed-marquee-scroll-left 24s linear infinite; }
-        .feed-marquee-right { animation: feed-marquee-scroll-right 24s linear infinite; }
-        .feed-marquee-track:hover { animation-play-state: paused; }
-        @keyframes feed-marquee-scroll-left {
-          from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
-        }
-        @keyframes feed-marquee-scroll-right {
-          from { transform: translateX(-50%); }
-          to { transform: translateX(0); }
-        }
+        .feed-tags-row::-webkit-scrollbar { height: 0; }
+
+        .feed-action-btn { transition: transform .15s ease, opacity .15s ease; }
+        .feed-action-btn:hover { opacity: 0.7; transform: scale(1.08); }
+        .feed-action-btn:active { transform: scale(0.92); }
+
+        .feed-tag-chip { transition: transform .15s ease, opacity .15s ease; }
+        .feed-tag-chip:hover { opacity: 0.85; }
+        .feed-tag-chip:active { transform: scale(0.96); }
 
         @media (min-width: 768px) {
           .feed-desktop-rail { display: flex; }
@@ -668,20 +722,45 @@ export default function FeedApp({ user }) {
           <main className="feed-main-col">
             <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px" }} ref={topRef}>
               {/* Hero */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>動態消息</div>
-                <div style={{ fontSize: 13, color: "var(--text-faint)", marginTop: 2 }}>看看朋友近況，分享你的想法</div>
+              <div style={{ marginBottom: 20, display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>動態消息</div>
+                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>看看朋友近況，分享你的想法</div>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ position: "relative" }}>
+                    <Icon name="search" size={15} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }} />
+                    <input
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="搜尋貼文..."
+                      style={{ width: 160, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 12px 7px 30px", color: "var(--text)", fontSize: 13, outline: "none" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 3, gap: 2 }}>
+                    {[["latest", "最新"], ["hot", "熱門"]].map(([mode, label]) => (
+                      <button key={mode} onClick={() => setSortMode(mode)}
+                        style={{
+                          border: "none", borderRadius: 16, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                          background: sortMode === mode ? "var(--accent)" : "transparent",
+                          color: sortMode === mode ? "#fff" : "var(--text-muted)",
+                        }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <NewPostForm myProfile={myProfile} />
 
-              <TopMarquee />
+              <TopicTagsBar topics={QUICK_TOPICS} selected={selectedTopic} onToggle={toggleTopic} />
 
               {filteredPosts.length === 0 && (
                 <div style={{ textAlign: "center", padding: "60px 20px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16 }}>
                   <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>還沒有動態</div>
-                  <div style={{ fontSize: 13, color: "var(--text-faint)", marginTop: 4 }}>分享你的第一篇學習筆記吧！</div>
+                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>分享你的第一篇學習筆記吧！</div>
                 </div>
               )}
 
