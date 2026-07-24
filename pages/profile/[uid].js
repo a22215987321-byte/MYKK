@@ -13,7 +13,7 @@ import { uploadToR2 } from "../../lib/uploadToR2";
 import { formatDate } from "../../lib/format";
 import { toast } from "../../lib/toast";
 import {
-  doc, getDoc, onSnapshot, collection, query, where, getDocs, addDoc,
+  doc, getDoc, onSnapshot, collection, query, where, orderBy, getDocs, addDoc,
   updateDoc, serverTimestamp, arrayUnion, arrayRemove,
 } from "firebase/firestore";
 
@@ -239,12 +239,12 @@ function NewPostForm({ profile, onPosted }) {
   );
 }
 
-function PostItem({ post, profile, isOwner, onTogglePin, onOpenImage }) {
+function PostItem({ post, profile, isOwner, onTogglePin, onOpenMedia }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const visInfo = VISIBILITY_OPTS.find(o => o.id === (post.visibility || "public"));
 
   return (
-    <div style={{ borderBottom: "1px solid var(--panel)", background: post.pinned ? "var(--panel-alt)" : "transparent" }}>
+    <div id={`post-${post.id}`} style={{ borderBottom: "1px solid var(--panel)", background: post.pinned ? "var(--panel-alt)" : "transparent" }}>
       <div style={{ padding: "16px 16px 12px" }}>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
           {profile.avatarImage
@@ -291,7 +291,7 @@ function PostItem({ post, profile, isOwner, onTogglePin, onOpenImage }) {
             )}
             {post.imageUrl && (
               <div style={{ borderRadius: 16, overflow: "hidden", marginTop: 10, cursor: "zoom-in" }}
-                onClick={() => onOpenImage(post.imageUrl)}>
+                onClick={() => onOpenMedia(post)}>
                 <img src={post.imageUrl} alt="貼文圖片" style={{ width: "100%", maxHeight: 400, objectFit: "cover", display: "block", transition: "filter 0.2s" }}
                   onMouseEnter={e => e.currentTarget.style.filter = "brightness(0.85)"}
                   onMouseLeave={e => e.currentTarget.style.filter = "brightness(1)"} />
@@ -436,6 +436,205 @@ function EditOverlay({ shape = "rect", label, onClick }) {
   );
 }
 
+// Rich media viewer — unlike a bare image lightbox, this keeps the source
+// post's author/time/text/like/comment context visible, and lets you step
+// through the same user's other media (mediaList) without closing/reopening.
+function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobile, onClose, onIndexChange, onViewOriginal }) {
+  const post = mediaList[index];
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState("");
+  const [sendingComment, setSendingComment] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
+
+  useEffect(() => {
+    if (!post) return;
+    return onSnapshot(query(collection(db, "posts", post.id, "comments"), orderBy("createdAt")), snap => {
+      setComments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => console.error("[ProfilePage.MediaLightbox] comments listener failed", e));
+  }, [post?.id]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "ArrowLeft" && index > 0) onIndexChange(index - 1);
+      else if (e.key === "ArrowRight" && index < mediaList.length - 1) onIndexChange(index + 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, mediaList.length, onIndexChange]);
+
+  if (!post) {
+    return (
+      <div role="dialog" aria-modal="true" aria-label="貼文檢視" onClick={onClose}
+        style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+        <div onClick={e => e.stopPropagation()}
+          style={{ background: "var(--panel)", borderRadius: 16, padding: 32, textAlign: "center", color: "var(--text-muted)" }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>🚫</div>
+          這則貼文已無法顯示
+          <div style={{ marginTop: 16 }}>
+            <button onClick={onClose} style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 18px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>關閉</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const liked = viewerUid ? (post.likes || []).includes(viewerUid) : false;
+
+  const toggleLike = async () => {
+    if (!viewerUid) { toast("請先登入後再按讚"); return; }
+    if (likeBusy) return;
+    setLikeBusy(true);
+    try {
+      await updateDoc(doc(db, "posts", post.id), { likes: liked ? arrayRemove(viewerUid) : arrayUnion(viewerUid) });
+    } catch (e) {
+      console.error("[ProfilePage.MediaLightbox] toggleLike failed", e);
+      toast("操作失敗，請重試");
+    } finally {
+      setLikeBusy(false);
+    }
+  };
+
+  const submitComment = async () => {
+    if (!viewerUid || !myProfile) { toast("請先登入後再留言"); return; }
+    if (!commentText.trim() || sendingComment) return;
+    setSendingComment(true);
+    try {
+      await addDoc(collection(db, "posts", post.id, "comments"), {
+        userId: myProfile.uid,
+        userNickname: myProfile.nickname,
+        userAvatar: myProfile.avatar,
+        userAvatarImage: myProfile.avatarImage || "",
+        userColor: myProfile.color,
+        text: commentText.trim(),
+        createdAt: serverTimestamp(),
+      });
+      setCommentText("");
+    } catch (e) {
+      console.error("[ProfilePage.MediaLightbox] submitComment failed", e);
+      toast("留言失敗，請重試");
+    } finally {
+      setSendingComment(false);
+    }
+  };
+
+  const share = async () => {
+    const url = `${window.location.origin}/profile/${profile.uid}?post=${post.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${profile.nickname} 的貼文`, text: post.text?.slice(0, 80) || "", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast("連結已複製", "success");
+      }
+    } catch { /* 使用者取消分享 */ }
+  };
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="貼文檢視" onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "stretch", justifyContent: "center" }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%", maxWidth: 1100, margin: "auto", maxHeight: "94vh", background: "#000" }}>
+
+        {/* Media + prev/next */}
+        <div style={{ position: "relative", flex: isMobile ? "0 0 auto" : "1 1 auto", minHeight: isMobile ? "40vh" : "auto", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          {post.videoUrl
+            ? <video src={post.videoUrl} controls style={{ maxWidth: "100%", maxHeight: isMobile ? "40vh" : "94vh", display: "block" }} />
+            : <img src={post.imageUrl} alt="貼文圖片" style={{ maxWidth: "100%", maxHeight: isMobile ? "40vh" : "94vh", objectFit: "contain", display: "block" }} />
+          }
+          {index > 0 && (
+            <button onClick={() => onIndexChange(index - 1)} aria-label="上一張"
+              style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", color: "#fff", width: 36, height: 36, borderRadius: "50%", cursor: "pointer", fontSize: 18 }}>
+              ‹
+            </button>
+          )}
+          {index < mediaList.length - 1 && (
+            <button onClick={() => onIndexChange(index + 1)} aria-label="下一張"
+              style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", color: "#fff", width: 36, height: 36, borderRadius: "50%", cursor: "pointer", fontSize: 18 }}>
+              ›
+            </button>
+          )}
+        </div>
+
+        {/* Post info + interactions */}
+        <div style={{ width: isMobile ? "100%" : 360, flexShrink: 0, background: "var(--panel)", display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div style={{ padding: 16, borderBottom: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {profile.avatarImage
+                ? <img src={profile.avatarImage} alt="頭像" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                : <div style={{ width: 36, height: 36, borderRadius: "50%", background: profile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{profile.avatar}</div>
+              }
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{profile.nickname}</div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{formatDate(post.createdAt)}</div>
+              </div>
+            </div>
+            {post.text && (
+              <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", marginTop: 10 }}>
+                {post.text}
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 12 }}>
+              <button onClick={toggleLike} disabled={likeBusy}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: liked ? "#ef4444" : "var(--text-faint)", fontSize: 13, fontWeight: 600, padding: 0 }}>
+                <span style={{ fontSize: 17 }}>{liked ? "❤️" : "🤍"}</span> {(post.likes || []).length}
+              </button>
+              <span style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--text-faint)", fontSize: 13, fontWeight: 600 }}>
+                <span style={{ fontSize: 17 }}>💬</span> {comments.length}
+              </span>
+              <button onClick={share}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 13, fontWeight: 600, padding: 0 }}>
+                <span style={{ fontSize: 17 }}>↗</span>
+              </button>
+            </div>
+            <button onClick={() => onViewOriginal(post.id)}
+              style={{ marginTop: 12, width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 0", color: "var(--text)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+              查看原貼文
+            </button>
+          </div>
+
+          {/* Comments */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
+            {comments.map(c => (
+              <div key={c.id} style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-start" }}>
+                {c.userAvatarImage
+                  ? <img src={c.userAvatarImage} alt="頭像" style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                  : <div style={{ width: 26, height: 26, borderRadius: "50%", background: c.userColor || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{c.userAvatar}</div>
+                }
+                <div style={{ background: "var(--panel-alt)", borderRadius: 10, padding: "6px 10px", flex: 1, minWidth: 0 }}>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: "var(--text-muted)", marginRight: 6 }}>{c.userNickname}</span>
+                  <span style={{ fontSize: 13, color: "var(--text)" }}>{c.text}</span>
+                </div>
+              </div>
+            ))}
+            {comments.length === 0 && (
+              <div style={{ fontSize: 13, color: "var(--text-dim)", textAlign: "center", padding: "20px 0" }}>還沒有留言</div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: 6, padding: 12, borderTop: "1px solid var(--border)" }}>
+            <input
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && submitComment()}
+              placeholder="留言..."
+              style={{ flex: 1, minWidth: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 12px", color: "var(--text)", fontSize: 13, outline: "none" }}
+            />
+            <button onClick={submitComment} disabled={!commentText.trim() || sendingComment}
+              style={{ background: commentText.trim() ? "var(--accent)" : "var(--panel-alt)", border: "none", borderRadius: 20, padding: "7px 16px", color: commentText.trim() ? "#fff" : "var(--text-dim)", cursor: commentText.trim() ? "pointer" : "default", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
+              送出
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button onClick={onClose} aria-label="關閉貼文檢視"
+        style={{ position: "absolute", top: 16, right: 16, background: "rgba(30,41,59,0.9)", border: "1px solid var(--border)", color: "#f1f5f9", fontSize: 20, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
 export default function ProfilePublicPage() {
   const router = useRouter();
   const { uid } = router.query;
@@ -446,7 +645,9 @@ export default function ProfilePublicPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [tab, setTab] = useState("posts");
-  const [lightboxImg, setLightboxImg] = useState(null);
+  const [avatarZoomImg, setAvatarZoomImg] = useState(null);
+  const [mediaLightboxIndex, setMediaLightboxIndex] = useState(null);
+  const [scrollToPostId, setScrollToPostId] = useState(null);
   const [avatarHover, setAvatarHover] = useState(false);
   const [hoveredMedia, setHoveredMedia] = useState(null);
   const [stickersPanelOpen, setStickersPanelOpen] = useState(false);
@@ -504,9 +705,35 @@ export default function ProfilePublicPage() {
   useEffect(() => { if (uid) reloadPosts(); }, [uid, reloadPosts]);
 
   useEffect(() => {
-    function onKey(e) { if (e.key === "Escape") setLightboxImg(null); }
+    function onKey(e) { if (e.key === "Escape") { setAvatarZoomImg(null); setMediaLightboxIndex(null); } }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // 「查看原貼文」／分享連結（?post=<id>）都指到貼文 tab 裡對應那則貼文的位置。
+  useEffect(() => {
+    if (tab !== "posts" || !scrollToPostId) return;
+    const id = scrollToPostId;
+    const t = setTimeout(() => {
+      document.getElementById(`post-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setScrollToPostId(null);
+    }, 50);
+    return () => clearTimeout(t);
+  }, [tab, scrollToPostId, posts]);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const postId = router.query.post;
+    if (typeof postId === "string" && postId && posts.some(p => p.id === postId)) {
+      setTab("posts");
+      setScrollToPostId(postId);
+    }
+  }, [router.isReady, router.query.post, posts]);
+
+  const viewOriginalPost = useCallback((postId) => {
+    setMediaLightboxIndex(null);
+    setTab("posts");
+    setScrollToPostId(postId);
   }, []);
 
   const togglePin = useCallback(async (post) => {
@@ -661,6 +888,11 @@ export default function ProfilePublicPage() {
   const totalLikes = visiblePosts.reduce((sum, p) => sum + (p.likes || []).length, 0);
   const friendUids = profile.friends || [];
 
+  const openMediaFor = (post) => {
+    const idx = mediaPosts.findIndex(p => p.id === post.id);
+    if (idx >= 0) setMediaLightboxIndex(idx);
+  };
+
   return (
     <>
       <style>{`
@@ -684,17 +916,32 @@ export default function ProfilePublicPage() {
         }
       `}</style>
 
-      {/* Lightbox */}
-      {lightboxImg && (
-        <div role="dialog" aria-modal="true" aria-label="圖片檢視" onClick={() => setLightboxImg(null)}
+      {/* Avatar zoom (no post context — just the profile picture itself) */}
+      {avatarZoomImg && (
+        <div role="dialog" aria-modal="true" aria-label="圖片檢視" onClick={() => setAvatarZoomImg(null)}
           style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
-          <img src={lightboxImg} alt="放大檢視的圖片" onClick={e => e.stopPropagation()}
+          <img src={avatarZoomImg} alt="放大檢視的圖片" onClick={e => e.stopPropagation()}
             style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 8, objectFit: "contain", cursor: "default", boxShadow: "0 8px 40px rgba(0,0,0,0.6)" }} />
-          <button onClick={() => setLightboxImg(null)} aria-label="關閉圖片檢視"
+          <button onClick={() => setAvatarZoomImg(null)} aria-label="關閉圖片檢視"
             style={{ position: "absolute", top: 20, right: 20, background: "rgba(30,41,59,0.9)", border: "1px solid var(--border)", color: "#f1f5f9", fontSize: 20, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             ✕
           </button>
         </div>
+      )}
+
+      {/* Media lightbox — keeps the source post's author/text/likes/comments visible */}
+      {mediaLightboxIndex != null && (
+        <MediaLightbox
+          mediaList={mediaPosts}
+          index={mediaLightboxIndex}
+          profile={profile}
+          viewerUid={viewerUid}
+          myProfile={myProfile}
+          isMobile={isMobile}
+          onClose={() => setMediaLightboxIndex(null)}
+          onIndexChange={setMediaLightboxIndex}
+          onViewOriginal={viewOriginalPost}
+        />
       )}
 
       {/* 我的貼圖包 */}
@@ -754,7 +1001,7 @@ export default function ProfilePublicPage() {
         <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px" }}>
           <div className="pp-avatar-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: -52, marginBottom: 12 }}>
             <div className="pp-avatar" style={{ flexShrink: 0, position: "relative", cursor: (!isOwner && profile.avatarImage) ? "pointer" : "default", width: 104, height: 104 }}
-              onClick={() => !isOwner && profile.avatarImage && setLightboxImg(profile.avatarImage)}
+              onClick={() => !isOwner && profile.avatarImage && setAvatarZoomImg(profile.avatarImage)}
               onMouseEnter={() => setAvatarHover(true)}
               onMouseLeave={() => setAvatarHover(false)}>
               {profile.avatarImage
@@ -932,7 +1179,7 @@ export default function ProfilePublicPage() {
                 </div>
               )}
               {orderedPosts.filter(p => p.text || p.imageUrl || p.videoUrl).map(post => (
-                <PostItem key={post.id} post={post} profile={profile} isOwner={isOwner} onTogglePin={togglePin} onOpenImage={setLightboxImg} />
+                <PostItem key={post.id} post={post} profile={profile} isOwner={isOwner} onTogglePin={togglePin} onOpenMedia={openMediaFor} />
               ))}
             </>
           )}
@@ -947,10 +1194,10 @@ export default function ProfilePublicPage() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, padding: "2px" }}>
                 {mediaPosts.map(post => (
                   <div key={post.id}
-                    onClick={() => post.imageUrl && setLightboxImg(post.imageUrl)}
+                    onClick={() => openMediaFor(post)}
                     onMouseEnter={() => setHoveredMedia(post.id)}
                     onMouseLeave={() => setHoveredMedia(null)}
-                    style={{ aspectRatio: "1", overflow: "hidden", background: "var(--panel)", cursor: post.imageUrl ? "zoom-in" : "default", position: "relative" }}>
+                    style={{ aspectRatio: "1", overflow: "hidden", background: "var(--panel)", cursor: "zoom-in", position: "relative" }}>
                     {post.videoUrl
                       ? <video src={post.videoUrl} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                       : <img src={post.imageUrl} alt="媒體" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.2s", transform: hoveredMedia === post.id ? "scale(1.06)" : "scale(1)" }} />
