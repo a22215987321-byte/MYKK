@@ -531,15 +531,21 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
 
   return (
     <div role="dialog" aria-modal="true" aria-label="貼文檢視" onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "stretch", justifyContent: "center" }}>
+      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
       <div onClick={e => e.stopPropagation()}
-        style={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%", maxWidth: 1100, margin: "auto", maxHeight: "94vh", background: "#000" }}>
+        style={{
+          display: "flex", flexDirection: isMobile ? "column" : "row",
+          width: "100%", maxWidth: 1100, height: "90vh", maxHeight: "90vh",
+          background: "#000", borderRadius: 12, overflow: "hidden",
+        }}>
 
-        {/* Media + prev/next */}
-        <div style={{ position: "relative", flex: isMobile ? "0 0 auto" : "1 1 auto", minHeight: isMobile ? "40vh" : "auto", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        {/* Media + prev/next — height:100% of the modal, so it's always exactly
+            as tall as the info column next to it (fixes the two columns
+            growing to different heights and spilling past the modal edge). */}
+        <div style={{ position: "relative", flex: isMobile ? "0 0 45%" : "1 1 auto", height: "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           {post.videoUrl
-            ? <video src={post.videoUrl} controls style={{ maxWidth: "100%", maxHeight: isMobile ? "40vh" : "94vh", display: "block" }} />
-            : <img src={post.imageUrl} alt="貼文圖片" style={{ maxWidth: "100%", maxHeight: isMobile ? "40vh" : "94vh", objectFit: "contain", display: "block" }} />
+            ? <video src={post.videoUrl} controls style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+            : <img src={post.imageUrl} alt="貼文圖片" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
           }
           {index > 0 && (
             <button onClick={() => onIndexChange(index - 1)} aria-label="上一張"
@@ -555,9 +561,11 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
           )}
         </div>
 
-        {/* Post info + interactions */}
-        <div style={{ width: isMobile ? "100%" : 360, flexShrink: 0, background: "var(--panel)", display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <div style={{ padding: 16, borderBottom: "1px solid var(--border)" }}>
+        {/* Post info + interactions — same height as the media column (both
+            children of a fixed-height flex row), so its own content scrolls
+            internally instead of overflowing past the modal's bottom edge. */}
+        <div style={{ width: isMobile ? "100%" : 360, flex: isMobile ? "1 1 auto" : "0 0 360px", height: "100%", background: "var(--panel)", display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div style={{ padding: 16, borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {profile.avatarImage
                 ? <img src={profile.avatarImage} alt="頭像" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
@@ -611,7 +619,7 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
             )}
           </div>
 
-          <div style={{ display: "flex", gap: 6, padding: 12, borderTop: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", gap: 6, padding: 12, borderTop: "1px solid var(--border)", flexShrink: 0 }}>
             <input
               value={commentText}
               onChange={e => setCommentText(e.target.value)}
@@ -1030,16 +1038,16 @@ export default function ProfilePublicPage() {
                   onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
                   ⚙️ 編輯個人資料
                 </Link>
+                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 10px", display: "flex", alignItems: "center" }}>
+                  <ThemeToggle mode="inline" openUp />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginLeft: 2 }}>設定</span>
+                </div>
                 <button onClick={() => setStickersPanelOpen(true)}
                   style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 16px", color: "var(--text)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
                   onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
                   onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
                   🖼️ 我的貼圖包
                 </button>
-                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 10px", display: "flex", alignItems: "center" }}>
-                  <ThemeToggle mode="inline" openUp />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginLeft: 2 }}>設定</span>
-                </div>
               </div>
             ) : friendState === "blocked" ? (
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
