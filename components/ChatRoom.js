@@ -732,6 +732,18 @@ export default function ChatApp({ user }) {
   const [calendarOpen,   setCalendarOpen]   = useState(false);
   const [mobileView,     setMobileView]     = useState(null); // 'more' | null (content-driven; 'list' 已改用下面的 sidebarOpen 抽屜)
   const [sidebarOpen,    setSidebarOpen]    = useState(false); // 手機版側邊抽屜的「已定案」開關狀態（拖曳中的即時位置不經過這個 state，見 dragStateRef）
+  // 桌面版導覽欄收合狀態（跟手機版的抽屜 sidebarOpen 是兩套機制，互不影響）。
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("cr-sidebar-collapsed") === "1") setSidebarCollapsed(true);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem("cr-sidebar-collapsed", sidebarCollapsed ? "1" : "0"); } catch {}
+  }, [sidebarCollapsed]);
 
   const resetAllViews = useCallback(() => {
     setActiveFriendId(null); setActiveGroupId(null);
@@ -1641,6 +1653,7 @@ export default function ChatApp({ user }) {
         onPointerUp={handleShellPointerEnd} onPointerCancel={handleShellPointerEnd}
         style={{
         display: "flex",
+        position: "relative",
         height: "calc(100vh - var(--shell-margin) * 2 - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
         marginTop: "calc(var(--shell-margin) + env(safe-area-inset-top))",
         marginBottom: "calc(var(--shell-margin) + env(safe-area-inset-bottom))",
@@ -1688,9 +1701,14 @@ export default function ChatApp({ user }) {
         </div>
 
         {/* 側邊欄：桌面版＝常駐側欄（一般 flex 排列）；手機版＝position:fixed 抽屜，
-            由 sidebarOpen 狀態＋拖曳時的即時 transform 控制（見 applyDrawerTransform）。 */}
-        <div ref={sidebarElRef} className="cr-sidebar" style={{
-          width: 280, background: "var(--panel-alt)", borderRight: "1px solid var(--panel)", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden",
+            由 sidebarOpen 狀態＋拖曳時的即時 transform 控制（見 applyDrawerTransform）。
+            桌面版另外還有 sidebarCollapsed（收合成寬度 0，跟手機抽屜是兩套獨立機制）。 */}
+        <div ref={sidebarElRef} className="cr-sidebar" aria-hidden={!isMobile && sidebarCollapsed} style={{
+          width: (!isMobile && sidebarCollapsed) ? 0 : 280,
+          background: "var(--panel-alt)",
+          borderRight: (!isMobile && sidebarCollapsed) ? "none" : "1px solid var(--panel)",
+          display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden",
+          transition: isMobile ? undefined : "width 0.25s ease, border-color 0.25s ease",
         }}>
 
           {/* My info — 手機版壓縮高度、拿掉桌面版才有的 ThemeToggle/登出（已移到手機版頂部列） */}
@@ -1997,6 +2015,31 @@ export default function ChatApp({ user }) {
           </div>
           </div>
         </div>
+
+        {/* 桌面版收合/展開開關：故意當 cr-sidebar 的 sibling（不是它的子元素），
+            這樣 nav 收合到寬度 0、overflow:hidden 裁掉內部內容時，這顆按鈕不會被
+            一起裁掉——收合後它剛好貼著畫面左邊界，同一顆鈕兼作「展開入口」，
+            不用再另外做一個 edge 按鈕。手機版有自己的抽屜開關（cr-mobile-topbar
+            的漢堡鈕），這裡不重複顯示。 */}
+        {!isMobile && (
+          <button
+            onClick={() => setSidebarCollapsed(v => !v)}
+            title={sidebarCollapsed ? "展開導覽列" : "收合導覽列"}
+            aria-label={sidebarCollapsed ? "展開導覽列" : "收合導覽列"}
+            style={{
+              position: "absolute", top: 16,
+              left: sidebarCollapsed ? 4 : 268,
+              zIndex: 40,
+              width: 28, height: 28, borderRadius: "50%",
+              background: "var(--panel)", border: "1px solid var(--border)",
+              color: "var(--text-muted)", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "var(--card-shadow)",
+              transition: "left 0.25s ease",
+            }}>
+            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        )}
 
         {/* 主要區域：一般文件流佈局；手機版拖曳抽屜時用 ref 直接位移（applyDrawerTransform），
             跟 sidebar 同步、零延遲；抽屜關閉時固定在 translateX(0)。 */}
