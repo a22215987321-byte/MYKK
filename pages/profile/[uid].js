@@ -531,18 +531,19 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
 
   return (
     <div role="dialog" aria-modal="true" aria-label="貼文檢視" onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
       <div onClick={e => e.stopPropagation()}
         style={{
           display: "flex", flexDirection: isMobile ? "column" : "row",
-          width: "100%", maxWidth: 1100, height: "90vh", maxHeight: "90vh",
-          background: "#000", borderRadius: 12, overflow: "hidden",
+          width: "100%", maxWidth: isMobile ? "none" : 1100,
+          height: isMobile ? "100dvh" : "90vh", maxHeight: isMobile ? "100dvh" : "90vh",
+          background: "#000", borderRadius: isMobile ? 0 : 12, overflow: "hidden",
         }}>
 
-        {/* Media + prev/next — height:100% of the modal, so it's always exactly
-            as tall as the info column next to it (fixes the two columns
-            growing to different heights and spilling past the modal edge). */}
-        <div style={{ position: "relative", flex: isMobile ? "0 0 45%" : "1 1 auto", height: "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        {/* Media + prev/next — fixed proportion of the modal's own height
+            (not the info column's content height), so a solid black media
+            area never depends on how much text happens to be below it. */}
+        <div style={{ position: "relative", flex: isMobile ? "0 0 62%" : "1 1 auto", height: isMobile ? undefined : "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           {post.videoUrl
             ? <video src={post.videoUrl} controls style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
             : <img src={post.imageUrl} alt="貼文圖片" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
@@ -561,10 +562,10 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
           )}
         </div>
 
-        {/* Post info + interactions — same height as the media column (both
-            children of a fixed-height flex row), so its own content scrolls
-            internally instead of overflowing past the modal's bottom edge. */}
-        <div style={{ width: isMobile ? "100%" : 360, flex: isMobile ? "1 1 auto" : "0 0 360px", height: "100%", background: "var(--panel)", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        {/* Post info + interactions — on desktop this shares the row's fixed
+            height with the media column; on mobile it's just "whatever's left"
+            after the media area's fixed 62%, with its own internal scroll. */}
+        <div style={{ width: isMobile ? "100%" : 360, flex: isMobile ? "1 1 0%" : "0 0 360px", height: isMobile ? undefined : "100%", minHeight: 0, background: "var(--panel)", display: "flex", flexDirection: "column" }}>
           {/* Fixed header — just the author row, always visible regardless of
               how long the post text below turns out to be. */}
           <div style={{ padding: 16, borderBottom: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
