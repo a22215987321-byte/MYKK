@@ -289,10 +289,16 @@ export default function Home() {
       setUser(u);
       const snap = await getDoc(doc(db, 'users', u.uid));
       if (snap.exists()) {
-        // Arriving via the mobile tab bar's ?view= redirect (from /feed or
-        // /profile/[uid], which live outside ChatRoom) should drop straight
-        // into chat, not replay the splash screen every time.
-        setStep(router.query.view ? 'chat' : 'splash');
+        // The splash screen is a once-per-session boot animation, not a
+        // per-navigation one — every client-side nav back to "/" (the
+        // 返回聊天室 link on /profile or /feed, browser back, etc.) remounts
+        // this component fresh, so without this check it would replay the
+        // "PRESS START" screen every single time. sessionStorage survives
+        // across that remount (unlike React state) but resets on an actual
+        // new tab/browser session, which is the boot-once behavior we want.
+        let splashShown = false;
+        try { splashShown = sessionStorage.getItem('evonchat-splash-shown') === '1'; } catch {}
+        setStep((splashShown || router.query.view) ? 'chat' : 'splash');
       } else {
         setSetupNickname(u.displayName || '');
         setStep('setup');
@@ -379,7 +385,10 @@ export default function Home() {
 
   // ── Splash ──
   if (step === 'splash') {
-    return <SplashScreen onEnter={() => setStep('chat')} />;
+    return <SplashScreen onEnter={() => {
+      try { sessionStorage.setItem('evonchat-splash-shown', '1'); } catch {}
+      setStep('chat');
+    }} />;
   }
 
   // ── Chat ──
