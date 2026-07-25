@@ -5,6 +5,10 @@ node_modules/
 .next/
 out/
 
+# scratch clones of external repos used only for reference during
+# development (e.g. `git clone ... .tmp/x`) — never part of this project
+.tmp/
+
 # environment variables — NEVER commit these
 .env
 .env.local

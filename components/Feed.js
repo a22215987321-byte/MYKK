@@ -11,6 +11,8 @@ import LoadingState from "./LoadingState";
 import { uploadToR2 } from "../lib/uploadToR2";
 import { formatDate, formatFullDate } from "../lib/format";
 import { toast } from "../lib/toast";
+import { PhotoEditorLazy, VideoEditorLazy } from "./media-editor";
+import { validatePhotoFile, validateVideoFile } from "./media-editor/mediaValidation";
 
 const HASHTAG_RE = /#[\p{L}\p{N}_]+/gu;
 function extractHashtags(text) {
@@ -364,14 +366,19 @@ function NewPostForm({ myProfile, onPosted }) {
   const [mediaType, setMediaType] = useState(null);
   const [preview, setPreview] = useState(null);
   const [posting, setPosting] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState(false);
+  const [editingVideo, setEditingVideo] = useState(false);
   const fileRef = useRef();
   const textareaRef = useRef();
 
   const onFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const isVideo = file.type.startsWith("video/");
+    const err = isVideo ? validateVideoFile(file) : validatePhotoFile(file);
+    if (err) { toast(err); e.target.value = ""; return; }
     setMediaFile(file);
-    setMediaType(file.type.startsWith("video/") ? "video" : "image");
+    setMediaType(isVideo ? "video" : "image");
     setPreview(URL.createObjectURL(file));
     setExpanded(true);
   };
@@ -490,11 +497,49 @@ function NewPostForm({ myProfile, onPosted }) {
                 ? <video src={preview} controls style={{ maxWidth: "100%", maxHeight: 240, borderRadius: 10, display: "block" }} />
                 : <img src={preview} alt="預覽" style={{ maxWidth: "100%", maxHeight: 240, borderRadius: 10, display: "block" }} />
               }
+              {mediaType === "image" && (
+                <button
+                  onClick={() => setEditingPhoto(true)}
+                  style={{ position: "absolute", bottom: 6, left: 6, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: 20, padding: "5px 12px", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}
+                >✏️ 編輯</button>
+              )}
+              {mediaType === "video" && (
+                <button
+                  onClick={() => setEditingVideo(true)}
+                  style={{ position: "absolute", bottom: 6, left: 6, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: 20, padding: "5px 12px", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}
+                >✂️ 剪輯</button>
+              )}
               <button
                 onClick={removeMedia}
                 style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "50%", width: 26, height: 26, color: "#fff", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
               >✕</button>
             </div>
+          )}
+
+          {editingPhoto && mediaFile && (
+            <PhotoEditorLazy
+              file={mediaFile}
+              onCancel={() => setEditingPhoto(false)}
+              onExport={(blob) => {
+                const edited = new File([blob], mediaFile.name.replace(/\.\w+$/, "") + "-edited.jpg", { type: "image/jpeg" });
+                setMediaFile(edited);
+                setPreview(URL.createObjectURL(blob));
+                setEditingPhoto(false);
+              }}
+            />
+          )}
+
+          {editingVideo && mediaFile && (
+            <VideoEditorLazy
+              files={[mediaFile]}
+              onCancel={() => setEditingVideo(false)}
+              onExport={(videoBlob) => {
+                const edited = new File([videoBlob], mediaFile.name.replace(/\.\w+$/, "") + "-edited.mp4", { type: "video/mp4" });
+                setMediaFile(edited);
+                setPreview(URL.createObjectURL(videoBlob));
+                setEditingVideo(false);
+              }}
+            />
           )}
 
           {expanded && (
