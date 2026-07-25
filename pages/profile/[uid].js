@@ -565,19 +565,25 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
             children of a fixed-height flex row), so its own content scrolls
             internally instead of overflowing past the modal's bottom edge. */}
         <div style={{ width: isMobile ? "100%" : 360, flex: isMobile ? "1 1 auto" : "0 0 360px", height: "100%", background: "var(--panel)", display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <div style={{ padding: 16, borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {profile.avatarImage
-                ? <img src={profile.avatarImage} alt="頭像" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                : <div style={{ width: 36, height: 36, borderRadius: "50%", background: profile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{profile.avatar}</div>
-              }
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{profile.nickname}</div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{formatDate(post.createdAt)}</div>
-              </div>
+          {/* Fixed header — just the author row, always visible regardless of
+              how long the post text below turns out to be. */}
+          <div style={{ padding: 16, borderBottom: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
+            {profile.avatarImage
+              ? <img src={profile.avatarImage} alt="頭像" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+              : <div style={{ width: 36, height: 36, borderRadius: "50%", background: profile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{profile.avatar}</div>
+            }
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{profile.nickname}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{formatDate(post.createdAt)}</div>
             </div>
+          </div>
+
+          {/* Scrollable body — post text (can be arbitrarily long, e.g. an AI
+              prompt) + actions + comments all share this one scroll region,
+              so nothing here can ever push past the modal's fixed height. */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
             {post.text && (
-              <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", marginTop: 10 }}>
+              <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                 {post.text}
               </div>
             )}
@@ -595,13 +601,11 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
               </button>
             </div>
             <button onClick={() => onViewOriginal(post.id)}
-              style={{ marginTop: 12, width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 0", color: "var(--text)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+              style={{ marginTop: 12, marginBottom: 16, width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 0", color: "var(--text)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
               查看原貼文
             </button>
-          </div>
 
-          {/* Comments */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
             {comments.map(c => (
               <div key={c.id} style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-start" }}>
                 {c.userAvatarImage
@@ -617,6 +621,7 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
             {comments.length === 0 && (
               <div style={{ fontSize: 13, color: "var(--text-dim)", textAlign: "center", padding: "20px 0" }}>還沒有留言</div>
             )}
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: 6, padding: 12, borderTop: "1px solid var(--border)", flexShrink: 0 }}>
