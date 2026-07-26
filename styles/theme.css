@@ -17,6 +17,11 @@
   --accent-2: #8b5cf6;
   --accent-active: #eceafd;
   --accent-hover: #f1f0fb;
+  /* Text/icon color for content drawn directly on an --accent-colored
+     surface (primary buttons, filled badges). White works for every
+     saturated accent above; pastel-pearl overrides this to a dark ink
+     since its accents are all light. */
+  --accent-text: #ffffff;
 
   --radius-sm: 10px;
   --radius-md: 14px;
@@ -110,6 +115,98 @@ html[data-theme="glass"] {
 
 html[data-theme="glass"] body {
   background-attachment: fixed;
+}
+
+/* Style 4 — Pastel Pearl: one shared cream/paper surface system with 6
+   interchangeable accent palettes selected via [data-pastel-palette].
+   Neutral tokens (surfaces, text, radius, shadow) are identical across all
+   6 — only --accent/--accent-2 (and everything derived from them below)
+   change, so switching palettes never touches layout or component CSS. */
+html[data-theme="pastel-pearl"] {
+  --bg: #f7f4ef;
+  --panel: #fffdf9;
+  --panel-alt: #f2eee8;
+  --panel-hover: #ffffff;
+  --border: #d8d0c7;
+  --border-soft: #e8e1d8;
+
+  --text: #3f3c39;
+  --text-muted: #6f6a66;
+  --text-faint: #89827c;
+  --text-dim: #89827c;
+  --text-subtle: #3f3c39;
+
+  --card-shadow: 0 2px 14px rgba(63, 60, 57, 0.08);
+  --glow-border: none;
+  --glow-shadow: none;
+  --bg-pattern: none;
+
+  --page-bg: var(--bg);
+  --panel-blur: none;
+  --shell-bg: var(--bg);
+  --shell-blur: none;
+  --shell-margin: 0px;
+  --shell-radius: 0px;
+  --shell-shadow: none;
+
+  /* Every pastel accent below is light, so content on top of it must stay
+     dark — unlike the saturated accents in the other 3 themes. */
+  --accent-text: #444444;
+
+  /* mist-blue is the default palette: first-ever pastel-pearl selection
+     with nothing saved yet (see ThemeToggle.js / _document.js). */
+  --accent: #a2c3e7;
+  --accent-2: #dddddd;
+}
+
+html[data-theme="pastel-pearl"][data-pastel-palette="champagne"] {
+  --accent: #f4bf45;
+  --accent-2: #f9c95f;
+}
+html[data-theme="pastel-pearl"][data-pastel-palette="coral-peach"] {
+  --accent: #f5a58c;
+  --accent-2: #fcc1ae;
+}
+html[data-theme="pastel-pearl"][data-pastel-palette="mist-blue"] {
+  --accent: #a2c3e7;
+  --accent-2: #dddddd;
+}
+html[data-theme="pastel-pearl"][data-pastel-palette="lavender"] {
+  --accent: #c0adde;
+  --accent-2: #fcc1ae;
+}
+html[data-theme="pastel-pearl"][data-pastel-palette="pearl-silver"] {
+  --accent: #d9d8d9;
+  --accent-2: #dddddd;
+}
+html[data-theme="pastel-pearl"][data-pastel-palette="mint-sea-salt"] {
+  --accent: #a7d7cc;
+  --accent-2: #a2c3e7;
+}
+
+/* Named semantic accent tokens for new/shared components — always derived
+   from --accent/--accent-2 above via color-mix, never a per-palette literal,
+   so no component ever needs to branch on the palette id itself. */
+html[data-theme="pastel-pearl"] {
+  --accent-primary: var(--accent);
+  --accent-secondary: var(--accent-2);
+  --accent-soft: color-mix(in srgb, var(--accent) 30%, var(--panel));
+  --accent-subtle: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  --accent-border: color-mix(in srgb, var(--accent) 55%, var(--border));
+  --accent-hover: color-mix(in srgb, var(--accent) 20%, var(--panel));
+  --accent-active: color-mix(in srgb, var(--accent) 32%, var(--panel));
+  --accent-focus: var(--accent);
+}
+
+/* pearl-silver's accent sits close to the neutral surface tones, so a
+   selected/active state can't rely on the color shift alone — force a
+   visible dark ring wherever a component opts into --accent-active-border. */
+html[data-theme="pastel-pearl"][data-pastel-palette="pearl-silver"] {
+  --accent-border: #444444;
+  --accent-active-border: #444444;
+}
+html[data-theme="pastel-pearl"][data-pastel-palette="pearl-silver"] :focus-visible {
+  outline-color: #444444;
 }
 
 body {

@@ -357,7 +357,7 @@ function NewPostForm({ profile, onPosted }) {
             </div>
             <input ref={fileRef} type="file" accept="image/*,video/*" onChange={onFile} style={{ display: "none" }} />
             <button onClick={submit} disabled={!canPost}
-              style={{ background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: "8px 20px", color: canPost ? "#fff" : "var(--text-dim)", cursor: canPost ? "pointer" : "default", fontSize: 14, fontWeight: 700 }}>
+              style={{ background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: "8px 20px", color: canPost ? "var(--accent-text)" : "var(--text-dim)", cursor: canPost ? "pointer" : "default", fontSize: 14, fontWeight: 700 }}>
               {posting ? "發佈中..." : "發佈"}
             </button>
           </div>
@@ -599,7 +599,7 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
           <div style={{ fontSize: 32, marginBottom: 10 }}>🚫</div>
           這則貼文已無法顯示
           <div style={{ marginTop: 16 }}>
-            <button onClick={onClose} style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 18px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>關閉</button>
+            <button onClick={onClose} style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 18px", color: "var(--accent-text)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>關閉</button>
           </div>
         </div>
       </div>
@@ -762,7 +762,7 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
               style={{ flex: 1, minWidth: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 12px", color: "var(--text)", fontSize: 13, outline: "none" }}
             />
             <button onClick={submitComment} disabled={!commentText.trim() || sendingComment}
-              style={{ background: commentText.trim() ? "var(--accent)" : "var(--panel-alt)", border: "none", borderRadius: 20, padding: "7px 16px", color: commentText.trim() ? "#fff" : "var(--text-dim)", cursor: commentText.trim() ? "pointer" : "default", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
+              style={{ background: commentText.trim() ? "var(--accent)" : "var(--panel-alt)", border: "none", borderRadius: 20, padding: "7px 16px", color: commentText.trim() ? "var(--accent-text)" : "var(--text-dim)", cursor: commentText.trim() ? "pointer" : "default", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
               送出
             </button>
           </div>
@@ -1207,11 +1207,11 @@ export default function ProfilePublicPage() {
                 )}
                 {friendState === "requestReceived" && (
                   <button onClick={acceptFriendRequest}
-                    style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
+                    style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 16px", color: "var(--accent-text)", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
                     ✅ 接受好友邀請
                   </button>
                 )}
-                <Link href={`/?chat=${uid}`} style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 18px", color: "#fff", textDecoration: "none", fontSize: 14, fontWeight: 700, transition: "background 0.15s", display: "inline-block" }}
+                <Link href={`/?chat=${uid}`} style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 18px", color: "var(--accent-text)", textDecoration: "none", fontSize: 14, fontWeight: 700, transition: "background 0.15s", display: "inline-block" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#2563eb"}
                   onMouseLeave={e => e.currentTarget.style.background = "var(--accent)"}>
                   💬 傳訊息

@@ -177,7 +177,7 @@ function CommentSection({ postId, myProfile }) {
           <button
             onClick={submit}
             disabled={!text.trim() || sending}
-            style={{ background: text.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: 20, padding: "6px 14px", color: text.trim() ? "#fff" : "var(--text-dim)", cursor: text.trim() ? "pointer" : "default", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+            style={{ background: text.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: 20, padding: "6px 14px", color: text.trim() ? "var(--accent-text)" : "var(--text-dim)", cursor: text.trim() ? "pointer" : "default", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
           >
             送出
           </button>
@@ -547,7 +547,7 @@ function NewPostForm({ myProfile, onPosted }) {
             <button
               onClick={submit}
               disabled={!canPost}
-              style={{ flexShrink: 0, background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel-alt)", border: canPost ? "none" : "1px solid var(--border)", borderRadius: 10, padding: "10px 18px", color: canPost ? "#fff" : "var(--text-dim)", cursor: canPost ? "pointer" : "not-allowed", fontSize: 14, fontWeight: 700 }}
+              style={{ flexShrink: 0, background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel-alt)", border: canPost ? "none" : "1px solid var(--border)", borderRadius: 10, padding: "10px 18px", color: canPost ? "var(--accent-text)" : "var(--text-dim)", cursor: canPost ? "pointer" : "not-allowed", fontSize: 14, fontWeight: 700 }}
             >
               {posting ? "發佈中..." : "發佈"}
             </button>

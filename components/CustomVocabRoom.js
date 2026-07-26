@@ -87,7 +87,7 @@ function CreateListModal({ onClose, onCreate }) {
         </div>
 
         <button onClick={() => valid && onCreate({ title: title.trim(), language, isPublic })} disabled={!valid}
-          style={{ width: "100%", background: valid ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: 12, color: valid ? "#fff" : "var(--text-dim)", fontSize: 15, fontWeight: 700, cursor: valid ? "pointer" : "default" }}>
+          style={{ width: "100%", background: valid ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: 12, color: valid ? "var(--accent-text)" : "var(--text-dim)", fontSize: 15, fontWeight: 700, cursor: valid ? "pointer" : "default" }}>
           建立詞彙表
         </button>
       </div>
@@ -136,7 +136,7 @@ function WordModal({ word: initWord, onClose, onSave, categories }) {
           </div>
         )}
         <button onClick={() => valid && onSave(form)} disabled={!valid}
-          style={{ width: "100%", background: valid ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: 12, color: valid ? "#fff" : "var(--text-dim)", fontSize: 15, fontWeight: 700, cursor: valid ? "pointer" : "default", marginTop: 4 }}>
+          style={{ width: "100%", background: valid ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: 12, color: valid ? "var(--accent-text)" : "var(--text-dim)", fontSize: 15, fontWeight: 700, cursor: valid ? "pointer" : "default", marginTop: 4 }}>
           {initWord ? "儲存修改" : "新增單字"}
         </button>
       </div>
@@ -583,7 +583,7 @@ function ManageView({ list, db, onBack, onUpdate }) {
       <div style={{ padding: "8px 16px", background: "var(--bg)", borderBottom: "1px solid var(--panel)", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", flexShrink: 0 }}>
         <span style={{ fontSize: 11, color: "var(--text-faint)", flexShrink: 0 }}>篩選：</span>
         <button onClick={() => setFilterCat(null)}
-          style={{ padding: "3px 10px", borderRadius: 14, border: "1px solid", borderColor: filterCat === null ? "var(--accent)" : "var(--border)", background: filterCat === null ? "var(--accent-active)" : "var(--panel)", color: filterCat === null ? "#fff" : "var(--text-muted)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+          style={{ padding: "3px 10px", borderRadius: 14, border: "1px solid", borderColor: filterCat === null ? "var(--accent)" : "var(--border)", background: filterCat === null ? "var(--accent-active)" : "var(--panel)", color: filterCat === null ? "var(--accent-text)" : "var(--text-muted)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
           全部
         </button>
         {categories.map(cat => (

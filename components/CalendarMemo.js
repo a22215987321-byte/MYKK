@@ -165,7 +165,7 @@ export default function CalendarMemo({ uid }) {
               取消
             </button>
             <button onClick={saveMemo} disabled={saving}
-              style={{ flex: 2, background: saving ? "var(--border)" : "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 8, padding: "7px 0", color: saving ? "var(--text-faint)" : "#fff", cursor: saving ? "default" : "pointer", fontSize: 13, fontWeight: 700 }}>
+              style={{ flex: 2, background: saving ? "var(--border)" : "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 8, padding: "7px 0", color: saving ? "var(--text-faint)" : "var(--accent-text)", cursor: saving ? "default" : "pointer", fontSize: 13, fontWeight: 700 }}>
               {saving ? "儲存中..." : "儲存"}
             </button>
           </div>

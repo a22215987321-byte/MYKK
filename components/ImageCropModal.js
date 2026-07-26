@@ -111,7 +111,7 @@ export default function ImageCropModal({ file, aspect = 1, outputWidth = 512, ti
             取消
           </button>
           <button onClick={confirm} disabled={saving || !imgEl}
-            style={{ background: "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 10, padding: "8px 18px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+            style={{ background: "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 10, padding: "8px 18px", color: "var(--accent-text)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
             {saving ? "上傳中..." : "確認"}
           </button>
         </div>

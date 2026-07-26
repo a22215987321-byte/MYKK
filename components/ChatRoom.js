@@ -429,7 +429,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
               }} />
             </div>
           </div>
-          <button onClick={() => onSave({ nickname, bio, avatar, color, statusText, status, signature, profileBg, profileBgType })} style={{ width: "100%", background: "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: "var(--radius-md)", padding: "12px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+          <button onClick={() => onSave({ nickname, bio, avatar, color, statusText, status, signature, profileBg, profileBgType })} style={{ width: "100%", background: "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: "var(--radius-md)", padding: "12px", color: "var(--accent-text)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
             儲存設定
           </button>
         </div>
@@ -489,7 +489,7 @@ function FriendSearch({ myUid, myProfile, onClose, onSendRequest }) {
                 {u.signature && <div style={{ fontSize: 13, color: "var(--text-muted)", fontStyle: "italic" }}>{u.signature}</div>}
                 <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>{u.email}</div>
               </div>
-              <button onClick={() => onSendRequest(u.uid)} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 18px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>加好友</button>
+              <button onClick={() => onSendRequest(u.uid)} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 18px", color: "var(--accent-text)", fontSize: 15, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>加好友</button>
             </div>
           ))}
         </div>
@@ -580,7 +580,7 @@ function CreateGroupModal({ friends, onClose, onCreate }) {
         <button
           onClick={() => name.trim() && onCreate(name.trim(), selected)}
           disabled={!name.trim()}
-          style={{ width: "100%", background: name.trim() ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: "var(--radius-md)", padding: "12px", color: name.trim() ? "#fff" : "var(--text-dim)", fontSize: 15, fontWeight: 700, cursor: name.trim() ? "pointer" : "default" }}>
+          style={{ width: "100%", background: name.trim() ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: "var(--radius-md)", padding: "12px", color: name.trim() ? "var(--accent-text)" : "var(--text-dim)", fontSize: 15, fontWeight: 700, cursor: name.trim() ? "pointer" : "default" }}>
           建立群組 ({1 + selected.length} 人)
         </button>
       </div>
@@ -589,6 +589,30 @@ function CreateGroupModal({ friends, onClose, onCreate }) {
 }
 
 // RankBadge
+
+// Fixed rank-based colors for the tipping leaderboard — a data/ranking
+// semantic that stays constant regardless of the active site theme (incl.
+// 柔和珠光's 6 accent palettes; see design spec §6). Rank #2 uses a dark
+// seal so it doesn't read as a near-duplicate of rank #1's gold.
+const RANK_PALETTE = [
+  { hex: "#F4BF45", badge: "#F4BF45", badgeText: "#444444", badgeTextMuted: "rgba(68,68,68,0.7)" },
+  { hex: "#F9C95F", badge: "#444444", badgeText: "#F9C95F", badgeTextMuted: "rgba(249,201,95,0.75)" },
+  { hex: "#F5A58C", badge: "#F5A58C", badgeText: "#444444", badgeTextMuted: "rgba(68,68,68,0.7)" },
+  { hex: "#A2C3E7", badge: "#A2C3E7", badgeText: "#444444", badgeTextMuted: "rgba(68,68,68,0.7)" },
+  { hex: "#C0ADDE", badge: "#C0ADDE", badgeText: "#444444", badgeTextMuted: "rgba(68,68,68,0.7)" },
+  { hex: "#DDDDDD", badge: "#DDDDDD", badgeText: "#444444", badgeTextMuted: "rgba(68,68,68,0.7)" },
+  { hex: "#FCC1AE", badge: "#FCC1AE", badgeText: "#444444", badgeTextMuted: "rgba(68,68,68,0.7)" },
+  { hex: "#D9D8D9", badge: "#D9D8D9", badgeText: "#444444", badgeTextMuted: "rgba(68,68,68,0.7)" },
+  { hex: "#A7D7CC", badge: "#A7D7CC", badgeText: "#444444", badgeTextMuted: "rgba(68,68,68,0.7)" },
+].map(r => {
+  const n = parseInt(r.hex.slice(1), 16);
+  const rgb = `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+  return { ...r, card: `rgba(${rgb},0.14)`, border: `rgba(${rgb},0.55)`, glow: `rgba(${rgb},0.28)`, amount: r.hex };
+});
+const RANK_PALETTE_FALLBACK = {
+  badge: "linear-gradient(135deg,var(--border),var(--text-dim))", badgeText: "#fff", badgeTextMuted: "rgba(255,255,255,0.75)",
+  card: "rgba(51,65,85,0.15)", border: "rgba(71,85,105,0.35)", glow: "transparent", amount: "var(--text-muted)",
+};
 
 function RankBadge({ rank, size = 32 }) {
   const bg =
@@ -1636,7 +1660,7 @@ export default function ChatApp({ user }) {
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                 <button onClick={() => { setActiveFriendId(friendInfo.uid); setActiveGroupId(null); setShowLeaderboard(false); setFriendInfo(null); }}
-                  style={{ flex: 1, background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 0", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  style={{ flex: 1, background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 0", color: "var(--accent-text)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   💬 傳送訊息                </button>
                 <Link href={`/profile/${friendInfo.uid}`} onClick={() => setFriendInfo(null)}
                   style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 0", color: "var(--text-muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -2083,14 +2107,7 @@ export default function ChatApp({ user }) {
                     const rank = i + 1;
                     const suffix = rank === 1 ? "ST" : rank === 2 ? "ND" : rank === 3 ? "RD" : "TH";
                     const title = rank === 1 ? "CHAMPION" : rank === 2 ? "RUNNER-UP" : rank === 3 ? "THIRD" : `${rank}TH PLACE`;
-                    const palette = [
-                      { badge: "linear-gradient(135deg,var(--accent),var(--accent-2))", card: "rgba(59,130,246,0.10)", border: "rgba(99,102,241,0.45)", glow: "rgba(99,102,241,0.25)", amount: "#93c5fd" },
-                      { badge: "linear-gradient(135deg,#ec4899,#ef4444)", card: "rgba(236,72,153,0.10)", border: "rgba(236,72,153,0.45)", glow: "rgba(236,72,153,0.25)", amount: "#f9a8d4" },
-                      { badge: "linear-gradient(135deg,var(--text-muted),var(--text-faint))",  card: "rgba(148,163,184,0.08)", border: "rgba(148,163,184,0.35)", glow: "rgba(148,163,184,0.15)", amount: "var(--text-subtle)" },
-                      { badge: "linear-gradient(135deg,#8b5cf6,var(--accent-2))", card: "rgba(139,92,246,0.09)",  border: "rgba(139,92,246,0.40)", glow: "rgba(139,92,246,0.20)", amount: "#c4b5fd" },
-                      { badge: "linear-gradient(135deg,#f59e0b,#d97706)", card: "rgba(245,158,11,0.09)",  border: "rgba(245,158,11,0.40)", glow: "rgba(245,158,11,0.20)", amount: "#fcd34d" },
-                    ];
-                    const p = i < palette.length ? palette[i] : { badge: "linear-gradient(135deg,var(--border),var(--text-dim))", card: "rgba(51,65,85,0.15)", border: "rgba(71,85,105,0.35)", glow: "transparent", amount: "var(--text-muted)" };
+                    const p = RANK_PALETTE[i] || RANK_PALETTE_FALLBACK;
                     return (
                       <div key={entry.userId} style={{
                         display: "flex", alignItems: "center", gap: 16,
@@ -2102,8 +2119,8 @@ export default function ChatApp({ user }) {
                       }}>
                         {/* Rank badge */}
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: 58, height: 58, borderRadius: "var(--radius-lg)", background: p.badge, flexShrink: 0, boxShadow: `0 4px 12px ${p.glow}` }}>
-                          <span style={{ fontSize: 22, fontWeight: 900, color: "#fff", lineHeight: 1.1 }}>{rank}</span>
-                          <span style={{ fontSize: 8, fontWeight: 800, color: "rgba(255,255,255,0.75)", letterSpacing: 1 }}>{suffix}</span>
+                          <span style={{ fontSize: 22, fontWeight: 900, color: p.badgeText, lineHeight: 1.1 }}>{rank}</span>
+                          <span style={{ fontSize: 8, fontWeight: 800, color: p.badgeTextMuted, letterSpacing: 1 }}>{suffix}</span>
                         </div>
                         {/* Avatar */}
                         <AvatarImg avatarImage={entry.userAvatarImage} avatar={entry.userAvatar} color={entry.userColor} size={52} />
@@ -2248,7 +2265,7 @@ export default function ChatApp({ user }) {
                         placeholder="留言..."
                         style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px 12px", color: "var(--text)", fontSize: 14, outline: "none" }} />
                       <button className="sb" onClick={sendCinemaComment}
-                        style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "8px 16px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>傳送</button>
+                        style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "8px 16px", color: "var(--accent-text)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>傳送</button>
                     </div>
                   </div>
                 </div>
@@ -2351,7 +2368,7 @@ export default function ChatApp({ user }) {
                   </button>
                   <input type="text" value={hallInput} onChange={e => setHallInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendHall()} placeholder="輸入訊息..."
                     style={{ flex: 1, minWidth: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
-                  <button className="sb" onClick={sendHall} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>傳送</button>
+                  <button className="sb" onClick={sendHall} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "var(--accent-text)", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>傳送</button>
                 </div>
                 {emojiPickerOpen === 'hall' && (
                   <EmojiStickerPicker isMobile={isMobile} anchorRef={hallEmojiBtnRef} uid={uid}
@@ -2410,7 +2427,7 @@ export default function ChatApp({ user }) {
                   <input type="text" value={privateInput} onChange={e => setPrivateInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendPrivate()} placeholder={`傳送訊息給 ${activeFriendProfile.nickname}...`}
                     style={{ flex: 1, minWidth: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
                   <button className="sb" onClick={sendPrivate} disabled={!privateInput.trim()}
-                    style={{ background: privateInput.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: privateInput.trim() ? "#fff" : "var(--text-dim)", cursor: privateInput.trim() ? "pointer" : "default", fontSize: 14, fontWeight: 600, transition: "all 0.15s", flexShrink: 0, whiteSpace: "nowrap" }}>
+                    style={{ background: privateInput.trim() ? "var(--accent)" : "var(--panel)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: privateInput.trim() ? "var(--accent-text)" : "var(--text-dim)", cursor: privateInput.trim() ? "pointer" : "default", fontSize: 14, fontWeight: 600, transition: "all 0.15s", flexShrink: 0, whiteSpace: "nowrap" }}>
                     傳送                  </button>
                 </div>
                 {emojiPickerOpen === 'private' && (
@@ -2463,7 +2480,7 @@ export default function ChatApp({ user }) {
                   </button>
                   <input type="text" value={groupInput} onChange={e => setGroupInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendGroup()} placeholder={`傳送訊息給 ${activeGroup.name}...`}
                     style={{ flex: 1, minWidth: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
-                  <button className="sb" onClick={sendGroup} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>傳送</button>
+                  <button className="sb" onClick={sendGroup} style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 16px", color: "var(--accent-text)", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>傳送</button>
                 </div>
                 {emojiPickerOpen === 'group' && (
                   <EmojiStickerPicker isMobile={isMobile} anchorRef={groupEmojiBtnRef} uid={uid}

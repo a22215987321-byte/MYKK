@@ -172,7 +172,7 @@ export default function StickerMaker({ uid, isMobile, onClose, onSaved }) {
             <div style={{ fontSize: 13, color: "var(--text-faint)", marginBottom: 18 }}>選一張圖片來製作貼圖<br />支援 PNG / JPG / WEBP，最大 5MB</div>
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" data-testid="sticker-file-input" style={{ display: "none" }} onChange={pickFile} />
             <button onClick={() => fileRef.current?.click()}
-              style={{ background: "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 12, padding: "12px 28px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              style={{ background: "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 12, padding: "12px 28px", color: "var(--accent-text)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
               選擇圖片
             </button>
           </div>
@@ -187,7 +187,7 @@ export default function StickerMaker({ uid, isMobile, onClose, onSaved }) {
                 overflow: "hidden", position: "relative", background: whiteBorder ? "#fff" : "var(--panel-alt)",
                 border: "1px solid var(--border)", cursor: "grab", touchAction: "none",
               }}>
-              <img src={img.src} draggable={false} style={{
+              <img src={img.src} alt="裁切預覽" draggable={false} style={{
                 position: "absolute", left: "50%", top: "50%", userSelect: "none", pointerEvents: "none",
                 width: Math.max(PREVIEW_SIZE / img.width, PREVIEW_SIZE / img.height) * img.width * zoom,
                 height: Math.max(PREVIEW_SIZE / img.width, PREVIEW_SIZE / img.height) * img.height * zoom,
@@ -218,7 +218,7 @@ export default function StickerMaker({ uid, isMobile, onClose, onSaved }) {
                 重新選圖
               </button>
               <button onClick={save} disabled={saving}
-                style={{ flex: 2, background: saving ? "var(--border)" : "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 10, padding: "11px 0", color: "#fff", fontSize: 14, fontWeight: 700, cursor: saving ? "default" : "pointer" }}>
+                style={{ flex: 2, background: saving ? "var(--border)" : "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 10, padding: "11px 0", color: saving ? "var(--text-faint)" : "var(--accent-text)", fontSize: 14, fontWeight: 700, cursor: saving ? "default" : "pointer" }}>
                 {saving ? "儲存中..." : "保存貼圖"}
               </button>
             </div>

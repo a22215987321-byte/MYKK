@@ -12,7 +12,16 @@ export default function Document() {
         <meta name="theme-color" content="#f4f3f9" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t&&t!=='default'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();`,
+            __html: `(function(){try{
+              var t=localStorage.getItem('theme');
+              if(t&&t!=='default'){document.documentElement.setAttribute('data-theme',t);}
+              if(t==='pastel-pearl'){
+                var palettes=['champagne','coral-peach','mist-blue','lavender','pearl-silver','mint-sea-salt'];
+                var p=localStorage.getItem('pastelPalette');
+                if(palettes.indexOf(p)===-1)p='mist-blue';
+                document.documentElement.setAttribute('data-pastel-palette',p);
+              }
+            }catch(e){}})();`,
           }}
         />
 

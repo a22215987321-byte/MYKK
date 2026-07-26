@@ -245,7 +245,7 @@ export default function AvatarCreator({ myProfile, onClose }) {
             </div>
 
             <button onClick={handleSave} disabled={saving}
-              style={{ width: "100%", background: saving ? "var(--border)" : "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 10, padding: "11px 0", color: saving ? "var(--text-faint)" : "#fff", fontSize: 14, fontWeight: 700, cursor: saving ? "default" : "pointer" }}>
+              style={{ width: "100%", background: saving ? "var(--border)" : "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 10, padding: "11px 0", color: saving ? "var(--text-faint)" : "var(--accent-text)", fontSize: 14, fontWeight: 700, cursor: saving ? "default" : "pointer" }}>
               {saving ? "儲存中..." : "✓ 儲存頭像"}
             </button>
           </div>
