@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { auth, db } from "../lib/firebase";
+import { uploadToR2 } from "../lib/uploadToR2";
+import { toast } from "../lib/toast";
 import AvatarCreator from "./AvatarCreator";
 import CalendarMemo from "./CalendarMemo";
 import PageNotes from "./PageNotes";
@@ -20,7 +22,10 @@ import SpanishGrammar from "./SpanishGrammar";
 import SpanishVerbConjugator from "./SpanishVerbConjugator";
 import EnglishPronunciation from "./EnglishPronunciation";
 import IeltsBand4 from "./IeltsBand4";
+import ImageEditorRoom from "./ImageEditorRoom";
 import EmojiStickerPicker from "./EmojiStickerPicker";
+import LoadingState from "./LoadingState";
+import useIsMobile from "../lib/useIsMobile";
 import { QUICK_REACTIONS } from "../data/chat/gesturePacks";
 import { ChevronLeft, ChevronRight, CalendarDays, Settings, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
 import {
@@ -61,23 +66,6 @@ function getStatus(status) {
     case "dnd":    return { label: "勿擾", color: "#ef4444" };
     default:       return { label: "離線",    color: "#6b7280" };
   }
-}
-
-async function uploadToR2(file) {
-  const base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-  const res = await fetch("/api/upload", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fileName: file.name, fileType: file.type, fileData: base64 }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "上傳失敗");
-  return data.url;
 }
 
 // Avatar helper
@@ -122,7 +110,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
     try {
       await updateDoc(doc(db, ...collectionPath), { recalled: true, text: "此訊息已撤回", imageUrl: "", videoUrl: "" });
     } catch (e) {
-      alert("撤回失敗，請重試");
+      toast("撤回失敗，請重試");
     }
   };
 
@@ -274,7 +262,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
       const url = await uploadToR2(file);
       await updateDoc(doc(db, 'users', myProfile.uid), { avatarImage: url });
     } catch {
-      alert("頭像上傳失敗，請重試");
+      toast("頭像上傳失敗，請重試");
     } finally {
       setAvatarUploading(false);
       e.target.value = "";
@@ -421,7 +409,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
                   setProfileBg(url);
                   setProfileBgType("image");
                 } catch {
-                  alert("背景上傳失敗，請重試");
+                  toast("背景上傳失敗，請重試");
                 } finally {
                   setBgUploading(false);
                   e.target.value = "";
@@ -638,7 +626,7 @@ function DonateModal({ myProfile, onClose }) {
   const finalAmount = useCustom ? (parseInt(customInput, 10) || 0) : amount;
 
   const handleDonate = async () => {
-    if (finalAmount < 1) { alert("請輸入最少 HK$1 的金額"); return; }
+    if (finalAmount < 1) { toast("請輸入最少 HK$1 的金額"); return; }
     setLoading(true);
     try {
       const res = await fetch("/api/create-checkout", {
@@ -655,9 +643,9 @@ function DonateModal({ myProfile, onClose }) {
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
-      else alert("付款失敗：" + (data.error || "請稍後再試"));
+      else toast("付款失敗：" + (data.error || "請稍後再試"));
     } catch {
-      alert("付款發生錯誤，請重試");
+      toast("付款發生錯誤，請重試");
     } finally {
       setLoading(false);
     }
@@ -707,6 +695,7 @@ export default function ChatApp({ user }) {
   const uid = user.uid;
 
   const [myProfile,      setMyProfile]      = useState(null);
+  const [myProfileError, setMyProfileError] = useState('');
   const [friendProfiles, setFriendProfiles] = useState({});
   const [hallMessages,   setHallMessages]   = useState([]);
   const [privateMessages,setPrivateMessages]= useState([]);
@@ -750,9 +739,10 @@ export default function ChatApp({ user }) {
   const [showEnglishPron,    setShowEnglishPron]    = useState(false);
   const [showIeltsBand4,     setShowIeltsBand4]     = useState(false);
   const [showFeed,           setShowFeed]           = useState(false);
+  const [showImageEditor,    setShowImageEditor]    = useState(false);
 
   // Mobile / sidebar states
-  const [isMobile,       setIsMobile]       = useState(false);
+  const isMobile = useIsMobile();
   const [calendarOpen,   setCalendarOpen]   = useState(false);
   const [mobileView,     setMobileView]     = useState(null); // 'more' | null (content-driven; 'list' 已改用下面的 sidebarOpen 抽屜)
   const [sidebarOpen,    setSidebarOpen]    = useState(false); // 手機版側邊抽屜的「已定案」開關狀態（拖曳中的即時位置不經過這個 state，見 dragStateRef）
@@ -776,7 +766,7 @@ export default function ChatApp({ user }) {
     setShowCustomVocab(false); setShowDict(false); setFrenchView(null);
     setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false);
     setShowEnglishPron(false); setShowIeltsBand4(false);
-    setShowFeed(false);
+    setShowFeed(false); setShowImageEditor(false);
   }, []);
 
   // Cinema states
@@ -831,8 +821,22 @@ export default function ChatApp({ user }) {
   useEffect(() => {
     return onSnapshot(doc(db, 'users', uid), snap => {
       if (snap.exists()) setMyProfile({ uid, ...snap.data() });
+    }, (e) => {
+      console.error('[ChatRoom] profile snapshot failed', e);
+      setMyProfileError('無法載入你的個人資料，請檢查網路連線');
     });
   }, [uid]);
+
+  // Safety net: an onSnapshot listener that never errors and never delivers
+  // a snapshot (dropped connection, blocked request) would otherwise leave
+  // the user stuck on the loading screen below indefinitely.
+  useEffect(() => {
+    if (myProfile) return;
+    const t = setTimeout(() => {
+      setMyProfileError(prev => prev || '載入時間過長，可能是網路連線問題');
+    }, 12000);
+    return () => clearTimeout(t);
+  }, [myProfile, uid]);
 
   const friendsKey = myProfile?.friends?.join(',') || '';
   useEffect(() => {
@@ -911,14 +915,6 @@ export default function ChatApp({ user }) {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [uid]);
 
-  // Mobile detection
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
   // Standalone pages outside this SPA (e.g. /feed, /profile/[uid]) send the
   // mobile tab bar's "聊天"/"更多" taps back here as /?view=list|more, since
   // sidebarOpen/mobileView are local state they have no other way to reach.
@@ -929,7 +925,8 @@ export default function ChatApp({ user }) {
     if (v === "list") settleDrawer(true);
     else if (v === "more") setMobileView("more");
     else if (v === "editProfile") setShowProfile(true);
-    if (v === "list" || v === "more" || v === "editProfile") router.replace("/", undefined, { shallow: true });
+    else if (v === "imageEditor") { resetAllViews(); setShowImageEditor(true); }
+    if (v === "list" || v === "more" || v === "editProfile" || v === "imageEditor") router.replace("/", undefined, { shallow: true });
   }, [router.isReady]);
 
   // 個人頁「傳訊息」按鈕送過來的 /?chat=<uid>，直接開對應的私訊視窗
@@ -1026,7 +1023,7 @@ export default function ChatApp({ user }) {
         text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
       });
     } catch {
-      alert("上傳失敗，請重試");
+      toast("上傳失敗，請重試");
     } finally {
       setHallUploading(false);
     }
@@ -1055,7 +1052,7 @@ export default function ChatApp({ user }) {
         text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
       });
     } catch {
-      alert("上傳失敗，請重試");
+      toast("上傳失敗，請重試");
     } finally {
       setPrivateUploading(false);
     }
@@ -1084,7 +1081,7 @@ export default function ChatApp({ user }) {
         text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
       });
     } catch {
-      alert("上傳失敗，請重試");
+      toast("上傳失敗，請重試");
     } finally {
       setGroupUploading(false);
     }
@@ -1316,9 +1313,11 @@ export default function ChatApp({ user }) {
 
   if (!myProfile) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "var(--text-faint)" }}>載入中...</div>
-      </div>
+      <LoadingState
+        label="載入中..."
+        error={myProfileError || undefined}
+        onRetry={myProfileError ? () => window.location.reload() : undefined}
+      />
     );
   }
 
@@ -1329,10 +1328,13 @@ export default function ChatApp({ user }) {
   const pendingInCount = (myProfile.pendingIn || []).length;
   const activeGroup = activeGroupId ? myGroups.find(g => g.id === activeGroupId) : null;
 
-  // Mobile nav: which top-level destination is currently "drilled into"
-  const inTool = showLeaderboard || showCinema || showVocab || showSpanish || showSpanishCourse ||
+  // Mobile nav: which top-level destination is currently "drilled into".
+  // showImageEditor is split out of inMoreTool since it now has its own tab
+  // bar entry — reaching it should highlight "圖片編輯", not "更多".
+  const inMoreTool = showLeaderboard || showCinema || showVocab || showSpanish || showSpanishCourse ||
     showCustomVocab || showDict || showSpanishPron || showSpanishGrammar || showSpanishVerbs ||
     showEnglishPron || showIeltsBand4;
+  const inTool = inMoreTool || showImageEditor;
   const inThread = !!activeFriendId || !!activeGroupId;
 
   // 手機版側邊抽屜：從內容區「中間」開始跟手拖曳，不是邊緣手勢。
@@ -1464,6 +1466,29 @@ export default function ChatApp({ user }) {
         .fb:hover { background: var(--accent-hover) !important; }
         .fb.act  { background: var(--accent-active) !important; box-shadow: var(--glow-shadow); }
         .sb:hover:not(:disabled) { background: #2563eb !important; }
+
+        /* Groups / Friends sidebar rows — sizing lives here (with a mobile
+           override below) instead of isMobile ? {} : {} inline style pairs,
+           since the two variants render identical markup and only differ
+           in size/spacing. */
+        .fb {
+          width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+          border-radius: var(--radius-md); border: none; background: transparent; color: var(--text);
+          cursor: pointer; text-align: left; transition: background 0.15s; margin-bottom: 2px;
+        }
+        .cr-fb-icon {
+          width: 36px; height: 36px; border-radius: 50%;
+          background: linear-gradient(135deg,var(--text-dim),var(--border));
+          display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+        }
+        .cr-fb-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cr-fb-sub  { font-size: 11px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cr-nav-hdr { padding: 0 12px 4px; display: flex; justify-content: space-between; align-items: center; }
+        .cr-nav-hdr-label { font-size: 11px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.06em; text-transform: uppercase; }
+        .cr-nav-icon-btn {
+          background: var(--border); border: none; border-radius: var(--radius-sm); padding: 3px 8px;
+          color: var(--text-muted); cursor: pointer; font-size: 14px;
+        }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
@@ -1546,6 +1571,22 @@ export default function ChatApp({ user }) {
             background: var(--panel);
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
+          }
+
+          /* Groups / Friends sidebar rows: bigger touch targets, no hover-era transition */
+          .fb {
+            min-height: 64px; box-sizing: border-box; gap: 12px; padding: 8px 0;
+            border-radius: 14px; margin-bottom: 0; transition: none;
+          }
+          .cr-fb-icon { width: 48px; height: 48px; font-size: 22px; }
+          .cr-fb-name { font-size: 16px; }
+          .cr-fb-sub  { font-size: 13px; color: var(--text-muted); }
+          .cr-nav-hdr { padding: 0 16px; margin-top: 8px; margin-bottom: 6px; }
+          .cr-nav-hdr-label { font-size: 13px; font-weight: 700; color: var(--text-muted); letter-spacing: normal; text-transform: none; }
+          .cr-nav-icon-btn {
+            width: 32px; height: 32px; border-radius: 16px; padding: 0;
+            background: var(--panel-alt); border: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
           }
 
           /* Calendar: full-screen overlay */
@@ -1696,7 +1737,7 @@ export default function ChatApp({ user }) {
         {/* Mobile topbar: back chevron（在聊天串/工具畫面時）+ 標題 + 日曆／設定／登出
             （在聊天列表首頁時）。全部改用 lucide 圖示，跟桌面版共用邏輯、不共用這個
             只在 isMobile 才會顯示的元素本身，所以不會影響桌面版。 */}
-        <div className="cr-mobile-topbar">
+        <header className="cr-mobile-topbar">
           {mobileView === null ? (
             <button onClick={() => { if (inTool) { setMobileView('more'); } else { settleDrawer(true); } }} aria-label="開啟選單"
               style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", padding: 6, margin: "-6px 0", lineHeight: 1, flexShrink: 0, display: "flex" }}>
@@ -1722,12 +1763,12 @@ export default function ChatApp({ user }) {
               <LogOut size={21} />
             </button>
           </div>
-        </div>
+        </header>
 
         {/* 側邊欄：桌面版＝常駐側欄（一般 flex 排列）；手機版＝position:fixed 抽屜，
             由 sidebarOpen 狀態＋拖曳時的即時 transform 控制（見 applyDrawerTransform）。
             桌面版另外還有 sidebarCollapsed（收合成寬度 0，跟手機抽屜是兩套獨立機制）。 */}
-        <div ref={sidebarElRef} className="cr-sidebar" aria-hidden={!isMobile && sidebarCollapsed} style={{
+        <nav ref={sidebarElRef} className="cr-sidebar" aria-label="聊天導覽" aria-hidden={!isMobile && sidebarCollapsed} style={{
           width: (!isMobile && sidebarCollapsed) ? 0 : 280,
           background: "var(--panel-alt)",
           borderRight: (!isMobile && sidebarCollapsed) ? "none" : "1px solid var(--panel)",
@@ -1821,7 +1862,7 @@ export default function ChatApp({ user }) {
                 </div>
               </button>
               {(() => {
-                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed;
+                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor;
                 return (
                   <button onClick={() => { resetAllViews(); if (isMobile) settleDrawer(false); }}
                     style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: hallActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
@@ -1848,7 +1889,7 @@ export default function ChatApp({ user }) {
               {/* Hall button */}
               <div style={{ padding: "4px 10px 0" }}>
                 <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧"
-                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed}
+                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor}
                   onClick={() => { resetAllViews(); }} />
               </div>
             </>
@@ -1866,6 +1907,12 @@ export default function ChatApp({ user }) {
           <div style={{ padding: "0 10px 6px" }}>
             <NavItem icon="🎬" iconBg="linear-gradient(135deg,var(--accent-hover),#2563eb)" label="電影院" sublabel="同步觀看影片"
               active={showCinema} onClick={() => { resetAllViews(); setShowCinema(true); }} />
+          </div>
+
+          {/* Image editor button */}
+          <div style={{ padding: "0 10px 6px" }}>
+            <NavItem icon="🖼️" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="圖片編輯" sublabel="裁剪・濾鏡・貼圖"
+              active={showImageEditor} onClick={() => { resetAllViews(); setShowImageEditor(true); }} />
           </div>
 
           {/* English section label */}
@@ -1938,15 +1985,9 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Groups section */}
-          <div style={isMobile
-            ? { padding: "0 16px", marginTop: 8, marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }
-            : { padding: "0 12px 4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={isMobile
-              ? { fontSize: 13, fontWeight: 700, color: "var(--text-muted)" }
-              : { fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>群組 {myGroups.length}</span>
-            <button onClick={() => setShowCreateGroup(true)} title="建立群組" style={isMobile
-              ? { width: 32, height: 32, borderRadius: 16, background: "var(--panel-alt)", border: "1px solid var(--border)", color: "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }
-              : { background: "var(--border)", border: "none", borderRadius: "var(--radius-sm)", padding: "3px 8px", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>
+          <div className="cr-nav-hdr">
+            <span className="cr-nav-hdr-label">群組 {myGroups.length}</span>
+            <button onClick={() => setShowCreateGroup(true)} title="建立群組" className="cr-nav-icon-btn">
               {isMobile ? <Plus size={16} /> : "+"}
             </button>
           </div>
@@ -1955,18 +1996,13 @@ export default function ChatApp({ user }) {
               const isActive = activeGroupId === group.id;
               return (
                 <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); if (isMobile) settleDrawer(false); }}
-                  className={`fb ${isActive ? "act" : ""}`}
-                  style={isMobile
-                    ? { width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }
-                    : { width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s", marginBottom: 2 }}>
-                  <div style={isMobile
-                    ? { width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg,var(--text-dim),var(--border))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }
-                    : { width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,var(--text-dim),var(--border))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                  className={`fb ${isActive ? "act" : ""}`}>
+                  <div className="cr-fb-icon">
                     {group.avatar || "👥"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: isMobile ? 16 : 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.name}</div>
-                    <div style={{ fontSize: isMobile ? 13 : 11, color: isMobile ? "var(--text-muted)" : "var(--text-faint)" }}>{(group.members || []).length} 人</div>
+                    <div className="cr-fb-name">{group.name}</div>
+                    <div className="cr-fb-sub">{(group.members || []).length} 人</div>
                   </div>
                 </button>
               );
@@ -1974,21 +2010,15 @@ export default function ChatApp({ user }) {
           </div>
 
           {/* Friends header */}
-          <div style={isMobile
-            ? { padding: "0 16px", marginTop: 8, marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }
-            : { padding: "0 12px 4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={isMobile
-              ? { fontSize: 13, fontWeight: 700, color: "var(--text-muted)" }
-              : { fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>好友 {myFriends.length}</span>
+          <div className="cr-nav-hdr">
+            <span className="cr-nav-hdr-label">好友 {myFriends.length}</span>
             <div style={{ display: "flex", gap: isMobile ? 8 : 4, alignItems: "center" }}>
               {pendingInCount > 0 && (
                 <button onClick={() => setShowFriendReqs(true)} title="好友請求" style={{ background: "#ef4444", border: "none", borderRadius: 20, padding: "2px 8px", color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
                   🔔 {pendingInCount}
                 </button>
               )}
-              <button onClick={() => setShowFriendSearch(true)} title="加好友" style={isMobile
-                ? { width: 32, height: 32, borderRadius: 16, background: "var(--panel-alt)", border: "1px solid var(--border)", color: "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }
-                : { background: "var(--border)", border: "none", borderRadius: "var(--radius-sm)", padding: "3px 8px", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>
+              <button onClick={() => setShowFriendSearch(true)} title="加好友" className="cr-nav-icon-btn">
                 {isMobile ? <Plus size={16} /> : "+"}
               </button>
             </div>
@@ -2020,16 +2050,14 @@ export default function ChatApp({ user }) {
                   onTouchEnd={() => clearTimeout(longPressTimerRef.current)}
                   onTouchMove={() => clearTimeout(longPressTimerRef.current)}
                   className={`fb ${isActive ? "act" : ""}`}
-                  style={isMobile
-                    ? { width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }
-                    : { width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "none", background: isActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s", marginBottom: 2, WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}>
+                  style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}>
                   <div style={{ position: "relative", flexShrink: 0 }}>
                     <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={isMobile ? 48 : 36} />
                     <span style={{ position: "absolute", bottom: 1, right: 1, width: isMobile ? 12 : 10, height: isMobile ? 12 : 10, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: isMobile ? 16 : 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{friend.nickname}</div>
-                    <div style={{ fontSize: isMobile ? 13 : 11, color: isMobile ? "var(--text-muted)" : "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div className="cr-fb-name">{friend.nickname}</div>
+                    <div className="cr-fb-sub">
                       {friend.statusText || getStatus(friend.status).label}
                     </div>
                   </div>
@@ -2038,7 +2066,7 @@ export default function ChatApp({ user }) {
             })}
           </div>
           </div>
-        </div>
+        </nav>
 
         {/* 桌面版收合/展開開關：故意當 cr-sidebar 的 sibling（不是它的子元素），
             這樣 nav 收合到寬度 0、overflow:hidden 裁掉內部內容時，這顆按鈕不會被
@@ -2067,7 +2095,7 @@ export default function ChatApp({ user }) {
 
         {/* 主要區域：一般文件流佈局；手機版拖曳抽屜時用 ref 直接位移（applyDrawerTransform），
             跟 sidebar 同步、零延遲；抽屜關閉時固定在 translateX(0)。 */}
-        <div ref={mainElRef} className="cr-main"
+        <main ref={mainElRef} className="cr-main"
           style={{
             flex: 1, display: (isMobile && mobileView === 'more') ? "none" : "flex", flexDirection: "column", background: "var(--bg)", minWidth: 0, minHeight: 0,
           }}>
@@ -2273,58 +2301,63 @@ export default function ChatApp({ user }) {
             </>
           )}
 
+          {/* Image editor view */}
+          {showImageEditor && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && (
+            <ImageEditorRoom />
+          )}
+
           {/* Vocab view */}
-          {showVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && (
+          {showVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && (
             <VocabRoom user={user} db={db} />
           )}
 
           {/* Spanish view */}
-          {showSpanish && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showFeed && (
+          {showSpanish && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showFeed && !showImageEditor && (
             <SpanishRoom user={user} db={db} />
           )}
 
           {/* Spanish Course view */}
-          {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showFeed && (
+          {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showFeed && !showImageEditor && (
             <SpanishCourseRoom user={user} db={db} onContextChange={setSpanishCourseNoteContext} />
           )}
 
           {/* Spanish Pronunciation view */}
-          {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && (
+          {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishPronunciation onNav={() => { setShowSpanishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Grammar view */}
-          {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && (
+          {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishGrammar onNav={() => { setShowSpanishGrammar(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Verb Conjugator view */}
-          {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && (
+          {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && (
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><SpanishVerbConjugator onNav={() => { setShowSpanishVerbs(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* English Pronunciation view */}
-          {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && (
+          {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && !showImageEditor && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishPronunciation user={user} db={db} onNav={() => { setShowEnglishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Custom vocab view */}
-          {showCustomVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showFeed && (
+          {showCustomVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showFeed && !showImageEditor && (
             <CustomVocabRoom user={myProfile || user} db={db} />
           )}
 
           {/* Dictionary view */}
-          {showDict && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showFeed && (
+          {showDict && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showFeed && !showImageEditor && (
             <DictionaryRoom />
           )}
 
           {/* Public hall */}
           {/* IELTS Band 4 view */}
-          {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showFeed && (
+          {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showFeed && !showImageEditor && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><IeltsBand4 onNav={() => { setShowIeltsBand4(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
-          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && (
+          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && (
             <>
               <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
                 <span style={{ fontSize: 20 }}>💬</span>
@@ -2494,9 +2527,9 @@ export default function ChatApp({ user }) {
 
           {/* Loading friend profile */}
           {activeFriendId && !activeFriendProfile && (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)" }}>載入中...</div>
+            <div role="status" aria-live="polite" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)" }}>載入中...</div>
           )}
-        </div>
+        </main>
 
         {/* 更多選單（手機版「更多」分頁） */}
         {isMobile && mobileView === 'more' && (
@@ -2521,9 +2554,14 @@ export default function ChatApp({ user }) {
 
         {isMobile && (
           <ChatMobileTabBar
-            activeTab={mobileView === 'more' || (mobileView === null && inTool) ? 'more' : 'chat'}
+            activeTab={
+              mobileView === 'more' || (mobileView === null && inMoreTool) ? 'more'
+              : showImageEditor ? 'imageEditor'
+              : 'chat'
+            }
             onSelectChats={() => settleDrawer(true)}
             onSelectMore={() => setMobileView('more')}
+            onSelectImageEditor={() => { resetAllViews(); setShowImageEditor(true); }}
             pendingCount={pendingInCount}
           />
         )}
