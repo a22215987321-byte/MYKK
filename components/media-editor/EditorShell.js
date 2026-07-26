@@ -26,9 +26,10 @@ export default function EditorShell({
         <div style={{ flex: 1 }} />
         <button onClick={onNext} disabled={nextDisabled || busy}
           style={{
-            minHeight: 44, padding: "0 20px", borderRadius: 22, border: "none",
+            minHeight: 44, padding: "0 22px", borderRadius: 999, border: "none",
             background: (nextDisabled || busy) ? "#333" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
-            color: (nextDisabled || busy) ? "#777" : "#fff",
+            color: (nextDisabled || busy) ? "#777" : "var(--accent-text)",
+            boxShadow: (nextDisabled || busy) ? "none" : "0 6px 16px rgba(0,0,0,0.45)",
             fontSize: 14, fontWeight: 700, cursor: (nextDisabled || busy) ? "default" : "pointer",
           }}>
           {busy ? "處理中..." : nextLabel}
@@ -43,31 +44,40 @@ export default function EditorShell({
       {/* Bottom tool strip. 5 or fewer tools (mobile: content tools + one
           centered "編輯" hub covering crop/rotate/adjust/privacy) get an
           evenly-spaced, non-scrolling row with the hub raised like a FAB;
-          more than that (desktop's full 8) falls back to a scrollable strip. */}
+          more than that (desktop's full 8) falls back to a scrollable strip.
+          A subtle top border + upward shadow separates this strip from the
+          preview above it, instead of the two blending together. */}
       <div style={{
         flexShrink: 0, display: "flex", gap: 4,
         overflowX: tools.length > 5 ? "auto" : "visible",
         justifyContent: tools.length <= 5 ? "space-around" : "flex-start",
         padding: "8px calc(env(safe-area-inset-left) + 8px) 8px calc(env(safe-area-inset-right) + 8px)",
-        background: "#111", borderTop: "1px solid #222",
+        background: "#111", borderTop: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 -6px 14px rgba(0,0,0,0.3)", position: "relative", zIndex: 1,
       }}>
-        {tools.map(t => (
-          <button key={t.id} onClick={() => onSelectTool(t.id)}
-            style={{
-              flexShrink: 0, minWidth: t.elevated ? 60 : 56, minHeight: t.elevated ? 52 : 44,
-              display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center", gap: 2,
-              borderRadius: t.elevated ? 26 : 12, border: "none",
-              marginTop: t.elevated ? -14 : 0,
-              boxShadow: t.elevated ? "0 4px 14px rgba(0,0,0,0.4)" : "none",
-              background: t.elevated ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : (activeTool === t.id ? "rgba(255,255,255,0.15)" : "transparent"),
-              color: t.elevated ? "var(--accent-text)" : (activeTool === t.id ? "#fff" : "#aaa"),
-              cursor: "pointer", padding: "4px 8px",
-            }}>
-            <span style={{ fontSize: t.elevated ? 22 : 18, lineHeight: 1 }} aria-hidden="true">{t.icon}</span>
-            <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{t.label}</span>
-          </button>
-        ))}
+        {tools.map(t => {
+          const isActive = activeTool === t.id;
+          return (
+            <button key={t.id} onClick={() => onSelectTool(t.id)}
+              style={{
+                flexShrink: 0, minWidth: t.elevated ? 60 : 56, minHeight: t.elevated ? 52 : 44,
+                display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", gap: 2,
+                borderRadius: t.elevated ? 26 : 14, border: "none",
+                marginTop: t.elevated ? -14 : 0,
+                boxShadow: t.elevated ? (isActive ? "0 4px 16px rgba(0,0,0,0.45)" : "0 4px 12px rgba(0,0,0,0.35)") : "none",
+                background: isActive
+                  ? "linear-gradient(135deg,var(--accent),var(--accent-2))"
+                  : (t.elevated ? "#242424" : "transparent"),
+                color: isActive ? "var(--accent-text)" : (t.elevated ? "#ddd" : "#aaa"),
+                cursor: "pointer", padding: "4px 8px",
+                transition: "background 0.15s, color 0.15s",
+              }}>
+              <span style={{ fontSize: t.elevated ? 22 : 18, lineHeight: 1 }} aria-hidden="true">{t.icon}</span>
+              <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{t.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Bottom drawer (tool settings) */}
