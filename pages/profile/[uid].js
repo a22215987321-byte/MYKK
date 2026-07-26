@@ -104,6 +104,12 @@ function VisibilityMenu({ value, onChange }) {
   );
 }
 
+// Auto-grow textarea: ~6 lines of breathing room before scrolling kicks in,
+// capped well short of the viewport so the 發佈 button never gets pushed
+// off-screen by a long draft.
+const TEXTAREA_MIN_HEIGHT = 132;
+const TEXTAREA_MAX_HEIGHT_RATIO = 0.55;
+
 function NewPostForm({ profile, onPosted }) {
   const [text, setText] = useState("");
   const [visibility, setVisibility] = useState("public");
@@ -113,17 +119,26 @@ function NewPostForm({ profile, onPosted }) {
   const [posting, setPosting] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState(false);
   const [editingVideo, setEditingVideo] = useState(false);
+  const [previewLightbox, setPreviewLightbox] = useState(false);
   const fileRef = useRef();
+  const textareaRef = useRef();
+  const manualHeightRef = useRef(0);
+  const pendingCursorRef = useRef(null);
+
+  const attachFile = (file) => {
+    const isVideo = file.type.startsWith("video/");
+    const err = isVideo ? validateVideoFile(file) : validatePhotoFile(file);
+    if (err) { toast(err); return false; }
+    setMediaFile(file);
+    setMediaType(isVideo ? "video" : "image");
+    setPreview(URL.createObjectURL(file));
+    return true;
+  };
 
   const onFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const isVideo = file.type.startsWith("video/");
-    const err = isVideo ? validateVideoFile(file) : validatePhotoFile(file);
-    if (err) { toast(err); e.target.value = ""; return; }
-    setMediaFile(file);
-    setMediaType(isVideo ? "video" : "image");
-    setPreview(URL.createObjectURL(file));
+    attachFile(file);
   };
 
   const removeMedia = () => {
@@ -131,6 +146,51 @@ function NewPostForm({ profile, onPosted }) {
     setMediaType(null);
     setPreview(null);
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const onTextareaPaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageItem = Array.from(items).find(it => it.type.startsWith("image/"));
+    if (!imageItem) return;
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    if (mediaFile) { toast("已經有附加媒體了，請先移除再貼上新圖片"); return; }
+    const named = new File([file], file.name || `pasted-${Date.now()}.png`, { type: file.type });
+    if (!attachFile(named)) return;
+    toast("圖片已加入", "success");
+
+    const pastedText = e.clipboardData.getData("text/plain");
+    if (pastedText) {
+      const el = e.target;
+      const start = el.selectionStart ?? text.length;
+      const end = el.selectionEnd ?? text.length;
+      pendingCursorRef.current = start + pastedText.length;
+      setText(prev => prev.slice(0, start) + pastedText + prev.slice(end));
+    }
+  };
+
+  useEffect(() => {
+    if (pendingCursorRef.current == null) return;
+    const el = textareaRef.current;
+    const pos = pendingCursorRef.current;
+    pendingCursorRef.current = null;
+    if (el) requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = pos; });
+  }, [text]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const maxH = Math.round(window.innerHeight * TEXTAREA_MAX_HEIGHT_RATIO);
+    const target = Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_HEIGHT, manualHeightRef.current), maxH);
+    el.style.height = `${target}px`;
+  }, [text]);
+
+  const onTextareaMouseUp = () => {
+    const el = textareaRef.current;
+    if (el) manualHeightRef.current = el.offsetHeight;
   };
 
   const submit = async () => {
@@ -207,33 +267,56 @@ function NewPostForm({ profile, onPosted }) {
         }
         <div style={{ flex: 1 }}>
           <textarea
+            ref={textareaRef}
             value={text}
             onChange={e => setText(e.target.value)}
-            placeholder="有什麼想分享的嗎？"
+            onPaste={onTextareaPaste}
+            onMouseUp={onTextareaMouseUp}
+            placeholder="有什麼想分享的嗎？（可直接貼上截圖）"
             aria-label="貼文內容"
-            rows={3}
-            style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", resize: "none", boxSizing: "border-box", lineHeight: 1.5 }}
+            style={{
+              width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12,
+              padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box", lineHeight: 1.5,
+              minHeight: TEXTAREA_MIN_HEIGHT, maxHeight: `${TEXTAREA_MAX_HEIGHT_RATIO * 100}vh`, overflowY: "auto", resize: "vertical",
+            }}
           />
           {preview && (
-            <div style={{ position: "relative", marginTop: 8, borderRadius: 10, overflow: "hidden", display: "inline-block" }}>
+            <div
+              onClick={() => setPreviewLightbox(true)}
+              style={{ position: "relative", marginTop: 8, width: 120, height: 120, borderRadius: 10, overflow: "hidden", cursor: "zoom-in", flexShrink: 0 }}
+            >
               {mediaType === "video"
-                ? <video src={preview} controls style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 10, display: "block" }} />
-                : <img src={preview} alt="預覽" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 10, display: "block" }} />
+                ? <video src={preview} muted style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                : <img src={preview} alt="預覽" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               }
               {mediaType === "image" && (
-                <button onClick={() => setEditingPhoto(true)}
-                  style={{ position: "absolute", bottom: 6, left: 6, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: 20, padding: "5px 12px", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-                  ✏️ 編輯
+                <button onClick={e => { e.stopPropagation(); setEditingPhoto(true); }} aria-label="編輯圖片"
+                  style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: 13, width: 26, height: 26, color: "#fff", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  ✏️
                 </button>
               )}
               {mediaType === "video" && (
-                <button onClick={() => setEditingVideo(true)}
-                  style={{ position: "absolute", bottom: 6, left: 6, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: 20, padding: "5px 12px", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-                  ✂️ 剪輯
+                <button onClick={e => { e.stopPropagation(); setEditingVideo(true); }} aria-label="剪輯影片"
+                  style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: 13, width: 26, height: 26, color: "#fff", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  ✂️
                 </button>
               )}
-              <button onClick={removeMedia} aria-label="移除附加媒體"
-                style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "50%", width: 26, height: 26, color: "#fff", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <button onClick={e => { e.stopPropagation(); removeMedia(); }} aria-label="移除附加媒體"
+                style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: "50%", width: 22, height: 22, color: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                ✕
+              </button>
+            </div>
+          )}
+
+          {previewLightbox && preview && (
+            <div role="dialog" aria-modal="true" aria-label="媒體預覽" onClick={() => setPreviewLightbox(false)}
+              style={{ position: "fixed", inset: 0, zIndex: 1500, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
+              {mediaType === "video"
+                ? <video src={preview} controls autoPlay onClick={e => e.stopPropagation()} style={{ maxWidth: "92vw", maxHeight: "92vh" }} />
+                : <img src={preview} alt="預覽" onClick={e => e.stopPropagation()} style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain" }} />
+              }
+              <button onClick={() => setPreviewLightbox(false)} aria-label="關閉預覽"
+                style={{ position: "absolute", top: 20, right: 20, background: "rgba(30,41,59,0.9)", border: "1px solid var(--border)", color: "#f1f5f9", fontSize: 20, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 ✕
               </button>
             </div>
