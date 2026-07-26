@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import * as fabric from "fabric";
 import EditorShell, { DrawerSlider, DrawerChipRow } from "./EditorShell";
 import { saveDraft } from "./editorDb";
+import useIsMobile from "../../lib/useIsMobile";
 
 // Working resolution cap — social output never needs more than this, and
 // capping it keeps both the live canvas and the exported Blob fast on
@@ -45,6 +46,20 @@ const TOOLS = [
   { id: "brush", icon: "✎", label: "畫筆" },
   { id: "privacy", icon: "▦", label: "馬賽克" },
 ];
+const toolById = id => TOOLS.find(t => t.id === id);
+
+// Mobile bottom strip collapses the 8 tools down to 5: the 4 "whole image"
+// tools (crop/rotate/adjust/privacy) fold into one centered, raised 編輯
+// hub button — tapping it shows a picker for those 4 instead of a normal
+// drawer — while the 4 "add content" tools stay directly reachable.
+const EDIT_GROUP_IDS = ["crop", "rotate", "adjust", "privacy"];
+const MOBILE_TOOLS = [
+  toolById("filter"),
+  toolById("text"),
+  { id: "editHub", icon: "🖊️", label: "編輯", elevated: true },
+  toolById("sticker"),
+  toolById("brush"),
+];
 
 export default function PhotoEditor({ file, draftId, onCancel, onExport }) {
   const canvasElRef = useRef(null);
@@ -53,6 +68,8 @@ export default function PhotoEditor({ file, draftId, onCancel, onExport }) {
   const containerRef = useRef(null);
   const cropRectRef = useRef(null);
   const historyRef = useRef({ stack: [], index: -1, suspend: false });
+  const isMobile = useIsMobile();
+  const [editHubOpen, setEditHubOpen] = useState(false);
 
   const [ready, setReady] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
@@ -388,23 +405,47 @@ export default function PhotoEditor({ file, draftId, onCancel, onExport }) {
     }
   };
 
-  const drawer = renderDrawer({
-    activeTool, aspect, setAspect: selectAspect, applyCrop,
-    rotate90, flip,
-    presetFilter, setPresetFilter,
-    brightness, setBrightness, contrast, setContrast, saturation, setSaturation, commitAdjustments,
-    addText, addEmojiSticker, addImageSticker, deleteActiveObject,
-    brushColor, setBrushColor, brushWidth, setBrushWidth,
-    privacyMode, setPrivacyMode, startPrivacySelection, applyPrivacyRegion,
-  });
+  const isEditGroupActive = EDIT_GROUP_IDS.includes(activeTool);
+
+  const handleSelectTool = (id) => {
+    if (id === "editHub") {
+      if (isEditGroupActive) { setActiveTool(null); setEditHubOpen(false); }
+      else setEditHubOpen(prev => !prev);
+      return;
+    }
+    setEditHubOpen(false);
+    setActiveTool(prev => prev === id ? null : id);
+  };
+
+  const editHubPicker = (
+    <DrawerChipRow
+      items={EDIT_GROUP_IDS.map(toolById)}
+      activeId={null}
+      onSelect={(id) => { setActiveTool(id); setEditHubOpen(false); }}
+      renderLabel={item => `${item.icon} ${item.label}`}
+    />
+  );
+
+  const drawer = isMobile && editHubOpen && !isEditGroupActive
+    ? editHubPicker
+    : renderDrawer({
+      activeTool, aspect, setAspect: selectAspect, applyCrop,
+      rotate90, flip,
+      presetFilter, setPresetFilter,
+      brightness, setBrightness, contrast, setContrast, saturation, setSaturation, commitAdjustments,
+      addText, addEmojiSticker, addImageSticker, deleteActiveObject,
+      brushColor, setBrushColor, brushWidth, setBrushWidth,
+      privacyMode, setPrivacyMode, startPrivacySelection, applyPrivacyRegion,
+    });
 
   return (
     <EditorShell
       onBack={onCancel}
       onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
       onNext={handleExport} nextLabel="發布" nextDisabled={!ready} busy={busy}
-      tools={TOOLS} activeTool={activeTool}
-      onSelectTool={(id) => setActiveTool(prev => prev === id ? null : id)}
+      tools={isMobile ? MOBILE_TOOLS : TOOLS}
+      activeTool={isMobile && (editHubOpen || isEditGroupActive) ? "editHub" : activeTool}
+      onSelectTool={handleSelectTool}
       drawer={drawer}
       preview={
         <div ref={containerRef} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>

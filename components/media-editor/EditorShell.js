@@ -40,21 +40,31 @@ export default function EditorShell({
         {preview}
       </div>
 
-      {/* Bottom tool strip */}
+      {/* Bottom tool strip. 5 or fewer tools (mobile: content tools + one
+          centered "編輯" hub covering crop/rotate/adjust/privacy) get an
+          evenly-spaced, non-scrolling row with the hub raised like a FAB;
+          more than that (desktop's full 8) falls back to a scrollable strip. */}
       <div style={{
-        flexShrink: 0, display: "flex", gap: 4, overflowX: "auto",
+        flexShrink: 0, display: "flex", gap: 4,
+        overflowX: tools.length > 5 ? "auto" : "visible",
+        justifyContent: tools.length <= 5 ? "space-around" : "flex-start",
         padding: "8px calc(env(safe-area-inset-left) + 8px) 8px calc(env(safe-area-inset-right) + 8px)",
         background: "#111", borderTop: "1px solid #222",
       }}>
         {tools.map(t => (
           <button key={t.id} onClick={() => onSelectTool(t.id)}
             style={{
-              flexShrink: 0, minWidth: 56, minHeight: 44, display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center", gap: 2, borderRadius: 12, border: "none",
-              background: activeTool === t.id ? "rgba(255,255,255,0.15)" : "transparent",
-              color: activeTool === t.id ? "#fff" : "#aaa", cursor: "pointer", padding: "4px 8px",
+              flexShrink: 0, minWidth: t.elevated ? 60 : 56, minHeight: t.elevated ? 52 : 44,
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 2,
+              borderRadius: t.elevated ? 26 : 12, border: "none",
+              marginTop: t.elevated ? -14 : 0,
+              boxShadow: t.elevated ? "0 4px 14px rgba(0,0,0,0.4)" : "none",
+              background: t.elevated ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : (activeTool === t.id ? "rgba(255,255,255,0.15)" : "transparent"),
+              color: t.elevated ? "var(--accent-text)" : (activeTool === t.id ? "#fff" : "#aaa"),
+              cursor: "pointer", padding: "4px 8px",
             }}>
-            <span style={{ fontSize: 18, lineHeight: 1 }} aria-hidden="true">{t.icon}</span>
+            <span style={{ fontSize: t.elevated ? 22 : 18, lineHeight: 1 }} aria-hidden="true">{t.icon}</span>
             <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{t.label}</span>
           </button>
         ))}
