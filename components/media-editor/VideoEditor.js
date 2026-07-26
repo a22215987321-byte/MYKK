@@ -97,6 +97,15 @@ export default function VideoEditor({ files, draftId, onCancel, onExport }) {
 
   const timeline = useMemo(() => buildTimeline(clips), [clips]);
 
+  useEffect(() => {
+    const el = musicElRef.current;
+    if (!el) return;
+    if (!music) { el.removeAttribute("src"); return; }
+    const url = URL.createObjectURL(music.file);
+    el.src = url;
+    return () => URL.revokeObjectURL(url);
+  }, [music?.file]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Undo/redo isn't part of the video editor's required feature set (only
   // the photo editor needs it) — keep the shell's buttons present but
   // permanently disabled rather than half-wiring a history stack that
@@ -190,13 +199,14 @@ export default function VideoEditor({ files, draftId, onCancel, onExport }) {
     if (selectedOverlayId === id) setSelectedOverlayId(null);
   };
 
-  // ---- preview playback (native <video> elements; muted — see note) ----
+  // ---- preview playback (native <video> elements drive both the drawn
+  // frame AND, now, real audio — see syncAudio below) ----
   const getOrCreateVideoEl = useCallback((clip) => {
     let v = videoElsRef.current[clip.id];
     if (!v) {
       v = document.createElement("video");
       v.src = URL.createObjectURL(clip.file);
-      v.muted = true;
+      v.muted = true; // default; syncAudio() unmutes the active clip once playback starts
       v.playsInline = true;
       v.preload = "auto";
       videoElsRef.current[clip.id] = v;
@@ -206,7 +216,11 @@ export default function VideoEditor({ files, draftId, onCancel, onExport }) {
 
   const previewGetFrame = useCallback((clip, sourceTime) => {
     const v = getOrCreateVideoEl(clip);
-    if (Math.abs(v.currentTime - sourceTime) > 0.12) {
+    // Re-seeking a *playing* video on every frame is what makes its audio
+    // stutter/click — only hard-correct drift once it's grown large; small
+    // drift is expected and inaudible while native playback is driving it.
+    const threshold = v.paused ? 0.1 : 0.35;
+    if (Math.abs(v.currentTime - sourceTime) > threshold) {
       try { v.currentTime = Math.max(0, sourceTime); } catch { /* seek may throw before metadata loads */ }
     }
     return v.readyState >= 2 ? v : null;
@@ -219,10 +233,75 @@ export default function VideoEditor({ files, draftId, onCancel, onExport }) {
     await drawFrame({ ctx, width: canvas.width, height: canvas.height, timeline, overlays, t, getFrameImage: previewGetFrame });
   }, [timeline, overlays, previewGetFrame]);
 
-  useEffect(() => { renderPreviewFrame(playhead); }, [playhead, renderPreviewFrame]);
+  // Drives real audio during playback: unmutes+plays whichever clip(s) are
+  // active at time t (both, during a transition's brief overlap) at their
+  // own volume, and separately drives the music <audio> element at its own
+  // trim/volume — same source of truth (getActiveFrames) the visual frame
+  // uses, so what you hear always matches what you see. Scrubbing while
+  // paused stays silent (everything gets paused in the `!isPlaying` branch).
+  const syncAudio = useCallback((t) => {
+    if (!isPlaying) {
+      Object.values(videoElsRef.current).forEach(v => { if (!v.paused) v.pause(); });
+      if (musicElRef.current && !musicElRef.current.paused) musicElRef.current.pause();
+      return;
+    }
+
+    const active = getActiveFrames(timeline, t);
+    const activeMap = {};
+    if (active?.type === "single") activeMap[active.clip.id] = active.sourceTime;
+    else if (active?.type === "transition") {
+      activeMap[active.outgoing.clip.id] = active.outgoing.sourceTime;
+      activeMap[active.incoming.clip.id] = active.incoming.sourceTime;
+    }
+
+    clips.forEach(c => {
+      const v = videoElsRef.current[c.id];
+      if (!v) return;
+      const sourceTime = activeMap[c.id];
+      if (sourceTime != null) {
+        v.volume = Math.max(0, Math.min(1, c.volume));
+        v.muted = c.volume <= 0;
+        if (v.paused) {
+          try { v.currentTime = sourceTime; } catch { /* not ready yet */ }
+          v.play().catch(() => {});
+        }
+      } else if (!v.paused) {
+        v.pause();
+      }
+    });
+
+    const m = musicElRef.current;
+    if (m && music) {
+      const musicSourceT = music.trimStart + t;
+      const withinRange = t >= 0 && musicSourceT < music.trimEnd;
+      m.volume = Math.max(0, Math.min(1, music.volume));
+      if (withinRange) {
+        if (m.paused) {
+          try { m.currentTime = musicSourceT; } catch { /* not ready yet */ }
+          m.play().catch(() => {});
+        } else if (Math.abs(m.currentTime - musicSourceT) > 0.35) {
+          m.currentTime = musicSourceT;
+        }
+      } else if (!m.paused) {
+        m.pause();
+      }
+    } else if (m && !m.paused) {
+      m.pause();
+    }
+  }, [timeline, clips, music, isPlaying]);
 
   useEffect(() => {
-    if (!isPlaying) { cancelAnimationFrame(rafRef.current); return; }
+    renderPreviewFrame(playhead);
+    syncAudio(playhead);
+  }, [playhead, renderPreviewFrame, syncAudio]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      cancelAnimationFrame(rafRef.current);
+      Object.values(videoElsRef.current).forEach(v => v.pause());
+      musicElRef.current?.pause();
+      return;
+    }
     lastTsRef.current = performance.now();
     const tick = (ts) => {
       const dt = (ts - lastTsRef.current) / 1000;
@@ -297,6 +376,8 @@ export default function VideoEditor({ files, draftId, onCancel, onExport }) {
   }
 
   return (
+    <>
+    <audio ref={musicElRef} style={{ display: "none" }} />
     <EditorShell
       onBack={onCancel}
       onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
@@ -337,6 +418,7 @@ export default function VideoEditor({ files, draftId, onCancel, onExport }) {
         </div>
       }
     />
+    </>
   );
 }
 

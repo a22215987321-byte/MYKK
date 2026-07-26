@@ -51,6 +51,7 @@ export default function PhotoEditor({ file, draftId, onCancel, onExport }) {
   const fabricCanvasRef = useRef(null);
   const imageObjRef = useRef(null);
   const containerRef = useRef(null);
+  const cropRectRef = useRef(null);
   const historyRef = useRef({ stack: [], index: -1, suspend: false });
 
   const [ready, setReady] = useState(false);
@@ -190,23 +191,78 @@ export default function PhotoEditor({ file, draftId, onCancel, onExport }) {
 
   const commitAdjustments = () => pushHistory();
 
-  // ---- tool: crop ----
+  // ---- tool: crop — a real draggable/resizable window, not just an
+  // auto-centered guess. The aspect ratio is still locked to one of the
+  // presets (that's what was asked for), but the window itself can be
+  // dragged around and resized from its corners like Instagram's crop tool. ----
+  const removeCropOverlay = useCallback(() => {
+    const canvas = fabricCanvasRef.current;
+    if (cropRectRef.current && canvas) {
+      canvas.remove(cropRectRef.current);
+      cropRectRef.current = null;
+      canvas.renderAll();
+    }
+  }, []);
+
+  const showCropOverlay = useCallback((aspectId) => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+    removeCropOverlay();
+    const def = ASPECTS.find(a => a.id === aspectId);
+    if (!def?.ratio) return;
+    const { width, height } = canvas;
+    const ratio = def.ratio;
+    const curRatio = width / height;
+    let w, h;
+    if (curRatio > ratio) { h = height * 0.9; w = h * ratio; } else { w = width * 0.9; h = w / ratio; }
+
+    const rect = new fabric.Rect({
+      left: (width - w) / 2, top: (height - h) / 2, width: w, height: h,
+      fill: "rgba(0,0,0,0.01)", stroke: "#fff", strokeWidth: 2, strokeDashArray: [8, 6],
+      cornerColor: "#fff", cornerStyle: "circle", transparentCorners: false,
+      lockRotation: true, hasRotatingPoint: false,
+      excludeFromExport: true, // never let this ghost box end up in history/export JSON
+    });
+    rect.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false, mtr: false });
+    // Corner drag resizes both handles at once by design, but we still snap
+    // height back to width*ratio on every tick so it can never drift off
+    // the locked aspect ratio (fabric's own corner controls don't enforce
+    // a *specific* ratio on their own, only proportional-from-origin).
+    rect.on("scaling", () => {
+      const w2 = rect.width * rect.scaleX;
+      rect.set({ height: w2 / ratio, scaleY: rect.scaleX });
+    });
+    canvas.add(rect);
+    canvas.setActiveObject(rect);
+    canvas.renderAll();
+    cropRectRef.current = rect;
+  }, [removeCropOverlay]);
+
+  const selectAspect = (id) => {
+    setAspect(id);
+    if (id === "original") removeCropOverlay();
+    else showCropOverlay(id);
+  };
+
+  useEffect(() => {
+    if (activeTool !== "crop") removeCropOverlay();
+  }, [activeTool, removeCropOverlay]);
+
   const applyCrop = () => {
     const canvas = fabricCanvasRef.current;
-    const def = ASPECTS.find(a => a.id === aspect);
-    if (!def?.ratio) { setActiveTool(null); return; }
-    const { width, height } = canvas;
-    const curRatio = width / height;
-    let cropW, cropH;
-    if (curRatio > def.ratio) { cropH = height; cropW = height * def.ratio; }
-    else { cropW = width; cropH = width / def.ratio; }
-    const left = (width - cropW) / 2, top = (height - cropH) / 2;
+    const rect = cropRectRef.current;
+    if (!rect) { setActiveTool(null); return; }
+    const left = rect.left, top = rect.top;
+    const cropW = rect.width * rect.scaleX, cropH = rect.height * rect.scaleY;
 
+    canvas.remove(rect);
+    cropRectRef.current = null;
     canvas.getObjects().forEach(o => { o.set({ left: o.left - left, top: o.top - top }); o.setCoords(); });
     canvas.setDimensions({ width: Math.round(cropW), height: Math.round(cropH) });
     canvas.renderAll();
     fitCanvasToContainer(canvas, containerRef.current);
     setActiveTool(null);
+    setAspect("original");
     pushHistory();
   };
 
@@ -333,7 +389,7 @@ export default function PhotoEditor({ file, draftId, onCancel, onExport }) {
   };
 
   const drawer = renderDrawer({
-    activeTool, aspect, setAspect, applyCrop,
+    activeTool, aspect, setAspect: selectAspect, applyCrop,
     rotate90, flip,
     presetFilter, setPresetFilter,
     brightness, setBrightness, contrast, setContrast, saturation, setSaturation, commitAdjustments,
@@ -378,6 +434,9 @@ function renderDrawer(p) {
       return (
         <div>
           <DrawerChipRow items={ASPECTS} activeId={p.aspect} onSelect={p.setAspect} />
+          {p.aspect !== "original" && (
+            <div style={{ fontSize: 11, color: "#777", marginTop: 8 }}>拖曳白框角落調整大小、拖曳框內移動位置</div>
+          )}
           <button onClick={p.applyCrop} style={applyBtnStyle}>套用裁剪</button>
         </div>
       );
