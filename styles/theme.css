@@ -180,7 +180,10 @@ html[data-theme="pastel-pearl"][data-pastel-palette="pearl-silver"] {
   --accent-2: #dddddd;
 }
 html[data-theme="pastel-pearl"][data-pastel-palette="mint-sea-salt"] {
-  --accent: #a7d7cc;
+  /* Softened a touch past the original spec hex (#a7d7cc is ~37% saturation)
+     per follow-up feedback: same hue, just lower saturation/higher lightness
+     for a milkier, more pearl-like mint rather than a flatter pastel teal. */
+  --accent: color-mix(in srgb, #a7d7cc 82%, #ffffff 18%);
   --accent-2: #a2c3e7;
 }
 
