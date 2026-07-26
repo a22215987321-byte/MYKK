@@ -462,7 +462,7 @@ function fitCanvasToContainer(canvas, container) {
   const pad = 16;
   const availW = container.clientWidth - pad * 2;
   const availH = container.clientHeight - pad * 2;
-  const scale = Math.min(1, availW / canvas.width, availH / canvas.height);
+  const scale = Math.min(availW / canvas.width, availH / canvas.height);
   canvas.setDimensions(
     { width: canvas.width * scale, height: canvas.height * scale },
     { cssOnly: true }
