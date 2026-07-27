@@ -1,27 +1,47 @@
 import { useState, useRef, useEffect } from "react";
 import { PhotoEditorEmbeddedLazy } from "./media-editor";
 import { toast } from "../lib/toast";
+import useIsMobile from "../lib/useIsMobile";
 
 // Standalone "圖片編輯" room — reuses the same fabric.js-based editor core
 // that already powers post/avatar image editing (see Feed.js, profile/[uid].js),
 // but through the embedded layout instead of their fullscreen one: editing
 // happens inline in this room's own content area, sidebar/calendar stay
 // visible the whole time, nothing covers the screen.
+//
+// Entry flow differs by device: desktop drops straight into a blank canvas
+// (no photo required — crop/filter/adjust/mosaic just have nothing to act
+// on until a photo is imported via the editor's own 匯入照片 button); mobile
+// stays photo-first, but via the camera directly instead of a generic
+// "choose a file" prompt.
 export default function ImageEditorRoom() {
+  const isMobile = useIsMobile();
   const [originalFile, setOriginalFile] = useState(null);
   const [editingPhoto, setEditingPhoto] = useState(false);
   const [result, setResult] = useState(null); // { url, blob }
   const [pasteFlash, setPasteFlash] = useState(false);
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   useEffect(() => {
     return () => { if (result?.url) URL.revokeObjectURL(result.url); };
   }, [result]);
 
-  const pickFile = () => fileInputRef.current?.click();
+  // Desktop only: nothing else to show first, so open straight into an
+  // editable blank canvas. Re-fires (harmlessly re-entering the same state)
+  // any time we land back on "nothing showing" — after a reset, or after
+  // finishing and clearing the result.
+  useEffect(() => {
+    if (isMobile) return;
+    if (!editingPhoto && !result) setEditingPhoto(true);
+  }, [isMobile, editingPhoto, result]);
 
-  // Shared by the file picker and the clipboard-paste handler below, so
-  // "attach an image" only has one code path regardless of how it arrived.
+  const pickFile = () => fileInputRef.current?.click();
+  const takePhoto = () => cameraInputRef.current?.click();
+
+  // Shared by the file picker, camera capture, clipboard paste, and the
+  // editor's own "匯入照片" button — "attach/replace the photo" only has one
+  // code path regardless of how it arrived.
   const attachFile = (file) => {
     if (!file) return;
     setResult(prev => { if (prev?.url) URL.revokeObjectURL(prev.url); return null; });
@@ -63,9 +83,11 @@ export default function ImageEditorRoom() {
     setResult(null);
     setOriginalFile(null);
     setEditingPhoto(false);
+    // Desktop: the effect above immediately reopens a fresh blank canvas.
+    // Mobile: this leaves the 拍照 prompt showing, as intended.
   };
 
-  const showEditor = editingPhoto && originalFile;
+  const showEditor = editingPhoto;
 
   return (
     <>
@@ -79,6 +101,7 @@ export default function ImageEditorRoom() {
       </div>
 
       <input ref={fileInputRef} type="file" accept="image/*" onChange={onFileChosen} style={{ display: "none" }} />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={onFileChosen} style={{ display: "none" }} />
 
       {/* Body — empty/result states stay centered; the embedded editor
           manages its own internal layout and just fills this area. */}
@@ -101,19 +124,26 @@ export default function ImageEditorRoom() {
                 setResult({ url: URL.createObjectURL(blob), blob });
                 setEditingPhoto(false);
               }}
+              onImportPhoto={(file) => setOriginalFile(file)}
             />
           </div>
         )}
 
-        {!showEditor && !result && (
+        {!showEditor && !result && isMobile && (
           <div style={{ textAlign: "center", color: "var(--text-dim)" }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>🖼️</div>
-            <div style={{ fontSize: 16, color: "var(--text-faint)", marginBottom: 8 }}>選一張圖片開始編輯</div>
-            <div style={{ fontSize: 13, marginBottom: 20, color: "var(--text-dim)" }}>裁剪、濾鏡、加貼圖，編輯完可直接下載，也可以直接貼上截圖</div>
-            <button onClick={pickFile}
-              style={{ background: "linear-gradient(135deg,#2563eb,var(--accent-active))", border: "none", borderRadius: "var(--radius-md)", padding: "10px 24px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-              選擇圖片
-            </button>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>📷</div>
+            <div style={{ fontSize: 16, color: "var(--text-faint)", marginBottom: 8 }}>拍張照片開始編輯</div>
+            <div style={{ fontSize: 13, marginBottom: 20, color: "var(--text-dim)" }}>拍完照直接進入編輯，也可以從相簿選擇或直接貼上截圖</div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              <button onClick={takePhoto}
+                style={{ background: "linear-gradient(135deg,#2563eb,var(--accent-active))", border: "none", borderRadius: "var(--radius-md)", padding: "10px 24px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                📷 拍照
+              </button>
+              <button onClick={pickFile}
+                style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 24px", color: "var(--text)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                從相簿選擇
+              </button>
+            </div>
           </div>
         )}
 

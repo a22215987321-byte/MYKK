@@ -9,6 +9,9 @@ import { saveDraft } from "./editorDb";
 // photo is smaller than this to begin with, it's used at its own size.
 const MAX_EDIT_DIMENSION = 1440;
 const HISTORY_LIMIT = 30;
+// Default working size when the editor opens with no photo at all (see the
+// `file` being null/undefined below) — a blank sheet to draw/type/stick on.
+const BLANK_CANVAS_SIZE = 1080;
 
 export const ASPECTS = [
   { id: "original", label: "原圖", ratio: null },
@@ -125,18 +128,28 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
       });
       fabricCanvasRef.current = canvas;
 
-      objectUrl = URL.createObjectURL(file);
-      const img = await fabric.FabricImage.fromURL(objectUrl, { crossOrigin: "anonymous" });
-      if (disposed) return;
+      if (file) {
+        objectUrl = URL.createObjectURL(file);
+        const img = await fabric.FabricImage.fromURL(objectUrl, { crossOrigin: "anonymous" });
+        if (disposed) return;
 
-      const scale = Math.min(1, MAX_EDIT_DIMENSION / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      canvas.setDimensions({ width: w, height: h });
-      img.set({ left: 0, top: 0, scaleX: w / img.width, scaleY: h / img.height, selectable: false, evented: false });
-      canvas.add(img);
-      canvas.renderAll();
-      imageObjRef.current = img;
+        const scale = Math.min(1, MAX_EDIT_DIMENSION / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        canvas.setDimensions({ width: w, height: h });
+        img.set({ left: 0, top: 0, scaleX: w / img.width, scaleY: h / img.height, selectable: false, evented: false });
+        canvas.add(img);
+        canvas.renderAll();
+        imageObjRef.current = img;
+      } else {
+        // No photo — a blank sheet to draw/type/stick on. fabric canvases
+        // are transparent by default, which flattens to solid black once
+        // exported as JPEG, so this needs an explicit white background.
+        canvas.setDimensions({ width: BLANK_CANVAS_SIZE, height: BLANK_CANVAS_SIZE });
+        canvas.backgroundColor = "#ffffff";
+        canvas.renderAll();
+        imageObjRef.current = null;
+      }
 
       fitCanvasToContainer(canvas, containerRef.current);
 
@@ -211,6 +224,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   };
   const flip = (axis) => {
     const img = imageObjRef.current;
+    if (!img) return; // no base photo (blank canvas) — nothing to flip
     img.set(axis === "x" ? { flipX: !img.flipX } : { flipY: !img.flipY });
     fabricCanvasRef.current.renderAll();
     pushHistory();
@@ -387,11 +401,11 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   const applyPrivacyRegion = async () => {
     const canvas = fabricCanvasRef.current;
     const sel = canvas.getActiveObject();
-    if (!sel) return;
+    const img = imageObjRef.current;
+    if (!sel || !img) return; // no base photo (blank canvas) — nothing to mosaic/blur
     const bounds = sel.getBoundingRect();
     canvas.remove(sel);
 
-    const img = imageObjRef.current;
     const clone = await img.clone();
     clone.set({
       left: 0, top: 0,

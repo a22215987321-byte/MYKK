@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { ToolButton, IconButton } from "./EditorShell";
 import usePhotoEditorCore, { renderPhotoEditorDrawer, TOOLS } from "./usePhotoEditorCore";
 
@@ -8,12 +9,19 @@ import usePhotoEditorCore, { renderPhotoEditorDrawer, TOOLS } from "./usePhotoEd
 // the app's own sidebar/calendar, and all 8 tools stay directly visible
 // (no mobile 5-icon/編輯-hub collapse — there's room here since this isn't
 // squeezed under a fixed viewport-height chrome).
-export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport }) {
+//
+// onImportPhoto is optional: when the room opens straight into a blank
+// canvas (desktop, no `file`), this lets the user bring in a real photo
+// mid-session. Passing a new file re-keys usePhotoEditorCore's init effect,
+// so it restarts the canvas fresh with that photo as the base — anything
+// drawn on the blank canvas before that point is not carried over.
+export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport, onImportPhoto }) {
   const core = usePhotoEditorCore({ file, draftId, onExport });
   const {
     canvasElRef, containerRef, ready, activeTool, selectTool, busy, canUndo, canRedo,
     undo, redo, eraseStrokeAt, handleExport,
   } = core;
+  const importInputRef = useRef(null);
 
   const drawer = renderPhotoEditorDrawer(core);
 
@@ -27,6 +35,13 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport 
         <IconButton label="返回" onClick={onCancel}>✕</IconButton>
         <IconButton label="復原" onClick={undo} disabled={!canUndo}>↶</IconButton>
         <IconButton label="重做" onClick={redo} disabled={!canRedo}>↷</IconButton>
+        {onImportPhoto && (
+          <>
+            <input ref={importInputRef} type="file" accept="image/*" style={{ display: "none" }}
+              onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onImportPhoto(f); }} />
+            <IconButton label="匯入照片" onClick={() => importInputRef.current?.click()}>🖼️</IconButton>
+          </>
+        )}
         <div style={{ flex: 1 }} />
         <button onClick={handleExport} disabled={!ready || busy}
           style={{
