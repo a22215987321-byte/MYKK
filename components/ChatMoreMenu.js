@@ -13,6 +13,10 @@ export default function ChatMoreMenu({ state, setters, onOpen }) {
         <NavItem icon="🎬" iconBg="linear-gradient(135deg,var(--accent-hover),#2563eb)" label="電影院" sublabel="同步觀看影片" mobileTouch
           active={state.showCinema} onClick={() => onOpen(setters.setShowCinema)} />
       </div>
+      <div style={{ padding: "0 10px 10px" }}>
+        <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel="有問題都可以問我" mobileTouch
+          active={state.showAiChat} onClick={() => onOpen(setters.setShowAiChat)} />
+      </div>
       <div style={{ padding: "4px 14px 4px" }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>🇬🇧 英語學習</span>
       </div>
