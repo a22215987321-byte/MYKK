@@ -268,22 +268,37 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     const img = await fabric.FabricImage.fromURL(url, { crossOrigin: "anonymous" });
     URL.revokeObjectURL(url);
     const becomesBase = !imageObjRef.current;
-    const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
-    img.set({
-      scaleX: scale, scaleY: scale,
-      selectable: !becomesBase, evented: !becomesBase,
-    });
-    canvas.add(img);
-    // canvas.centerObject() instead of hand-rolled left/top math — it
-    // accounts for the object's actual origin/transform internally, so it
-    // can't drift off-center the way manually computing (canvas.width-w)/2
-    // did (the imported photo was landing top-left-biased instead of centered).
-    canvas.centerObject(img);
-    img.setCoords();
+
     if (becomesBase) {
+      // Blank canvas has nothing worth preserving space for yet — resize the
+      // canvas itself to match this photo (same as opening with a file
+      // directly) instead of leaving it at the blank canvas's own, usually
+      // much wider, container-derived size with the photo centered in a
+      // sea of leftover white.
+      const scale = Math.min(1, MAX_EDIT_DIMENSION / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      canvas.setDimensions({ width: w, height: h });
+      canvas.backgroundColor = "";
+      img.set({ left: 0, top: 0, scaleX: w / img.width, scaleY: h / img.height, selectable: false, evented: false });
+      canvas.add(img);
       canvas.sendObjectToBack(img);
       imageObjRef.current = img;
       setHasImage(true);
+      setZoomPctState(100);
+      fitCanvasToContainer(canvas, containerRef.current);
+    } else {
+      // Already has a base photo — this one becomes an additional, movable
+      // object layered on top instead (so a second import can't clobber the
+      // first photo's edits).
+      const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
+      img.set({ scaleX: scale, scaleY: scale, selectable: true, evented: true });
+      canvas.add(img);
+      // canvas.centerObject() instead of hand-rolled left/top math — it
+      // accounts for the object's actual origin/transform internally, so it
+      // can't drift off-center the way manually computing (canvas.width-w)/2
+      // did (this used to land top-left-biased instead of centered).
+      canvas.centerObject(img);
+      img.setCoords();
     }
     canvas.renderAll();
     pushHistory();
