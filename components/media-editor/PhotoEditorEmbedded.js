@@ -1,29 +1,55 @@
-import { useRef } from "react";
-import { ToolButton, IconButton } from "./EditorShell";
-import usePhotoEditorCore, { renderPhotoEditorDrawer, TOOLS } from "./usePhotoEditorCore";
+import { useRef, useState } from "react";
+import { ToolButton, IconButton, DrawerChipRow } from "./EditorShell";
+import useIsMobile from "../../lib/useIsMobile";
+import usePhotoEditorCore, {
+  renderPhotoEditorDrawer, TOOLS, MOBILE_TOOLS, EDIT_GROUP_IDS, toolById, withPhotoToolState,
+} from "./usePhotoEditorCore";
 
 // Inline/embedded layout for the standalone 圖片編輯室 (ImageEditorRoom) —
 // same canvas/tool/history logic as the fullscreen PhotoEditor (both use
 // usePhotoEditorCore), but laid out as a normal block within the page
 // instead of a position:fixed overlay: no black backdrop, nothing covers
-// the app's own sidebar/calendar, and all 8 tools stay directly visible
-// (no mobile 5-icon/編輯-hub collapse — there's room here since this isn't
-// squeezed under a fixed viewport-height chrome).
-//
-// onImportPhoto is optional: when the room opens straight into a blank
-// canvas (desktop, no `file`), this lets the user bring in a real photo
-// mid-session. Passing a new file re-keys usePhotoEditorCore's init effect,
-// so it restarts the canvas fresh with that photo as the base — anything
-// drawn on the blank canvas before that point is not carried over.
-export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport, onImportPhoto }) {
+// the app's own sidebar/calendar. Mobile still collapses to the same
+// 5-icon + 編輯-hub strip as the fullscreen editor (same MOBILE_TOOLS); only
+// desktop keeps all 8 expanded, since there's no cramped fixed-height
+// chrome forcing the collapse there.
+export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport }) {
+  const isMobile = useIsMobile();
+  const [editHubOpen, setEditHubOpen] = useState(false);
   const core = usePhotoEditorCore({ file, draftId, onExport });
   const {
-    canvasElRef, containerRef, ready, activeTool, selectTool, busy, canUndo, canRedo,
-    undo, redo, eraseStrokeAt, handleExport,
+    canvasElRef, containerRef, ready, activeTool, setActiveTool, selectTool, busy, canUndo, canRedo,
+    undo, redo, eraseStrokeAt, handleExport, hasImage, importPhoto,
   } = core;
   const importInputRef = useRef(null);
 
-  const drawer = renderPhotoEditorDrawer(core);
+  const isEditGroupActive = EDIT_GROUP_IDS.includes(activeTool);
+
+  const handleSelectTool = (id) => {
+    if (id === "editHub") {
+      if (isEditGroupActive) { setActiveTool(null); setEditHubOpen(false); }
+      else setEditHubOpen(prev => !prev);
+      return;
+    }
+    setEditHubOpen(false);
+    selectTool(id);
+  };
+
+  const editHubPicker = (
+    <DrawerChipRow
+      items={EDIT_GROUP_IDS.map(toolById)}
+      activeId={null}
+      onSelect={(id) => { setActiveTool(id); setEditHubOpen(false); }}
+      renderLabel={item => `${item.icon} ${item.label}`}
+    />
+  );
+
+  const drawer = isMobile && editHubOpen && !isEditGroupActive
+    ? editHubPicker
+    : renderPhotoEditorDrawer(core);
+
+  const tools = withPhotoToolState(isMobile ? MOBILE_TOOLS : TOOLS, hasImage);
+  const displayActiveTool = isMobile && (editHubOpen || isEditGroupActive) ? "editHub" : activeTool;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, background: "var(--panel)" }}>
@@ -37,13 +63,9 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport,
         <IconButton label="返回" onClick={onCancel}>✕</IconButton>
         <IconButton label="復原" onClick={undo} disabled={!canUndo}>↶</IconButton>
         <IconButton label="重做" onClick={redo} disabled={!canRedo}>↷</IconButton>
-        {onImportPhoto && (
-          <>
-            <input ref={importInputRef} type="file" accept="image/*" style={{ display: "none" }}
-              onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onImportPhoto(f); }} />
-            <IconButton label="匯入照片" onClick={() => importInputRef.current?.click()}>🖼️</IconButton>
-          </>
-        )}
+        <input ref={importInputRef} type="file" accept="image/*" style={{ display: "none" }}
+          onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importPhoto(f); }} />
+        <IconButton label="匯入照片" onClick={() => importInputRef.current?.click()}>🖼️</IconButton>
         <div style={{ flex: 1 }} />
         <button onClick={handleExport} disabled={!ready || busy}
           style={{
@@ -65,17 +87,20 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport,
         flex: 1, minHeight: 200, position: "relative", display: "flex",
         alignItems: "center", justifyContent: "center", background: "#000", overflow: "hidden",
       }}>
-        <canvas ref={canvasElRef} onClick={activeTool === "brush-erase" ? eraseStrokeAt : undefined} />
+        <canvas ref={canvasElRef} onClick={activeTool === "brush" ? eraseStrokeAt : undefined} />
         {!ready && <div style={{ position: "absolute", color: "#888", fontSize: 13 }}>載入中...</div>}
       </div>
 
-      {/* Tool strip — all 8 tools directly, no mobile collapse */}
+      {/* Tool strip — 8 tools on desktop; mobile collapses to the same
+          5-icon + 編輯 hub strip as the fullscreen editor. */}
       <div style={{
-        flexShrink: 0, display: "flex", gap: 4, overflowX: "auto", justifyContent: "flex-start",
+        flexShrink: 0, display: "flex", gap: 4, overflowX: tools.length > 5 ? "auto" : "visible",
+        justifyContent: tools.length <= 5 ? "space-around" : "flex-start",
         padding: "12px", background: "#111", borderTop: "1px solid rgba(255,255,255,0.08)",
       }}>
-        {TOOLS.map(t => (
-          <ToolButton key={t.id} tool={t} active={activeTool === t.id} onClick={() => selectTool(t.id)} />
+        {tools.map(t => (
+          <ToolButton key={t.id} tool={t} active={displayActiveTool === t.id} onClick={() => handleSelectTool(t.id)}
+            disabled={t.disabled} title={t.title} />
         ))}
       </div>
 

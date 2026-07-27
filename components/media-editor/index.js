@@ -19,5 +19,8 @@ export const VideoEditorLazy = dynamic(() => import("./VideoEditor"), {
 // overlay (see components/media-editor/PhotoEditorEmbedded.js).
 export const PhotoEditorEmbeddedLazy = dynamic(() => import("./PhotoEditorEmbedded"), {
   ssr: false,
-  loading: () => <LoadingState label="載入編輯器..." minHeight="400px" />,
+  // Matches the loaded component's own height:100% instead of a fixed px
+  // value, so there's no height jump the moment the real editor mounts —
+  // the parent (ImageEditorRoom's flex/minHeight wrapper) already bounds it.
+  loading: () => <LoadingState label="載入編輯器..." minHeight="100%" />,
 });

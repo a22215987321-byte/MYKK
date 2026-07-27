@@ -2,7 +2,7 @@ import { useState } from "react";
 import EditorShell, { DrawerChipRow } from "./EditorShell";
 import useIsMobile from "../../lib/useIsMobile";
 import usePhotoEditorCore, {
-  renderPhotoEditorDrawer, TOOLS, MOBILE_TOOLS, EDIT_GROUP_IDS, toolById,
+  renderPhotoEditorDrawer, TOOLS, MOBILE_TOOLS, EDIT_GROUP_IDS, toolById, withPhotoToolState,
 } from "./usePhotoEditorCore";
 
 // Fullscreen wrapper used by post composers (Feed.js, profile/[uid].js) —
@@ -16,7 +16,7 @@ export default function PhotoEditor({ file, draftId, onCancel, onExport }) {
   const [editHubOpen, setEditHubOpen] = useState(false);
 
   const core = usePhotoEditorCore({ file, draftId, onExport });
-  const { canvasElRef, containerRef, ready, activeTool, setActiveTool, busy, canUndo, canRedo, undo, redo, eraseStrokeAt, handleExport } = core;
+  const { canvasElRef, containerRef, ready, activeTool, setActiveTool, busy, canUndo, canRedo, undo, redo, eraseStrokeAt, handleExport, hasImage } = core;
 
   const isEditGroupActive = EDIT_GROUP_IDS.includes(activeTool);
 
@@ -48,13 +48,13 @@ export default function PhotoEditor({ file, draftId, onCancel, onExport }) {
       onBack={onCancel}
       onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
       onNext={handleExport} nextLabel="發布" nextDisabled={!ready} busy={busy}
-      tools={isMobile ? MOBILE_TOOLS : TOOLS}
+      tools={withPhotoToolState(isMobile ? MOBILE_TOOLS : TOOLS, hasImage)}
       activeTool={isMobile && (editHubOpen || isEditGroupActive) ? "editHub" : activeTool}
       onSelectTool={handleSelectTool}
       drawer={drawer}
       preview={
         <div ref={containerRef} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <canvas ref={canvasElRef} onClick={activeTool === "brush-erase" ? eraseStrokeAt : undefined} />
+          <canvas ref={canvasElRef} onClick={activeTool === "brush" ? eraseStrokeAt : undefined} />
           {!ready && <div style={{ position: "absolute", color: "#888", fontSize: 13 }}>載入中...</div>}
         </div>
       }

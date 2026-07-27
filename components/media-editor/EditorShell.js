@@ -56,7 +56,8 @@ export default function EditorShell({
         boxShadow: "0 -6px 14px rgba(0,0,0,0.3)", position: "relative", zIndex: 1,
       }}>
         {tools.map(t => (
-          <ToolButton key={t.id} tool={t} active={activeTool === t.id} onClick={() => onSelectTool(t.id)} />
+          <ToolButton key={t.id} tool={t} active={activeTool === t.id} onClick={() => onSelectTool(t.id)}
+            disabled={t.disabled} title={t.title} />
         ))}
       </div>
 
@@ -78,9 +79,9 @@ export default function EditorShell({
 // gradient when selected; `elevated` (the fullscreen mobile 編輯 hub) gets a
 // bigger raised circular treatment on top of the same fill logic. Shared by
 // EditorShell's own strip and the embedded 圖片編輯室 layout's tool row.
-export function ToolButton({ tool, active, onClick }) {
+export function ToolButton({ tool, active, onClick, disabled, title }) {
   return (
-    <button onClick={onClick}
+    <button onClick={disabled ? undefined : onClick} disabled={disabled} title={title}
       style={{
         flexShrink: 0, minWidth: tool.elevated ? 60 : 56, minHeight: tool.elevated ? 52 : 44,
         display: "flex", flexDirection: "column",
@@ -92,7 +93,8 @@ export function ToolButton({ tool, active, onClick }) {
           ? "linear-gradient(135deg,var(--accent),var(--accent-2))"
           : (tool.elevated ? "#242424" : "transparent"),
         color: active ? "var(--accent-text)" : (tool.elevated ? "#ddd" : "#aaa"),
-        cursor: "pointer", padding: "4px 8px",
+        cursor: disabled ? "not-allowed" : "pointer", padding: "4px 8px",
+        opacity: disabled ? 0.4 : 1,
         transition: "background 0.15s, color 0.15s",
       }}>
       <span style={{ fontSize: tool.elevated ? 22 : 18, lineHeight: 1 }} aria-hidden="true">{tool.icon}</span>
@@ -116,33 +118,33 @@ export function IconButton({ label, onClick, disabled, children }) {
 
 // Small reusable slider row for the "adjust" style panels (brightness/
 // contrast/saturation/volume/speed...).
-export function DrawerSlider({ label, value, min, max, step, onChange }) {
+export function DrawerSlider({ label, value, min, max, step, onChange, disabled }) {
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div style={{ marginBottom: 14, opacity: disabled ? 0.4 : 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#aaa", marginBottom: 6 }}>
         <span>{label}</span>
         <span>{value}</span>
       </div>
-      <input type="range" min={min} max={max} step={step} value={value}
+      <input type="range" min={min} max={max} step={step} value={value} disabled={disabled}
         onChange={e => onChange(Number(e.target.value))}
-        style={{ width: "100%", height: 44 }} />
+        style={{ width: "100%", height: 44, cursor: disabled ? "not-allowed" : "pointer" }} />
     </div>
   );
 }
 
 // Horizontal scrollable chip row (filters, transitions, sticker picker...).
-export function DrawerChipRow({ items, activeId, onSelect, renderLabel }) {
+export function DrawerChipRow({ items, activeId, onSelect, renderLabel, disabled }) {
   const [hoverId, setHoverId] = useState(null);
   return (
-    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, opacity: disabled ? 0.4 : 1 }}>
       {items.map(item => (
-        <button key={item.id} onClick={() => onSelect(item.id)}
+        <button key={item.id} onClick={disabled ? undefined : () => onSelect(item.id)} disabled={disabled}
           onMouseEnter={() => setHoverId(item.id)} onMouseLeave={() => setHoverId(null)}
           style={{
             flexShrink: 0, minHeight: 44, padding: "0 14px", borderRadius: 20,
             border: activeId === item.id ? "1px solid var(--accent)" : "1px solid #333",
             background: activeId === item.id ? "var(--accent)" : (hoverId === item.id ? "#222" : "#181818"),
-            color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+            color: "#fff", fontSize: 12, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", whiteSpace: "nowrap",
           }}>
           {renderLabel ? renderLabel(item) : item.label}
         </button>

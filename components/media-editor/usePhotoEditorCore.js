@@ -63,6 +63,25 @@ export const MOBILE_TOOLS = [
   toolById("brush"),
 ];
 
+// These act on the base photo itself (filters/adjust recolor it, privacy
+// mosaics/blurs a region of it) — meaningless with no photo loaded yet
+// (blank canvas), so both layouts grey these out and skip straight to a
+// no-op instead of letting the user fiddle with controls that do nothing.
+export const DISABLED_WITHOUT_IMAGE = ["filter", "adjust", "privacy"];
+export const DISABLED_HINT = "請先匯入照片再使用此工具";
+
+// Augments a TOOLS/MOBILE_TOOLS array with disabled/title for whichever
+// entries need a base photo that isn't loaded yet — shared so the fullscreen
+// and embedded tool strips grey these out identically instead of each
+// re-deriving the same list.
+export function withPhotoToolState(tools, hasImage) {
+  return tools.map(t => (
+    DISABLED_WITHOUT_IMAGE.includes(t.id) && !hasImage
+      ? { ...t, disabled: true, title: DISABLED_HINT }
+      : t
+  ));
+}
+
 export function fitCanvasToContainer(canvas, container) {
   if (!container || !canvas) return;
   const pad = 16;
@@ -93,6 +112,12 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   const [busy, setBusy] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  // Mirror imageObjRef/canvas-object-count into state so tool buttons and
+  // drawer controls can reactively grey themselves out — refs alone don't
+  // trigger a re-render when they change.
+  const [hasImage, setHasImage] = useState(false);
+  const [hasObjects, setHasObjects] = useState(false);
+  const addOffsetRef = useRef(0);
 
   const [aspect, setAspectState] = useState("original");
   const [presetFilter, setPresetFilter] = useState("none");
@@ -114,6 +139,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     h.index = h.stack.length - 1;
     setCanUndo(h.index > 0);
     setCanRedo(false);
+    setHasObjects(canvas.getObjects().length > 0);
   }, []);
 
   // ---- init ----
@@ -141,6 +167,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
         canvas.add(img);
         canvas.renderAll();
         imageObjRef.current = img;
+        setHasImage(true);
       } else {
         // No photo — a blank sheet to draw/type/stick on. Sized to match
         // the container's own aspect ratio (falling back to a square if the
@@ -157,6 +184,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
         canvas.backgroundColor = "#ffffff";
         canvas.renderAll();
         imageObjRef.current = null;
+        setHasImage(false);
       }
 
       fitCanvasToContainer(canvas, containerRef.current);
@@ -195,6 +223,40 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     return () => ro.disconnect();
   }, [ready]);
 
+  // Brings a photo into the CURRENT canvas as a new object (centered, scaled
+  // to fit within it) instead of rebuilding the canvas from scratch — the
+  // init effect above only runs again when `file` itself changes, which
+  // would otherwise silently wipe out anything already drawn/typed. If
+  // there's no base photo yet (blank canvas), this one becomes it — sent to
+  // the back so existing text/stickers/strokes stay on top — and unlocks
+  // filter/adjust/privacy. If a base photo already exists, the imported
+  // photo is added as a regular selectable/movable object instead (so a
+  // second import can't silently replace edits already made to the first).
+  const importPhoto = async (file) => {
+    if (!file) return;
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+    const url = URL.createObjectURL(file);
+    const img = await fabric.FabricImage.fromURL(url, { crossOrigin: "anonymous" });
+    URL.revokeObjectURL(url);
+    const becomesBase = !imageObjRef.current;
+    const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
+    const w = img.width * scale, h = img.height * scale;
+    img.set({
+      left: (canvas.width - w) / 2, top: (canvas.height - h) / 2,
+      scaleX: scale, scaleY: scale,
+      selectable: !becomesBase, evented: !becomesBase,
+    });
+    canvas.add(img);
+    if (becomesBase) {
+      canvas.sendObjectToBack(img);
+      imageObjRef.current = img;
+      setHasImage(true);
+    }
+    canvas.renderAll();
+    pushHistory();
+  };
+
   const restoreHistory = useCallback(async (index) => {
     const canvas = fabricCanvasRef.current;
     const h = historyRef.current;
@@ -230,11 +292,21 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     canvas.renderAll();
     pushHistory();
   };
+  // Mirrors every object's position (and its own rendered content, via
+  // flipX/flipY) across the canvas's center line — consistent with rotate90
+  // acting on everything, not just the base photo. A no-op with nothing on
+  // the canvas at all (checked by the caller via hasObjects).
   const flip = (axis) => {
-    const img = imageObjRef.current;
-    if (!img) return; // no base photo (blank canvas) — nothing to flip
-    img.set(axis === "x" ? { flipX: !img.flipX } : { flipY: !img.flipY });
-    fabricCanvasRef.current.renderAll();
+    const canvas = fabricCanvasRef.current;
+    if (!canvas || canvas.getObjects().length === 0) return;
+    const { width, height } = canvas;
+    canvas.getObjects().forEach(o => {
+      const w = o.width * o.scaleX, h = o.height * o.scaleY;
+      if (axis === "x") o.set({ left: width - o.left - w, flipX: !o.flipX });
+      else o.set({ top: height - o.top - h, flipY: !o.flipY });
+      o.setCoords();
+    });
+    canvas.renderAll();
     pushHistory();
   };
 
@@ -337,13 +409,25 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     pushHistory();
   };
 
+  // Successive new text/stickers cascade 20px down-right instead of landing
+  // on the exact same spot every time (cycles back once it'd drift too far).
+  const nextAddOffset = () => {
+    const off = addOffsetRef.current;
+    addOffsetRef.current = off + 20 > 160 ? 0 : off + 20;
+    return off;
+  };
+
   // ---- tool: text ----
   const addText = () => {
     const canvas = fabricCanvasRef.current;
+    const off = nextAddOffset();
+    // White+outline reads on a photo; on a blank (white) canvas that same
+    // combo would be invisible, so it defaults to dark ink instead.
+    const hasBase = !!imageObjRef.current;
     const text = new fabric.IText("雙擊編輯文字", {
-      left: canvas.width / 2 - 60, top: canvas.height / 2 - 15,
-      fontSize: 32, fill: "#ffffff", stroke: "#000000", strokeWidth: 1,
-      fontFamily: "sans-serif", fontWeight: 700,
+      left: canvas.width / 2 - 60 + off, top: canvas.height / 2 - 15 + off,
+      fontSize: 32, fontFamily: "sans-serif", fontWeight: 700,
+      ...(hasBase ? { fill: "#ffffff", stroke: "#000000", strokeWidth: 1 } : { fill: "#1a1a1a" }),
     });
     canvas.add(text);
     canvas.setActiveObject(text);
@@ -353,8 +437,9 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   // ---- tool: stickers ----
   const addEmojiSticker = (emoji) => {
     const canvas = fabricCanvasRef.current;
+    const off = nextAddOffset();
     const t = new fabric.FabricText(emoji, {
-      left: canvas.width / 2 - 24, top: canvas.height / 2 - 24, fontSize: 56,
+      left: canvas.width / 2 - 24 + off, top: canvas.height / 2 - 24 + off, fontSize: 56,
     });
     canvas.add(t);
     canvas.setActiveObject(t);
@@ -462,6 +547,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   return {
     canvasElRef, containerRef,
     ready, activeTool, setActiveTool, selectTool, busy, canUndo, canRedo,
+    hasImage, hasObjects, importPhoto,
     aspect, presetFilter, setPresetFilter, brightness, setBrightness, contrast, setContrast,
     saturation, setSaturation, brushColor, setBrushColor, brushWidth, setBrushWidth, privacyMode, setPrivacyMode,
     undo, redo,
@@ -490,23 +576,32 @@ export function renderPhotoEditorDrawer(p) {
           <button onClick={p.applyCrop} style={applyBtnStyle}>套用裁剪</button>
         </div>
       );
-    case "rotate":
+    case "rotate": {
+      const flipDisabled = !p.hasObjects;
+      const flipTitle = flipDisabled ? "畫布上還沒有任何內容可以翻轉" : undefined;
       return (
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={p.rotate90} style={toolBtnStyle}>⟳ 旋轉 90°</button>
-          <button onClick={() => p.flip("x")} style={toolBtnStyle}>⇋ 水平翻轉</button>
-          <button onClick={() => p.flip("y")} style={toolBtnStyle}>⇵ 垂直翻轉</button>
+          <button onClick={() => p.flip("x")} disabled={flipDisabled} title={flipTitle} style={disabledStyle(toolBtnStyle, flipDisabled)}>⇋ 水平翻轉</button>
+          <button onClick={() => p.flip("y")} disabled={flipDisabled} title={flipTitle} style={disabledStyle(toolBtnStyle, flipDisabled)}>⇵ 垂直翻轉</button>
         </div>
       );
+    }
     case "filter":
-      return <DrawerChipRow items={PRESET_FILTERS} activeId={p.presetFilter} onSelect={p.setPresetFilter} />;
+      return (
+        <div>
+          <DrawerChipRow items={PRESET_FILTERS} activeId={p.presetFilter} onSelect={p.setPresetFilter} disabled={!p.hasImage} />
+          {!p.hasImage && <div style={{ fontSize: 11, color: "#777", marginTop: 8 }}>{DISABLED_HINT}</div>}
+        </div>
+      );
     case "adjust":
       return (
         <div>
-          <DrawerSlider label="亮度" value={p.brightness} min={-1} max={1} step={0.05} onChange={p.setBrightness} />
-          <DrawerSlider label="對比" value={p.contrast} min={-1} max={1} step={0.05} onChange={p.setContrast} />
-          <DrawerSlider label="飽和度" value={p.saturation} min={-1} max={1} step={0.05} onChange={p.setSaturation} />
-          <button onClick={p.commitAdjustments} style={applyBtnStyle}>完成調整</button>
+          <DrawerSlider label="亮度" value={p.brightness} min={-1} max={1} step={0.05} onChange={p.setBrightness} disabled={!p.hasImage} />
+          <DrawerSlider label="對比" value={p.contrast} min={-1} max={1} step={0.05} onChange={p.setContrast} disabled={!p.hasImage} />
+          <DrawerSlider label="飽和度" value={p.saturation} min={-1} max={1} step={0.05} onChange={p.setSaturation} disabled={!p.hasImage} />
+          <button onClick={p.commitAdjustments} disabled={!p.hasImage} style={disabledStyle(applyBtnStyle, !p.hasImage)}>完成調整</button>
+          {!p.hasImage && <div style={{ fontSize: 11, color: "#777", marginTop: 4 }}>{DISABLED_HINT}</div>}
         </div>
       );
     case "text":
@@ -541,20 +636,22 @@ export function renderPhotoEditorDrawer(p) {
           <div style={{ fontSize: 11, color: "#777" }}>提示：點擊已畫的線條可將其刪除（橡皮擦）</div>
         </div>
       );
-    case "privacy":
+    case "privacy": {
+      const d = !p.hasImage;
       return (
         <div>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <button onClick={() => p.setPrivacyMode("pixelate")} style={{ ...toolBtnStyle, background: p.privacyMode === "pixelate" ? "var(--accent)" : "#222" }}>馬賽克</button>
-            <button onClick={() => p.setPrivacyMode("blur")} style={{ ...toolBtnStyle, background: p.privacyMode === "blur" ? "var(--accent)" : "#222" }}>模糊</button>
+            <button onClick={() => p.setPrivacyMode("pixelate")} disabled={d} style={disabledStyle({ ...toolBtnStyle, background: p.privacyMode === "pixelate" ? "var(--accent)" : "#222" }, d)}>馬賽克</button>
+            <button onClick={() => p.setPrivacyMode("blur")} disabled={d} style={disabledStyle({ ...toolBtnStyle, background: p.privacyMode === "blur" ? "var(--accent)" : "#222" }, d)}>模糊</button>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={p.startPrivacySelection} style={toolBtnStyle}>+ 新增遮蔽區域</button>
-            <button onClick={p.applyPrivacyRegion} style={applyBtnStyle}>套用</button>
+            <button onClick={p.startPrivacySelection} disabled={d} style={disabledStyle(toolBtnStyle, d)}>+ 新增遮蔽區域</button>
+            <button onClick={p.applyPrivacyRegion} disabled={d} style={disabledStyle(applyBtnStyle, d)}>套用</button>
           </div>
-          <div style={{ fontSize: 11, color: "#777", marginTop: 8 }}>拖曳/縮放白色方框對準要遮蔽的區域，再按套用</div>
+          <div style={{ fontSize: 11, color: "#777", marginTop: 8 }}>{d ? DISABLED_HINT : "拖曳/縮放白色方框對準要遮蔽的區域，再按套用"}</div>
         </div>
       );
+    }
     default:
       return null;
   }
@@ -565,3 +662,7 @@ const toolBtnStyle = {
   background: "#222", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
 };
 const applyBtnStyle = { ...toolBtnStyle, marginTop: 10, width: "100%", background: "var(--accent)", border: "none" };
+
+function disabledStyle(base, disabled) {
+  return disabled ? { ...base, opacity: 0.4, cursor: "not-allowed" } : base;
+}

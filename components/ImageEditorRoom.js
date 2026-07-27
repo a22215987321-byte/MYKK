@@ -10,10 +10,11 @@ import useIsMobile from "../lib/useIsMobile";
 // visible the whole time, nothing covers the screen.
 //
 // Entry flow differs by device: desktop drops straight into a blank canvas
-// (no photo required — crop/filter/adjust/mosaic just have nothing to act
-// on until a photo is imported via the editor's own 匯入照片 button); mobile
-// stays photo-first, but via the camera directly instead of a generic
-// "choose a file" prompt.
+// (no photo required — crop/filter/adjust/mosaic are greyed out until a
+// photo is imported via the editor's own 匯入照片 button, which adds it into
+// the current canvas rather than starting over); mobile defaults to the
+// camera directly instead of a generic "choose a file" prompt, but can also
+// start blank.
 export default function ImageEditorRoom() {
   const isMobile = useIsMobile();
   const [originalFile, setOriginalFile] = useState(null);
@@ -38,10 +39,12 @@ export default function ImageEditorRoom() {
 
   const pickFile = () => fileInputRef.current?.click();
   const takePhoto = () => cameraInputRef.current?.click();
+  const startBlank = () => { setOriginalFile(null); setEditingPhoto(true); };
 
-  // Shared by the file picker, camera capture, clipboard paste, and the
-  // editor's own "匯入照片" button — "attach/replace the photo" only has one
-  // code path regardless of how it arrived.
+  // Shared by the file picker, camera capture, and clipboard paste — "open
+  // the editor with this photo" only has one code path regardless of how
+  // the file arrived. (The editor's own "匯入照片" button is separate: it
+  // adds a photo into an already-open session instead of starting one.)
   const attachFile = (file) => {
     if (!file) return;
     setResult(prev => { if (prev?.url) URL.revokeObjectURL(prev.url); return null; });
@@ -129,7 +132,6 @@ export default function ImageEditorRoom() {
                 setResult({ url: URL.createObjectURL(blob), blob });
                 setEditingPhoto(false);
               }}
-              onImportPhoto={(file) => setOriginalFile(file)}
             />
           </div>
         )}
@@ -138,7 +140,7 @@ export default function ImageEditorRoom() {
           <div style={{ textAlign: "center", color: "var(--text-dim)" }}>
             <div style={{ fontSize: 56, marginBottom: 16 }}>📷</div>
             <div style={{ fontSize: 16, color: "var(--text-faint)", marginBottom: 8 }}>拍張照片開始編輯</div>
-            <div style={{ fontSize: 13, marginBottom: 20, color: "var(--text-dim)" }}>拍完照直接進入編輯，也可以從相簿選擇或直接貼上截圖</div>
+            <div style={{ fontSize: 13, marginBottom: 20, color: "var(--text-dim)" }}>拍完照直接進入編輯，也可以從相簿選擇、直接貼上截圖，或不用照片直接畫</div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={takePhoto}
                 style={{ background: "linear-gradient(135deg,#2563eb,var(--accent-active))", border: "none", borderRadius: "var(--radius-md)", padding: "10px 24px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
@@ -147,6 +149,10 @@ export default function ImageEditorRoom() {
               <button onClick={pickFile}
                 style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 24px", color: "var(--text)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                 從相簿選擇
+              </button>
+              <button onClick={startBlank}
+                style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 24px", color: "var(--text)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                空白畫布
               </button>
             </div>
           </div>
