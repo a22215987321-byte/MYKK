@@ -55,8 +55,11 @@ export default function EmojiStickerPicker({ isMobile, onClose, onInsertEmoji, o
 
   const searchResults = useMemo(() => (query.trim() ? searchGestureItems(query) : null), [query]);
 
+  // "faces"（表情）貼圖要能跟文字混在一起打字、一起送出，所以不管 item.type
+  // 是 emoji 還是 sticker 都走插入輸入框那條路；只有「手勢」是點了就直接送出
+  // 的快速反應。
   function isDirectSend(item, packId) {
-    return packId === "gestures" || item.type === "sticker";
+    return packId === "gestures";
   }
 
   function handlePick(item, packId) {
@@ -66,7 +69,9 @@ export default function EmojiStickerPicker({ isMobile, onClose, onInsertEmoji, o
       onSendItem({ ...item, packId });
       onClose();
     } else {
-      onInsertEmoji(item.emoji);
+      // 圖片貼圖沒有 emoji 字元可以插入文字框，改插入一段代碼
+      // （[[sticker:id]]），訊息渲染那邊會把代碼換成小圖或大圖。
+      onInsertEmoji(item.type === "sticker" ? `[[sticker:${item.id}]]` : item.emoji);
     }
   }
 

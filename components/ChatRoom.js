@@ -27,7 +27,7 @@ import AiChatRoom from "./AiChatRoom";
 import EmojiStickerPicker from "./EmojiStickerPicker";
 import LoadingState from "./LoadingState";
 import useIsMobile from "../lib/useIsMobile";
-import { QUICK_REACTIONS } from "../data/chat/gesturePacks";
+import { QUICK_REACTIONS, STICKER_SRC_BY_ID } from "../data/chat/gesturePacks";
 import { ChevronLeft, ChevronRight, CalendarDays, Settings, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
 import {
   doc, collection, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
@@ -67,6 +67,43 @@ function getStatus(status) {
     case "dnd":    return { label: "勿擾", color: "#ef4444" };
     default:       return { label: "離線",    color: "#6b7280" };
   }
+}
+
+// 表情貼圖插入文字時用的代碼（見 EmojiStickerPicker 的 handlePick），
+// 這裡在渲染訊息文字時把代碼換回圖片：整則訊息只有一個代碼＝貼圖大小獨立顯示，
+// 代碼混在其他文字中間＝縮成跟文字同高的小圖，行為隨代碼在訊息裡的位置決定。
+const STICKER_TOKEN_RE = /\[\[sticker:([\w-]+)\]\]/g;
+
+function isSoloStickerToken(text) {
+  if (!text) return false;
+  const matches = [...text.matchAll(STICKER_TOKEN_RE)];
+  return matches.length === 1 && text.trim() === matches[0][0];
+}
+
+function renderMessageText(text) {
+  if (!text) return text;
+  const matches = [...text.matchAll(STICKER_TOKEN_RE)];
+  if (matches.length === 0) return text;
+
+  if (isSoloStickerToken(text)) {
+    const src = STICKER_SRC_BY_ID[matches[0][1]];
+    return src
+      ? <img src={src} alt="" style={{ width: 120, height: 120, objectFit: "contain", display: "block" }} />
+      : text;
+  }
+
+  const parts = [];
+  let last = 0;
+  matches.forEach((m, i) => {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const src = STICKER_SRC_BY_ID[m[1]];
+    parts.push(src
+      ? <img key={i} src={src} alt="" style={{ height: "1.5em", width: "1.5em", objectFit: "contain", verticalAlign: "middle", margin: "0 1px" }} />
+      : m[0]);
+    last = m.index + m[0].length;
+  });
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
 }
 
 // Avatar helper
@@ -139,6 +176,10 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
   const hasMedia = msg.imageUrl || msg.videoUrl;
   const isEmojiMsg = msg.type === "emoji";
   const isStickerMsg = msg.type === "sticker";
+  // 純文字訊息，但整則內容就是一個 [[sticker:id]] 代碼（表情面板插入的貼圖，
+  // 沒有跟其他文字混在一起）——外觀比照 isStickerMsg，跟文字混用時則維持
+  // 普通文字泡泡、代碼縮小成行內圖片（見下面 renderMessageText）。
+  const soloSticker = !isEmojiMsg && !isStickerMsg && isSoloStickerToken(msg.text);
   const activeReactions = Object.entries(msg.reactions || {}).filter(([, uids]) => uids?.length > 0);
 
   return (
@@ -181,11 +222,11 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start" }}>
           {!isMine && showSender && <span style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 3, marginLeft: 2 }}>{msg.sender}</span>}
           <div onDoubleClick={() => setShowPicker(v => !v)} style={{
-            padding: isEmojiMsg ? 0 : isStickerMsg ? 4 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
+            padding: isEmojiMsg ? 0 : (isStickerMsg || soloSticker) ? 4 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
             borderRadius: isEmojiMsg ? 0 : (isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px"),
-            background: isEmojiMsg ? "none" : isStickerMsg ? "var(--panel-alt)" : (isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)"),
+            background: isEmojiMsg ? "none" : (isStickerMsg || soloSticker) ? "var(--panel-alt)" : (isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)"),
             color: isMine ? "#fff" : "var(--text)", fontSize: 14, lineHeight: 1.5, cursor: "default",
-            border: isEmojiMsg ? "none" : isStickerMsg ? "1px solid var(--border)" : (isMine ? "none" : "1px solid var(--border)"),
+            border: isEmojiMsg ? "none" : (isStickerMsg || soloSticker) ? "1px solid var(--border)" : (isMine ? "none" : "1px solid var(--border)"),
             backdropFilter: isEmojiMsg ? "none" : "var(--panel-blur)", WebkitBackdropFilter: isEmojiMsg ? "none" : "var(--panel-blur)",
             overflow: "hidden",
           }}>
@@ -206,7 +247,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
                 {msg.imageUrl && (
                   <img src={msg.imageUrl} alt="圖片" style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
                 )}
-                {msg.text}
+                {renderMessageText(msg.text)}
               </>
             )}
           </div>

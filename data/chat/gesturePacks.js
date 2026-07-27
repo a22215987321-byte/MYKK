@@ -102,6 +102,11 @@ export const gesturePacks = [
 // 手機聊天輸入欄快速反應（長按訊息 / hover 訊息時顯示的預設 7 個）。
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "👏", "🙏"];
 
+// id → 圖片路徑，給訊息渲染那邊把文字裡的 [[sticker:id]] 代碼換成小圖用。
+export const STICKER_SRC_BY_ID = Object.fromEntries(
+  gesturePacks.flatMap(p => p.items.filter(i => i.type === "sticker").map(i => [i.id, i.src]))
+);
+
 export function findGesturePackItem(id) {
   for (const pack of gesturePacks) {
     const item = pack.items.find(i => i.id === id);
