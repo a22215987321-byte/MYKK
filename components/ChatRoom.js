@@ -121,7 +121,7 @@ function AvatarImg({ avatarImage, avatar, color, size = 36 }) {
 
 // MessageBubble
 
-function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
+function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFontSize = 14 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [tapped, setTapped] = useState(false);
@@ -225,13 +225,13 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
             padding: isEmojiMsg || isStickerMsg || soloSticker ? 0 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
             borderRadius: isEmojiMsg ? 0 : (isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px"),
             background: isEmojiMsg || isStickerMsg || soloSticker ? "none" : (isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)"),
-            color: isMine ? "#fff" : "var(--text)", fontSize: 14, lineHeight: 1.5, cursor: "default",
+            color: isMine ? "#fff" : "var(--text)", fontSize: msgFontSize, lineHeight: 1.5, cursor: "default",
             border: isEmojiMsg || isStickerMsg || soloSticker ? "none" : (isMine ? "none" : "1px solid var(--border)"),
             backdropFilter: isEmojiMsg || isStickerMsg || soloSticker ? "none" : "var(--panel-blur)", WebkitBackdropFilter: isEmojiMsg || isStickerMsg || soloSticker ? "none" : "var(--panel-blur)",
             overflow: "hidden",
           }}>
             {isEmojiMsg ? (
-              <span style={{ fontSize: 42, lineHeight: 1, display: "block" }}>{msg.text}</span>
+              <span style={{ fontSize: 42 * (msgFontSize / 14), lineHeight: 1, display: "block" }}>{msg.text}</span>
             ) : isStickerMsg ? (
               <div onClick={e => { e.stopPropagation(); setPreview(true); }} data-sticker-message={msg.stickerId || ""}
                 style={{ width: 160, height: 160, maxWidth: 160, maxHeight: 160, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in" }}>
@@ -801,6 +801,78 @@ export default function ChatApp({ user }) {
   useEffect(() => {
     try { localStorage.setItem("cr-sidebar-collapsed", sidebarCollapsed ? "1" : "0"); } catch {}
   }, [sidebarCollapsed]);
+
+  // 桌面版可拖曳調整寬度：側欄跟日曆欄各自的寬度、拖完存 localStorage，
+  // 中間 <main> 本來就是 flex:1，兩邊寬度一變它自動跟著縮放，不用另外處理。
+  const SIDEBAR_DEFAULT_WIDTH = 280;
+  const CAL_DEFAULT_WIDTH = 252;
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const [calWidth, setCalWidth] = useState(CAL_DEFAULT_WIDTH);
+  const [resizingPanel, setResizingPanel] = useState(null); // "sidebar" | "cal" | null — suppresses the width transition mid-drag
+
+  useEffect(() => {
+    try {
+      const sw = parseInt(localStorage.getItem("cr-sidebar-width"), 10);
+      if (sw >= 220 && sw <= 420) setSidebarWidth(sw);
+      const cw = parseInt(localStorage.getItem("cr-cal-width"), 10);
+      if (cw >= 200 && cw <= 420) setCalWidth(cw);
+    } catch {}
+  }, []);
+
+  const startPanelResize = useCallback((e, which) => {
+    e.preventDefault();
+    setResizingPanel(which);
+    const startX = e.clientX;
+    const startWidth = which === "sidebar" ? sidebarWidth : calWidth;
+    const setW = which === "sidebar" ? setSidebarWidth : setCalWidth;
+    const min = which === "sidebar" ? 220 : 200;
+    const max = 420;
+    const onMove = (ev) => {
+      // Calendar panel sits on the right edge, so dragging it right should
+      // shrink it (not grow) — flip the delta's sign for that one handle.
+      const dx = which === "sidebar" ? (ev.clientX - startX) : (startX - ev.clientX);
+      setW(Math.min(max, Math.max(min, startWidth + dx)));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      setResizingPanel(null);
+      setW(w => {
+        try { localStorage.setItem(which === "sidebar" ? "cr-sidebar-width" : "cr-cal-width", String(w)); } catch {}
+        return w;
+      });
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [sidebarWidth, calWidth]);
+
+  // 聊天訊息文字大小（可調整、可復原），表情/貼圖用相對單位（em）或按比例縮放，
+  // 跟著這個設定一起變大變小。控制項在 ThemeToggle 的設定選單裡（見下方 <ThemeToggle>）。
+  const DEFAULT_MSG_FONT_SIZE = 14;
+  const [msgFontSize, setMsgFontSizeState] = useState(DEFAULT_MSG_FONT_SIZE);
+
+  useEffect(() => {
+    try {
+      const fs = parseInt(localStorage.getItem("cr-msg-font-size"), 10);
+      if (fs >= 10 && fs <= 30) setMsgFontSizeState(fs);
+    } catch {}
+  }, []);
+
+  const setMsgFontSize = useCallback((size) => {
+    const clamped = Math.min(30, Math.max(10, size));
+    setMsgFontSizeState(clamped);
+    try { localStorage.setItem("cr-msg-font-size", String(clamped)); } catch {}
+  }, []);
+
+  const resetPanelWidth = useCallback((which) => {
+    if (which === "sidebar") {
+      setSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
+      try { localStorage.setItem("cr-sidebar-width", String(SIDEBAR_DEFAULT_WIDTH)); } catch {}
+    } else {
+      setCalWidth(CAL_DEFAULT_WIDTH);
+      try { localStorage.setItem("cr-cal-width", String(CAL_DEFAULT_WIDTH)); } catch {}
+    }
+  }, []);
 
   const resetAllViews = useCallback(() => {
     setActiveFriendId(null); setActiveGroupId(null);
@@ -1812,11 +1884,11 @@ export default function ChatApp({ user }) {
             由 sidebarOpen 狀態＋拖曳時的即時 transform 控制（見 applyDrawerTransform）。
             桌面版另外還有 sidebarCollapsed（收合成寬度 0，跟手機抽屜是兩套獨立機制）。 */}
         <nav ref={sidebarElRef} className="cr-sidebar" aria-label="聊天導覽" aria-hidden={!isMobile && sidebarCollapsed} style={{
-          width: (!isMobile && sidebarCollapsed) ? 0 : 280,
+          width: (!isMobile && sidebarCollapsed) ? 0 : sidebarWidth,
           background: "var(--panel-alt)",
           borderRight: (!isMobile && sidebarCollapsed) ? "none" : "1px solid var(--panel)",
           display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden",
-          transition: isMobile ? undefined : "width 0.25s ease, border-color 0.25s ease",
+          transition: (isMobile || resizingPanel === "sidebar") ? undefined : "width 0.25s ease, border-color 0.25s ease",
         }}>
 
           {/* My info — 手機版壓縮高度、拿掉桌面版才有的 ThemeToggle/登出（已移到手機版頂部列） */}
@@ -1851,7 +1923,9 @@ export default function ChatApp({ user }) {
                   {myProfile.statusText && <div style={{ fontSize: 11, color: "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myProfile.statusText}</div>}
                 </div>
                 <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                  <ThemeToggle mode="inline" onOpenProfile={() => setShowProfile(true)} />
+                  <ThemeToggle mode="inline" onOpenProfile={() => setShowProfile(true)}
+                    msgFontSize={msgFontSize} onChangeMsgFontSize={setMsgFontSize}
+                    onResetMsgFontSize={() => setMsgFontSize(DEFAULT_MSG_FONT_SIZE)} />
                   <button onClick={() => auth.signOut()} title="登出" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>🚪</button>
                 </div>
               </div>
@@ -2117,6 +2191,20 @@ export default function ChatApp({ user }) {
           </div>
         </nav>
 
+        {/* 側欄寬度拖曳把手：只在展開狀態顯示，雙擊復原成預設寬度。 */}
+        {!isMobile && !sidebarCollapsed && (
+          <div
+            onMouseDown={e => startPanelResize(e, "sidebar")}
+            onDoubleClick={() => resetPanelWidth("sidebar")}
+            title="拖曳調整寬度（雙擊復原預設）"
+            style={{
+              width: 6, flexShrink: 0, cursor: "col-resize",
+              background: resizingPanel === "sidebar" ? "var(--accent)" : "transparent",
+              marginLeft: -3, marginRight: -3, zIndex: 30, position: "relative",
+            }}
+          />
+        )}
+
         {/* 桌面版收合/展開開關：故意當 cr-sidebar 的 sibling（不是它的子元素），
             這樣 nav 收合到寬度 0、overflow:hidden 裁掉內部內容時，這顆按鈕不會被
             一起裁掉——收合後它剛好貼著畫面左邊界，同一顆鈕兼作「展開入口」，
@@ -2129,14 +2217,14 @@ export default function ChatApp({ user }) {
             aria-label={sidebarCollapsed ? "展開導覽列" : "收合導覽列"}
             style={{
               position: "absolute", top: 16,
-              left: sidebarCollapsed ? 4 : 268,
+              left: sidebarCollapsed ? 4 : sidebarWidth - 12,
               zIndex: 40,
               width: 28, height: 28, borderRadius: "50%",
               background: "var(--panel)", border: "1px solid var(--border)",
               color: "var(--text-muted)", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
               boxShadow: "var(--card-shadow)",
-              transition: "left 0.25s ease",
+              transition: resizingPanel === "sidebar" ? undefined : "left 0.25s ease",
             }}>
             {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
@@ -2438,7 +2526,7 @@ export default function ChatApp({ user }) {
                   );
                   const isMine = msg.senderId === uid;
                   const showSender = !isMine && hallMessages[i-1]?.senderId !== msg.senderId;
-                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["hall_messages", msg.id]} />;
+                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["hall_messages", msg.id]} msgFontSize={msgFontSize} />;
                 })}
                 <div ref={messagesEndRef} />
               </div>
@@ -2496,7 +2584,7 @@ export default function ChatApp({ user }) {
                 </div>
                 {privateMessages.map((msg, i) => {
                   const isMine = msg.senderId === uid;
-                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={!isMine && privateMessages[i-1]?.senderId !== msg.senderId} myUid={uid} collectionPath={["private_chats", chatId, "messages", msg.id]} />;
+                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={!isMine && privateMessages[i-1]?.senderId !== msg.senderId} myUid={uid} collectionPath={["private_chats", chatId, "messages", msg.id]} msgFontSize={msgFontSize} />;
                 })}
                 <div ref={messagesEndRef} />
               </div>
@@ -2550,7 +2638,7 @@ export default function ChatApp({ user }) {
                 {groupMessages.map((msg, i) => {
                   const isMine = msg.senderId === uid;
                   const showSender = !isMine && groupMessages[i-1]?.senderId !== msg.senderId;
-                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["groups", activeGroupId, "messages", msg.id]} />;
+                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["groups", activeGroupId, "messages", msg.id]} msgFontSize={msgFontSize} />;
                 })}
                 <div ref={messagesEndRef} />
               </div>
@@ -2594,8 +2682,22 @@ export default function ChatApp({ user }) {
           />
         )}
 
+        {/* 日曆欄寬度拖曳把手：只在桌面版顯示，雙擊復原成預設寬度。 */}
+        {!isMobile && (
+          <div
+            onMouseDown={e => startPanelResize(e, "cal")}
+            onDoubleClick={() => resetPanelWidth("cal")}
+            title="拖曳調整寬度（雙擊復原預設）"
+            style={{
+              width: 6, flexShrink: 0, cursor: "col-resize",
+              background: resizingPanel === "cal" ? "var(--accent)" : "transparent",
+              marginLeft: -3, marginRight: -3, zIndex: 30, position: "relative",
+            }}
+          />
+        )}
+
         {/* Right panel: calendar overlay on mobile, sidebar on desktop */}
-        <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{ width: 252, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", borderLeft: "1px solid var(--panel)" }}>
+        <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{ width: calWidth, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", borderLeft: "1px solid var(--panel)", transition: resizingPanel === "cal" ? undefined : "width 0.2s ease" }}>
           {isMobile && (
             <div style={{ padding: "calc(env(safe-area-inset-top) + 8px) 14px 8px", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
               <span style={{ flex: 1, fontWeight: 700, fontSize: 14, color: "var(--text)" }}>📅 日曆備忘錄</span>

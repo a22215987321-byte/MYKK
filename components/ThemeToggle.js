@@ -68,7 +68,7 @@ function PaletteGrid({ selected, onSelect }) {
   );
 }
 
-export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp = false }) {
+export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp = false, msgFontSize, onChangeMsgFontSize, onResetMsgFontSize }) {
   const [theme, setTheme] = useState("default");
   const [pastelPalette, setPastelPalette] = useState(DEFAULT_PASTEL_PALETTE);
   const [open, setOpen] = useState(false);
@@ -192,6 +192,23 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
             >
               👤 個人資料設定
             </button>
+          )}
+          {onChangeMsgFontSize && (
+            <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-soft)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>訊息文字大小</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{msgFontSize}</span>
+                  <button onClick={onResetMsgFontSize} title="復原預設值"
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "1px 6px", color: "var(--text-faint)", fontSize: 11, cursor: "pointer" }}>
+                    復原
+                  </button>
+                </div>
+              </div>
+              <input type="range" min={10} max={30} step={1} value={msgFontSize}
+                onChange={e => onChangeMsgFontSize(Number(e.target.value))}
+                style={{ width: "100%", cursor: "pointer" }} />
+            </div>
           )}
           {THEMES.map(t => (
             <button
