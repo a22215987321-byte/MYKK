@@ -59,9 +59,9 @@ export default function AiChatRoom() {
     <>
       {/* Header */}
       <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
-        <span style={{ fontSize: 20 }}>🤖</span>
+        <img src="/ai-avatar.png" alt="EVON AI" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
         <div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>AI 助手</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>1.0 EVON AI</div>
           <div style={{ fontSize: 11, color: "var(--text-faint)" }}>有問題都可以問我</div>
         </div>
       </div>
@@ -70,7 +70,6 @@ export default function AiChatRoom() {
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
         {messages.length === 0 && (
           <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "80px 0" }}>
-            <div style={{ fontSize: 48, marginBottom: 14 }}>🤖</div>
             <div style={{ fontSize: 14 }}>打個招呼開始對話吧</div>
           </div>
         )}
@@ -96,48 +95,48 @@ export default function AiChatRoom() {
         <div ref={endRef} />
       </div>
 
-      {/* Model picker */}
-      <div ref={modelMenuRef} style={{ position: "relative", padding: "8px 16px 0", flexShrink: 0 }}>
-        <button onClick={() => setModelMenuOpen(v => !v)}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 999,
-            padding: "6px 14px", color: "var(--text)", fontSize: 12, fontWeight: 600, cursor: "pointer",
-          }}>
-          🤖 {model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
-        </button>
-
-        {modelMenuOpen && (
-          <div style={{
-            position: "absolute", bottom: "calc(100% + 6px)", left: 16,
-            background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
-            boxShadow: "var(--card-shadow)", overflow: "hidden", zIndex: 20, minWidth: 210,
-          }}>
-            {MODELS.map(m => (
-              <button key={m.id} onClick={() => { setModel(m.id); setModelMenuOpen(false); }}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%",
-                  padding: "10px 14px", background: "none", border: "none",
-                  color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer",
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
-                onMouseLeave={e => e.currentTarget.style.background = "none"}>
-                <span>{m.label}</span>
-                {model === m.id && <span>✓</span>}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Input */}
+      {/* Input row — model picker sits directly to the left of 傳送 */}
       <div style={{ padding: "12px 16px", borderTop: "1px solid var(--panel)", display: "flex", gap: 8, flexShrink: 0 }}>
         <input type="text" value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && send()}
           placeholder="輸入訊息..." disabled={sending}
           style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
+
+        <div ref={modelMenuRef} style={{ position: "relative", flexShrink: 0 }}>
+          <button onClick={() => setModelMenuOpen(v => !v)}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6, height: "100%",
+              background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 999,
+              padding: "0 14px", color: "var(--text)", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+            }}>
+            {model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
+          </button>
+
+          {modelMenuOpen && (
+            <div style={{
+              position: "absolute", bottom: "calc(100% + 6px)", right: 0,
+              background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
+              boxShadow: "var(--card-shadow)", overflow: "hidden", zIndex: 20, minWidth: 210,
+            }}>
+              {MODELS.map(m => (
+                <button key={m.id} onClick={() => { setModel(m.id); setModelMenuOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%",
+                    padding: "10px 14px", background: "none", border: "none",
+                    color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "none"}>
+                  <span>{m.label}</span>
+                  {model === m.id && <span>✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button onClick={send} disabled={sending || !input.trim()}
-          style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 18px", color: "var(--accent-text)", fontSize: 14, fontWeight: 600, cursor: sending ? "default" : "pointer", opacity: sending || !input.trim() ? 0.6 : 1 }}>
+          style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 18px", color: "var(--accent-text)", fontSize: 14, fontWeight: 600, cursor: sending ? "default" : "pointer", opacity: sending || !input.trim() ? 0.6 : 1, flexShrink: 0 }}>
           傳送
         </button>
       </div>
