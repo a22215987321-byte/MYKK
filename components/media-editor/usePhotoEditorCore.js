@@ -269,13 +269,17 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     URL.revokeObjectURL(url);
     const becomesBase = !imageObjRef.current;
     const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
-    const w = img.width * scale, h = img.height * scale;
     img.set({
-      left: (canvas.width - w) / 2, top: (canvas.height - h) / 2,
       scaleX: scale, scaleY: scale,
       selectable: !becomesBase, evented: !becomesBase,
     });
     canvas.add(img);
+    // canvas.centerObject() instead of hand-rolled left/top math — it
+    // accounts for the object's actual origin/transform internally, so it
+    // can't drift off-center the way manually computing (canvas.width-w)/2
+    // did (the imported photo was landing top-left-biased instead of centered).
+    canvas.centerObject(img);
+    img.setCoords();
     if (becomesBase) {
       canvas.sendObjectToBack(img);
       imageObjRef.current = img;
@@ -481,8 +485,10 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     const img = await fabric.FabricImage.fromURL(url);
     const canvas = fabricCanvasRef.current;
     const scale = Math.min(1, (canvas.width * 0.4) / img.width);
-    img.set({ left: canvas.width / 2 - (img.width * scale) / 2, top: canvas.height / 2 - (img.height * scale) / 2, scaleX: scale, scaleY: scale });
+    img.set({ scaleX: scale, scaleY: scale });
     canvas.add(img);
+    canvas.centerObject(img); // same centering fix as importPhoto — see its comment
+    img.setCoords();
     canvas.setActiveObject(img);
     canvas.renderAll();
     URL.revokeObjectURL(url);
