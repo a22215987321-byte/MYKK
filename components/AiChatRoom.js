@@ -5,6 +5,8 @@ import { toast } from "../lib/toast";
 const MODELS = [
   { id: "deepseek-v4-flash", label: "deepseek-v4-flash" },
   { id: "deepseek-v4-pro", label: "deepseek-v4-pro" },
+  { id: "claude-sonnet", label: "Claude Sonnet 4.6" },
+  { id: "gpt-5", label: "GPT-5.2" },
 ];
 
 // Standalone "AI 助手" room — a simple chat UI backed by pages/api/ai/chat.js
