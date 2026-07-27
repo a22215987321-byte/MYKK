@@ -4,6 +4,8 @@
 // single provider.
 const MAX_MESSAGES = 20;
 const MAX_CONTENT_LENGTH = 4000;
+const ALLOWED_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro"];
+const DEFAULT_MODEL = ALLOWED_MODELS[0];
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -11,10 +13,15 @@ export default async function handler(req, res) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "AI 服務尚未設定" });
 
-  const { messages } = req.body || {};
+  const { messages, model } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "invalid messages" });
   }
+  // Never forward an arbitrary client-supplied string straight into the
+  // upstream request — fall back to the default for anything not on the
+  // allow-list instead of rejecting outright, since a stale/unknown value
+  // shouldn't hard-fail the whole chat.
+  const selectedModel = ALLOWED_MODELS.includes(model) ? model : DEFAULT_MODEL;
   const cleaned = messages.slice(-MAX_MESSAGES).map(m => ({
     role: m.role === "assistant" ? "assistant" : "user",
     content: String(m.content || "").slice(0, MAX_CONTENT_LENGTH),
@@ -27,7 +34,7 @@ export default async function handler(req, res) {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "deepseek-v4-flash",
+        model: selectedModel,
         messages: [{ role: "system", content: "你是 EVONCHAT 裡的 AI 助手，用繁體中文回覆，語氣自然親切。" }, ...cleaned],
         stream: false,
       }),

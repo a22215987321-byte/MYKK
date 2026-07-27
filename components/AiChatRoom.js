@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { toast } from "../lib/toast";
 
+const MODELS = [
+  { id: "deepseek-v4-flash", label: "deepseek-v4-flash" },
+  { id: "deepseek-v4-pro", label: "deepseek-v4-pro" },
+];
+
 // Standalone "AI 助手" room — a simple chat UI backed by pages/api/ai/chat.js
 // (DeepSeek, server-side only). Conversation only lives in local state for
 // now; nothing is persisted to Firestore.
@@ -8,11 +13,24 @@ export default function AiChatRoom() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [model, setModel] = useState(MODELS[0].id);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const endRef = useRef(null);
+  const modelMenuRef = useRef(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, sending]);
+
+  // Click-outside-to-close, same pattern as ThemeToggle's dropdown.
+  useEffect(() => {
+    if (!modelMenuOpen) return;
+    const onClickOutside = e => {
+      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target)) setModelMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [modelMenuOpen]);
 
   const send = async () => {
     const text = input.trim();
@@ -25,7 +43,7 @@ export default function AiChatRoom() {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({ messages: next, model }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "AI 服務發生錯誤");
@@ -76,6 +94,40 @@ export default function AiChatRoom() {
           </div>
         )}
         <div ref={endRef} />
+      </div>
+
+      {/* Model picker */}
+      <div ref={modelMenuRef} style={{ position: "relative", padding: "8px 16px 0", flexShrink: 0 }}>
+        <button onClick={() => setModelMenuOpen(v => !v)}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 999,
+            padding: "6px 14px", color: "var(--text)", fontSize: 12, fontWeight: 600, cursor: "pointer",
+          }}>
+          🤖 {model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
+        </button>
+
+        {modelMenuOpen && (
+          <div style={{
+            position: "absolute", bottom: "calc(100% + 6px)", left: 16,
+            background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
+            boxShadow: "var(--card-shadow)", overflow: "hidden", zIndex: 20, minWidth: 210,
+          }}>
+            {MODELS.map(m => (
+              <button key={m.id} onClick={() => { setModel(m.id); setModelMenuOpen(false); }}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%",
+                  padding: "10px 14px", background: "none", border: "none",
+                  color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}>
+                <span>{m.label}</span>
+                {model === m.id && <span>✓</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Input */}
