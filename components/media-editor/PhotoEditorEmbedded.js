@@ -2,11 +2,17 @@ import { useRef, useState } from "react";
 import { ToolButton, IconButton, DrawerChipRow } from "./EditorShell";
 import useIsMobile from "../../lib/useIsMobile";
 import usePhotoEditorCore, {
-  renderPhotoEditorDrawer, TOOLS, MOBILE_TOOLS, EDIT_GROUP_IDS, toolById, withPhotoToolState,
+  renderPhotoEditorDrawer, TOOLS, MOBILE_TOOLS, EDIT_GROUP_IDS, TRIM_TOOL, toolById, withPhotoToolState,
 } from "./usePhotoEditorCore";
 import TextPanel from "./TextPanel";
 
 const ZOOM_OPTIONS = [50, 75, 100, 125, 150, 200, 300, 400];
+// 去除留白 only exists here (see TRIM_TOOL) — appended after 馬賽克 on desktop's
+// full strip, folded into mobile's 編輯 hub alongside the other "whole
+// canvas" tools instead of a 6th direct icon.
+const DESKTOP_TOOLS = [...TOOLS, TRIM_TOOL];
+const EMBEDDED_EDIT_GROUP_IDS = [...EDIT_GROUP_IDS, "trim"];
+const embeddedToolById = (id) => (id === "trim" ? TRIM_TOOL : toolById(id));
 
 // Inline/embedded layout for the standalone 圖片編輯室 (ImageEditorRoom) —
 // same canvas/tool/history logic as the fullscreen PhotoEditor (both use
@@ -31,7 +37,7 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport 
   } = core;
   const importInputRef = useRef(null);
 
-  const isEditGroupActive = EDIT_GROUP_IDS.includes(activeTool);
+  const isEditGroupActive = EMBEDDED_EDIT_GROUP_IDS.includes(activeTool);
 
   const handleSelectTool = (id) => {
     if (id === "editHub") {
@@ -45,7 +51,7 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport 
 
   const editHubPicker = (
     <DrawerChipRow
-      items={EDIT_GROUP_IDS.map(toolById)}
+      items={EMBEDDED_EDIT_GROUP_IDS.map(embeddedToolById)}
       activeId={null}
       onSelect={(id) => { setActiveTool(id); setEditHubOpen(false); }}
       renderLabel={item => `${item.icon} ${item.label}`}
@@ -59,7 +65,7 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport 
     ? <TextPanel core={core} />
     : (isMobile && editHubOpen && !isEditGroupActive ? editHubPicker : renderPhotoEditorDrawer(core));
 
-  const tools = withPhotoToolState(isMobile ? MOBILE_TOOLS : TOOLS, hasImage);
+  const tools = withPhotoToolState(isMobile ? MOBILE_TOOLS : DESKTOP_TOOLS, hasImage);
   const displayActiveTool = isMobile && (editHubOpen || isEditGroupActive) ? "editHub" : activeTool;
 
   return (

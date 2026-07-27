@@ -59,6 +59,13 @@ export const TOOLS = [
 ];
 export const toolById = id => TOOLS.find(t => t.id === id);
 
+// 去除留白 — deliberately NOT part of TOOLS/MOBILE_TOOLS: it only matters in
+// the embedded 圖片編輯室 (where a blank canvas can leave extra margin around
+// an imported photo). The fullscreen editor always opens already sized to
+// its photo, so it never sees this tool at all — PhotoEditorEmbedded.js
+// appends it to its own tools list instead of it living in the shared arrays.
+export const TRIM_TOOL = { id: "trim", icon: "⛶", label: "去除留白" };
+
 // Mobile bottom strip (fullscreen EditorShell only) collapses the 8 tools
 // down to 5: the 4 "whole image" tools (crop/rotate/adjust/privacy) fold
 // into one centered, raised 編輯 hub button. The embedded layout (圖片編輯
@@ -76,7 +83,7 @@ export const MOBILE_TOOLS = [
 // mosaics/blurs a region of it) — meaningless with no photo loaded yet
 // (blank canvas), so both layouts grey these out and skip straight to a
 // no-op instead of letting the user fiddle with controls that do nothing.
-export const DISABLED_WITHOUT_IMAGE = ["filter", "adjust", "privacy"];
+export const DISABLED_WITHOUT_IMAGE = ["filter", "adjust", "privacy", "trim"];
 export const DISABLED_HINT = "請先匯入照片再使用此工具";
 
 // Augments a TOOLS/MOBILE_TOOLS array with disabled/title for whichever
@@ -268,39 +275,50 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     const img = await fabric.FabricImage.fromURL(url, { crossOrigin: "anonymous" });
     URL.revokeObjectURL(url);
     const becomesBase = !imageObjRef.current;
-
+    const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
+    img.set({
+      scaleX: scale, scaleY: scale,
+      selectable: !becomesBase, evented: !becomesBase,
+    });
+    canvas.add(img);
+    // canvas.centerObject() instead of hand-rolled left/top math — it
+    // accounts for the object's actual origin/transform internally, so it
+    // can't drift off-center the way manually computing (canvas.width-w)/2
+    // did (the imported photo used to land top-left-biased instead of
+    // centered). The canvas itself keeps its current size here — any extra
+    // blank space around the photo is a separate, explicit action (the 去除
+    //留白 tool below), not something importing a photo does on its own.
+    canvas.centerObject(img);
+    img.setCoords();
     if (becomesBase) {
-      // Blank canvas has nothing worth preserving space for yet — resize the
-      // canvas itself to match this photo (same as opening with a file
-      // directly) instead of leaving it at the blank canvas's own, usually
-      // much wider, container-derived size with the photo centered in a
-      // sea of leftover white.
-      const scale = Math.min(1, MAX_EDIT_DIMENSION / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
-      canvas.setDimensions({ width: w, height: h });
-      canvas.backgroundColor = "";
-      img.set({ left: 0, top: 0, scaleX: w / img.width, scaleY: h / img.height, selectable: false, evented: false });
-      canvas.add(img);
       canvas.sendObjectToBack(img);
       imageObjRef.current = img;
       setHasImage(true);
-      setZoomPctState(100);
-      fitCanvasToContainer(canvas, containerRef.current);
-    } else {
-      // Already has a base photo — this one becomes an additional, movable
-      // object layered on top instead (so a second import can't clobber the
-      // first photo's edits).
-      const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
-      img.set({ scaleX: scale, scaleY: scale, selectable: true, evented: true });
-      canvas.add(img);
-      // canvas.centerObject() instead of hand-rolled left/top math — it
-      // accounts for the object's actual origin/transform internally, so it
-      // can't drift off-center the way manually computing (canvas.width-w)/2
-      // did (this used to land top-left-biased instead of centered).
-      canvas.centerObject(img);
-      img.setCoords();
     }
     canvas.renderAll();
+    pushHistory();
+  };
+
+  // 去除留白 — shrinks the canvas down to exactly the base photo's own
+  // bounding box, carrying every other object along by the same offset so
+  // their position relative to the photo doesn't change. A separate,
+  // explicit tool rather than something importPhoto does automatically,
+  // since auto-shrinking surprised users who expected the canvas to stay put.
+  const trimToContent = () => {
+    const canvas = fabricCanvasRef.current;
+    const img = imageObjRef.current;
+    if (!canvas || !img) return;
+    const bounds = img.getBoundingRect();
+    const dx = bounds.left, dy = bounds.top;
+    canvas.getObjects().forEach(o => {
+      o.set({ left: o.left - dx, top: o.top - dy });
+      o.setCoords();
+    });
+    canvas.setDimensions({ width: Math.round(bounds.width), height: Math.round(bounds.height) });
+    canvas.backgroundColor = "";
+    canvas.renderAll();
+    setZoomPctState(100);
+    fitCanvasToContainer(canvas, containerRef.current);
     pushHistory();
   };
 
@@ -669,7 +687,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   return {
     canvasElRef, containerRef,
     ready, activeTool, setActiveTool, selectTool, busy, canUndo, canRedo,
-    hasImage, hasObjects, importPhoto,
+    hasImage, hasObjects, importPhoto, trimToContent,
     aspect, presetFilter, setPresetFilter, brightness, setBrightness, contrast, setContrast,
     saturation, setSaturation, brushColor, setBrushColor, brushWidth, setBrushWidth, privacyMode, setPrivacyMode,
     zoomPct, applyZoomPct, snapEnabled, setSnapEnabled,
@@ -773,6 +791,19 @@ export function renderPhotoEditorDrawer(p) {
             <button onClick={p.applyPrivacyRegion} disabled={d} style={disabledStyle(applyBtnStyle, d)}>套用</button>
           </div>
           <div style={{ fontSize: 11, color: "var(--pe-text-dim)", marginTop: 8 }}>{d ? DISABLED_HINT : "拖曳/縮放白色方框對準要遮蔽的區域，再按套用"}</div>
+        </div>
+      );
+    }
+    // Embedded-only (see TRIM_TOOL) — never reachable from the fullscreen
+    // editor since its TOOLS/MOBILE_TOOLS arrays don't include this id.
+    case "trim": {
+      const d = !p.hasImage;
+      return (
+        <div>
+          <button onClick={p.trimToContent} disabled={d} style={disabledStyle(applyBtnStyle, d)}>套用：移除多餘空白</button>
+          <div style={{ fontSize: 11, color: "var(--pe-text-dim)", marginTop: 8 }}>
+            {d ? DISABLED_HINT : "把畫布縮小到跟目前照片一樣大，去掉周圍多餘的空白區域；畫布上其他物件的相對位置不會改變。"}
+          </div>
         </div>
       );
     }
