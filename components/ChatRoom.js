@@ -222,12 +222,12 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start" }}>
           {!isMine && showSender && <span style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 3, marginLeft: 2 }}>{msg.sender}</span>}
           <div onDoubleClick={() => setShowPicker(v => !v)} style={{
-            padding: isEmojiMsg ? 0 : (isStickerMsg || soloSticker) ? 4 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
+            padding: isEmojiMsg || isStickerMsg || soloSticker ? 0 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
             borderRadius: isEmojiMsg ? 0 : (isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px"),
-            background: isEmojiMsg ? "none" : (isStickerMsg || soloSticker) ? "var(--panel-alt)" : (isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)"),
+            background: isEmojiMsg || isStickerMsg || soloSticker ? "none" : (isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)"),
             color: isMine ? "#fff" : "var(--text)", fontSize: 14, lineHeight: 1.5, cursor: "default",
-            border: isEmojiMsg ? "none" : (isStickerMsg || soloSticker) ? "1px solid var(--border)" : (isMine ? "none" : "1px solid var(--border)"),
-            backdropFilter: isEmojiMsg ? "none" : "var(--panel-blur)", WebkitBackdropFilter: isEmojiMsg ? "none" : "var(--panel-blur)",
+            border: isEmojiMsg || isStickerMsg || soloSticker ? "none" : (isMine ? "none" : "1px solid var(--border)"),
+            backdropFilter: isEmojiMsg || isStickerMsg || soloSticker ? "none" : "var(--panel-blur)", WebkitBackdropFilter: isEmojiMsg || isStickerMsg || soloSticker ? "none" : "var(--panel-blur)",
             overflow: "hidden",
           }}>
             {isEmojiMsg ? (
