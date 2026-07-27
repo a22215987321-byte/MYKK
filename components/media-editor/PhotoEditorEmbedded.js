@@ -27,9 +27,11 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport,
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, background: "var(--panel)" }}>
-      {/* Top bar — local to this embedded area, not stuck to the browser viewport */}
+      {/* Top bar — local to this embedded area, not stuck to the browser viewport.
+          Padding matches the tool strip/drawer below (12px) for a consistent
+          rhythm instead of each block picking its own inset. */}
       <div style={{
-        flexShrink: 0, display: "flex", alignItems: "center", gap: 4, padding: "8px",
+        flexShrink: 0, display: "flex", alignItems: "center", gap: 4, padding: "12px",
         background: "#111", borderTopLeftRadius: "var(--radius-lg)", borderTopRightRadius: "var(--radius-lg)",
       }}>
         <IconButton label="返回" onClick={onCancel}>✕</IconButton>
@@ -60,7 +62,7 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport,
           whenever this area's own size changes, including when the drawer
           below opens/closes. */}
       <div ref={containerRef} style={{
-        flex: 1, minHeight: 280, position: "relative", display: "flex",
+        flex: 1, minHeight: 200, position: "relative", display: "flex",
         alignItems: "center", justifyContent: "center", background: "#000", overflow: "hidden",
       }}>
         <canvas ref={canvasElRef} onClick={activeTool === "brush-erase" ? eraseStrokeAt : undefined} />
@@ -70,7 +72,7 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport,
       {/* Tool strip — all 8 tools directly, no mobile collapse */}
       <div style={{
         flexShrink: 0, display: "flex", gap: 4, overflowX: "auto", justifyContent: "flex-start",
-        padding: "8px", background: "#111", borderTop: "1px solid rgba(255,255,255,0.08)",
+        padding: "12px", background: "#111", borderTop: "1px solid rgba(255,255,255,0.08)",
       }}>
         {TOOLS.map(t => (
           <ToolButton key={t.id} tool={t} active={activeTool === t.id} onClick={() => selectTool(t.id)} />

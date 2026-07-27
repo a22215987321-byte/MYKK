@@ -142,10 +142,18 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
         canvas.renderAll();
         imageObjRef.current = img;
       } else {
-        // No photo — a blank sheet to draw/type/stick on. fabric canvases
-        // are transparent by default, which flattens to solid black once
-        // exported as JPEG, so this needs an explicit white background.
-        canvas.setDimensions({ width: BLANK_CANVAS_SIZE, height: BLANK_CANVAS_SIZE });
+        // No photo — a blank sheet to draw/type/stick on. Sized to match
+        // the container's own aspect ratio (falling back to a square if the
+        // container isn't measurable yet) so it fills the available area
+        // edge-to-edge instead of a fixed square leaving big empty margins
+        // in a wide/short embedded layout. fabric canvases are transparent
+        // by default, which flattens to solid black once exported as JPEG,
+        // so this also needs an explicit white background.
+        const c = containerRef.current;
+        const pad = 16;
+        const blankW = c ? Math.max(Math.round(c.clientWidth - pad * 2), 100) : BLANK_CANVAS_SIZE;
+        const blankH = c ? Math.max(Math.round(c.clientHeight - pad * 2), 100) : BLANK_CANVAS_SIZE;
+        canvas.setDimensions({ width: blankW, height: blankH });
         canvas.backgroundColor = "#ffffff";
         canvas.renderAll();
         imageObjRef.current = null;

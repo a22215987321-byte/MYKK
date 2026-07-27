@@ -91,14 +91,19 @@ export default function ImageEditorRoom() {
 
   return (
     <>
-      {/* Header */}
-      <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
-        <span style={{ fontSize: 20 }}>🖼️</span>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>圖片編輯</div>
-          <div style={{ fontSize: 11, color: "var(--text-faint)" }}>裁剪・濾鏡・貼圖・可直接貼上截圖</div>
+      {/* Room header — only shown before editing starts. Once a photo/blank
+          canvas is open, the embedded editor's own top bar (✕/復原/重做/完成)
+          is the only header for this view; keeping both stacked two title
+          bars on top of each other for no reason. */}
+      {!showEditor && (
+        <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
+          <span style={{ fontSize: 20 }}>🖼️</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>圖片編輯</div>
+            <div style={{ fontSize: 11, color: "var(--text-faint)" }}>裁剪・濾鏡・貼圖・可直接貼上截圖</div>
+          </div>
         </div>
-      </div>
+      )}
 
       <input ref={fileInputRef} type="file" accept="image/*" onChange={onFileChosen} style={{ display: "none" }} />
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={onFileChosen} style={{ display: "none" }} />
@@ -115,7 +120,7 @@ export default function ImageEditorRoom() {
         boxSizing: "border-box", transition: "border-color 0.2s",
       }}>
         {showEditor && (
-          <div style={{ flex: 1, minHeight: 480, borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+          <div style={{ flex: 1, minHeight: 360, borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
             <PhotoEditorEmbeddedLazy
               file={originalFile}
               onCancel={() => setEditingPhoto(false)}
