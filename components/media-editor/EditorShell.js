@@ -13,6 +13,17 @@ export default function EditorShell({
       position: "fixed", inset: 0, zIndex: 2000, background: "#000",
       height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden",
       touchAction: "none",
+      // Local theme vars for the pieces shared with the embedded 圖片編輯室
+      // layout (ToolButton, DrawerSlider, DrawerChipRow, toolBtnStyle) — set
+      // here to the exact literals this fullscreen chrome always used, so
+      // sharing that code with a differently-themed embedded layout (which
+      // sets these to the app's light theme tokens instead) can't change
+      // anything here.
+      "--pe-bg": "#111", "--pe-bg-2": "#181818", "--pe-control-bg": "#222",
+      "--pe-text": "#fff", "--pe-text-dim": "#aaa", "--pe-text-disabled": "#444", "--pe-border": "#333",
+      "--pe-canvas-bg": "#000",
+      "--pe-selected-bg": "linear-gradient(135deg,var(--accent),var(--accent-2))",
+      "--pe-selected-text": "var(--accent-text)",
     }}>
       {/* Top bar */}
       <div style={{
@@ -90,9 +101,9 @@ export function ToolButton({ tool, active, onClick, disabled, title }) {
         marginTop: tool.elevated ? -14 : 0,
         boxShadow: tool.elevated ? (active ? "0 4px 16px rgba(0,0,0,0.45)" : "0 4px 12px rgba(0,0,0,0.35)") : "none",
         background: active
-          ? "linear-gradient(135deg,var(--accent),var(--accent-2))"
-          : (tool.elevated ? "#242424" : "transparent"),
-        color: active ? "var(--accent-text)" : (tool.elevated ? "#ddd" : "#aaa"),
+          ? "var(--pe-selected-bg)"
+          : (tool.elevated ? "var(--pe-control-bg)" : "transparent"),
+        color: active ? "var(--pe-selected-text)" : "var(--pe-text-dim)",
         cursor: disabled ? "not-allowed" : "pointer", padding: "4px 8px",
         opacity: disabled ? 0.4 : 1,
         transition: "background 0.15s, color 0.15s",
@@ -108,7 +119,7 @@ export function IconButton({ label, onClick, disabled, children }) {
     <button onClick={onClick} disabled={disabled} aria-label={label} title={label}
       style={{
         width: 44, height: 44, borderRadius: 22, border: "none", background: "transparent",
-        color: disabled ? "#444" : "#fff", fontSize: 20, cursor: disabled ? "default" : "pointer",
+        color: disabled ? "var(--pe-text-disabled)" : "var(--pe-text)", fontSize: 20, cursor: disabled ? "default" : "pointer",
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
       {children}
@@ -121,7 +132,7 @@ export function IconButton({ label, onClick, disabled, children }) {
 export function DrawerSlider({ label, value, min, max, step, onChange, disabled }) {
   return (
     <div style={{ marginBottom: 14, opacity: disabled ? 0.4 : 1 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#aaa", marginBottom: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--pe-text-dim)", marginBottom: 6 }}>
         <span>{label}</span>
         <span>{value}</span>
       </div>
@@ -142,9 +153,10 @@ export function DrawerChipRow({ items, activeId, onSelect, renderLabel, disabled
           onMouseEnter={() => setHoverId(item.id)} onMouseLeave={() => setHoverId(null)}
           style={{
             flexShrink: 0, minHeight: 44, padding: "0 14px", borderRadius: 20,
-            border: activeId === item.id ? "1px solid var(--accent)" : "1px solid #333",
-            background: activeId === item.id ? "var(--accent)" : (hoverId === item.id ? "#222" : "#181818"),
-            color: "#fff", fontSize: 12, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+            border: activeId === item.id ? "1px solid var(--accent)" : "1px solid var(--pe-border)",
+            background: activeId === item.id ? "var(--accent)" : (hoverId === item.id ? "var(--pe-control-bg)" : "var(--pe-bg-2)"),
+            color: activeId === item.id ? "var(--accent-text)" : "var(--pe-text)",
+            fontSize: 12, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", whiteSpace: "nowrap",
           }}>
           {renderLabel ? renderLabel(item) : item.label}
         </button>

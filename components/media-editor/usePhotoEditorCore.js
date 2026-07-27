@@ -38,6 +38,15 @@ export const PRESET_FILTERS = [
 
 export const STICKER_EMOJIS = ["❤️", "🔥", "😂", "😍", "🎉", "✨", "👍", "🥳", "💯", "🙌", "😎", "⭐"];
 
+// System font stacks only (no web-font loading) — matches how the app's own
+// --font-body already falls back through this exact family list.
+export const FONT_FAMILIES = [
+  { id: "sans", label: "Noto Sans TC", value: "'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
+  { id: "system", label: "系統預設", value: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif" },
+  { id: "serif", label: "Noto Serif TC", value: "'Noto Serif TC', Georgia, serif" },
+  { id: "mono", label: "等寬 Monospace", value: "'Courier New', Courier, monospace" },
+];
+
 export const TOOLS = [
   { id: "crop", icon: "⬚", label: "裁剪" },
   { id: "rotate", icon: "⟳", label: "旋轉" },
@@ -128,6 +137,21 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   const [brushWidth, setBrushWidth] = useState(6);
   const [privacyMode, setPrivacyMode] = useState("pixelate"); // pixelate | blur
 
+  // Display-only zoom (canvas.setZoom) — a "camera" over the canvas's own
+  // coordinate space, independent of fitCanvasToContainer's CSS-level
+  // resize-to-fit; doesn't touch the actual working resolution/export size.
+  const [zoomPct, setZoomPctState] = useState(100);
+  // Snap-to-guides toggle — currently just the on/off state; the actual
+  // snapping behavior (guide lines + coordinate correction on object
+  // "moving") is a separate, not-yet-built feature.
+  const [snapEnabled, setSnapEnabled] = useState(false);
+  // The live-selected object (for the text property panel) and a tick that
+  // bumps on every .set() so controls re-read fresh values — the object
+  // reference itself never changes on mutation, so state alone wouldn't
+  // trigger a re-render.
+  const [selectedObj, setSelectedObj] = useState(null);
+  const [selTick, setSelTick] = useState(0);
+
   const pushHistory = useCallback(() => {
     const canvas = fabricCanvasRef.current;
     if (!canvas || historyRef.current.suspend) return;
@@ -188,11 +212,15 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
       }
 
       fitCanvasToContainer(canvas, containerRef.current);
+      setZoomPctState(100);
 
       canvas.on("object:modified", pushHistory);
       canvas.on("object:added", pushHistory);
       canvas.on("object:removed", pushHistory);
       canvas.on("path:created", pushHistory);
+      canvas.on("selection:created", () => setSelectedObj(canvas.getActiveObject() || null));
+      canvas.on("selection:updated", () => setSelectedObj(canvas.getActiveObject() || null));
+      canvas.on("selection:cleared", () => setSelectedObj(null));
 
       pushHistory();
       setReady(true);
@@ -466,6 +494,79 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     if (obj && obj !== imageObjRef.current) canvas.remove(obj);
   };
 
+  // ---- display zoom (embedded 圖片編輯室's zoom dropdown) ----
+  const applyZoomPct = (pct) => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+    const clamped = Math.max(25, Math.min(400, Math.round(pct)));
+    canvas.setZoom(clamped / 100);
+    canvas.renderAll();
+    setZoomPctState(clamped);
+  };
+
+  // ---- text object property panel (embedded 圖片編輯室 only) ----
+  // Generic partial-update for whatever's currently selected — used by every
+  // tab of the text panel (content/style/spacing/etc.) except shadow, which
+  // needs its sub-properties merged into a fabric.Shadow instance instead of
+  // being flat props. `commit:false` skips pushHistory for continuous inputs
+  // (color/slider dragging) — call commitTextProp() once the drag/pick ends
+  // so history doesn't get an entry per intermediate tick.
+  const updateTextProp = (patch, { commit = true } = {}) => {
+    const canvas = fabricCanvasRef.current;
+    const obj = canvas?.getActiveObject();
+    if (!obj) return;
+    obj.set(patch);
+    canvas.renderAll();
+    setSelTick(t => t + 1);
+    if (commit) pushHistory();
+  };
+  const commitTextProp = () => pushHistory();
+
+  const updateTextShadow = (patch, { commit = true } = {}) => {
+    const canvas = fabricCanvasRef.current;
+    const obj = canvas?.getActiveObject();
+    if (!obj) return;
+    if (patch.enabled === false) {
+      obj.set({ shadow: null });
+    } else {
+      const cur = obj.shadow;
+      obj.set({
+        shadow: new fabric.Shadow({
+          color: patch.color ?? cur?.color ?? "rgba(0,0,0,0.5)",
+          blur: patch.blur ?? cur?.blur ?? 6,
+          offsetX: patch.offsetX ?? cur?.offsetX ?? 3,
+          offsetY: patch.offsetY ?? cur?.offsetY ?? 3,
+        }),
+      });
+    }
+    canvas.renderAll();
+    setSelTick(t => t + 1);
+    if (commit) pushHistory();
+  };
+
+  // Object-vs-canvas alignment (点 15 — distinct from textAlign's
+  // paragraph-level alignment above): centers/edges the selected object
+  // against the canvas bounds. Works on any object, not just text.
+  const alignObjectToCanvas = (mode) => {
+    const canvas = fabricCanvasRef.current;
+    const obj = canvas?.getActiveObject();
+    if (!obj) return;
+    const w = obj.width * obj.scaleX, h = obj.height * obj.scaleY;
+    const patch = {};
+    if (mode === "center-h") patch.left = (canvas.width - w) / 2;
+    else if (mode === "center-v") patch.top = (canvas.height - h) / 2;
+    else if (mode === "left") patch.left = 0;
+    else if (mode === "right") patch.left = canvas.width - w;
+    else if (mode === "top") patch.top = 0;
+    else if (mode === "bottom") patch.top = canvas.height - h;
+    else return;
+    obj.set(patch);
+    obj.setCoords();
+    canvas.renderAll();
+    setSelTick(t => t + 1);
+    pushHistory();
+  };
+
   // ---- tool: brush ----
   useEffect(() => {
     const canvas = fabricCanvasRef.current;
@@ -550,6 +651,8 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     hasImage, hasObjects, importPhoto,
     aspect, presetFilter, setPresetFilter, brightness, setBrightness, contrast, setContrast,
     saturation, setSaturation, brushColor, setBrushColor, brushWidth, setBrushWidth, privacyMode, setPrivacyMode,
+    zoomPct, applyZoomPct, snapEnabled, setSnapEnabled,
+    selectedObj, selTick, updateTextProp, commitTextProp, updateTextShadow, alignObjectToCanvas,
     undo, redo,
     rotate90, flip,
     setAspect: selectAspect, applyCrop,
@@ -571,7 +674,7 @@ export function renderPhotoEditorDrawer(p) {
         <div>
           <DrawerChipRow items={ASPECTS} activeId={p.aspect} onSelect={p.setAspect} />
           {p.aspect !== "original" && (
-            <div style={{ fontSize: 11, color: "#777", marginTop: 8 }}>拖曳白框角落調整大小、拖曳框內移動位置</div>
+            <div style={{ fontSize: 11, color: "var(--pe-text-dim)", marginTop: 8 }}>拖曳白框角落調整大小、拖曳框內移動位置</div>
           )}
           <button onClick={p.applyCrop} style={applyBtnStyle}>套用裁剪</button>
         </div>
@@ -591,7 +694,7 @@ export function renderPhotoEditorDrawer(p) {
       return (
         <div>
           <DrawerChipRow items={PRESET_FILTERS} activeId={p.presetFilter} onSelect={p.setPresetFilter} disabled={!p.hasImage} />
-          {!p.hasImage && <div style={{ fontSize: 11, color: "#777", marginTop: 8 }}>{DISABLED_HINT}</div>}
+          {!p.hasImage && <div style={{ fontSize: 11, color: "var(--pe-text-dim)", marginTop: 8 }}>{DISABLED_HINT}</div>}
         </div>
       );
     case "adjust":
@@ -601,7 +704,7 @@ export function renderPhotoEditorDrawer(p) {
           <DrawerSlider label="對比" value={p.contrast} min={-1} max={1} step={0.05} onChange={p.setContrast} disabled={!p.hasImage} />
           <DrawerSlider label="飽和度" value={p.saturation} min={-1} max={1} step={0.05} onChange={p.setSaturation} disabled={!p.hasImage} />
           <button onClick={p.commitAdjustments} disabled={!p.hasImage} style={disabledStyle(applyBtnStyle, !p.hasImage)}>完成調整</button>
-          {!p.hasImage && <div style={{ fontSize: 11, color: "#777", marginTop: 4 }}>{DISABLED_HINT}</div>}
+          {!p.hasImage && <div style={{ fontSize: 11, color: "var(--pe-text-dim)", marginTop: 4 }}>{DISABLED_HINT}</div>}
         </div>
       );
     case "text":
@@ -630,10 +733,10 @@ export function renderPhotoEditorDrawer(p) {
         <div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
             <input type="color" value={p.brushColor} onChange={e => p.setBrushColor(e.target.value)} style={{ width: 44, height: 44, border: "none", background: "none" }} />
-            <span style={{ fontSize: 12, color: "#aaa" }}>畫筆顏色</span>
+            <span style={{ fontSize: 12, color: "var(--pe-text-dim)" }}>畫筆顏色</span>
           </div>
           <DrawerSlider label="筆刷粗細" value={p.brushWidth} min={2} max={30} step={1} onChange={p.setBrushWidth} />
-          <div style={{ fontSize: 11, color: "#777" }}>提示：點擊已畫的線條可將其刪除（橡皮擦）</div>
+          <div style={{ fontSize: 11, color: "var(--pe-text-dim)" }}>提示：點擊已畫的線條可將其刪除（橡皮擦）</div>
         </div>
       );
     case "privacy": {
@@ -641,14 +744,14 @@ export function renderPhotoEditorDrawer(p) {
       return (
         <div>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <button onClick={() => p.setPrivacyMode("pixelate")} disabled={d} style={disabledStyle({ ...toolBtnStyle, background: p.privacyMode === "pixelate" ? "var(--accent)" : "#222" }, d)}>馬賽克</button>
-            <button onClick={() => p.setPrivacyMode("blur")} disabled={d} style={disabledStyle({ ...toolBtnStyle, background: p.privacyMode === "blur" ? "var(--accent)" : "#222" }, d)}>模糊</button>
+            <button onClick={() => p.setPrivacyMode("pixelate")} disabled={d} style={disabledStyle({ ...toolBtnStyle, background: p.privacyMode === "pixelate" ? "var(--accent)" : "var(--pe-control-bg)" }, d)}>馬賽克</button>
+            <button onClick={() => p.setPrivacyMode("blur")} disabled={d} style={disabledStyle({ ...toolBtnStyle, background: p.privacyMode === "blur" ? "var(--accent)" : "var(--pe-control-bg)" }, d)}>模糊</button>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={p.startPrivacySelection} disabled={d} style={disabledStyle(toolBtnStyle, d)}>+ 新增遮蔽區域</button>
             <button onClick={p.applyPrivacyRegion} disabled={d} style={disabledStyle(applyBtnStyle, d)}>套用</button>
           </div>
-          <div style={{ fontSize: 11, color: "#777", marginTop: 8 }}>{d ? DISABLED_HINT : "拖曳/縮放白色方框對準要遮蔽的區域，再按套用"}</div>
+          <div style={{ fontSize: 11, color: "var(--pe-text-dim)", marginTop: 8 }}>{d ? DISABLED_HINT : "拖曳/縮放白色方框對準要遮蔽的區域，再按套用"}</div>
         </div>
       );
     }
@@ -658,10 +761,10 @@ export function renderPhotoEditorDrawer(p) {
 }
 
 const toolBtnStyle = {
-  minHeight: 44, padding: "0 14px", borderRadius: 10, border: "1px solid #333",
-  background: "#222", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+  minHeight: 44, padding: "0 14px", borderRadius: 10, border: "1px solid var(--pe-border)",
+  background: "var(--pe-control-bg)", color: "var(--pe-text)", fontSize: 13, fontWeight: 600, cursor: "pointer",
 };
-const applyBtnStyle = { ...toolBtnStyle, marginTop: 10, width: "100%", background: "var(--accent)", border: "none" };
+const applyBtnStyle = { ...toolBtnStyle, marginTop: 10, width: "100%", background: "var(--accent)", color: "var(--accent-text)", border: "none" };
 
 function disabledStyle(base, disabled) {
   return disabled ? { ...base, opacity: 0.4, cursor: "not-allowed" } : base;
