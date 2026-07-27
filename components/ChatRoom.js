@@ -2316,7 +2316,7 @@ export default function ChatApp({ user }) {
 
           {/* AI chat view */}
           {showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && (
-            <AiChatRoom />
+            <AiChatRoom user={user} db={db} />
           )}
 
           {/* Vocab view */}

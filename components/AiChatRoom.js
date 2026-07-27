@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "../lib/toast";
 
 const MODELS = [
@@ -7,16 +8,44 @@ const MODELS = [
 ];
 
 // Standalone "AI 助手" room — a simple chat UI backed by pages/api/ai/chat.js
-// (DeepSeek, server-side only). Conversation only lives in local state for
-// now; nothing is persisted to Firestore.
-export default function AiChatRoom() {
+// (DeepSeek, server-side only). The conversation is saved to Firestore
+// (aiChats/{uid}) so it survives a refresh; "新對話" clears it and starts fresh.
+export default function AiChatRoom({ user, db }) {
+  const uid = user?.uid;
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [model, setModel] = useState(MODELS[0].id);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const endRef = useRef(null);
   const modelMenuRef = useRef(null);
+
+  // Load this user's saved conversation once on mount.
+  useEffect(() => {
+    if (!uid) { setLoaded(true); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "aiChats", uid));
+        if (!cancelled && snap.exists()) setMessages(snap.data().messages || []);
+      } catch (err) {
+        console.error("AiChatRoom load error:", err);
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [uid, db]);
+
+  // Persist on every change, but only once the initial load has settled —
+  // otherwise the empty initial state would overwrite the saved conversation
+  // for a split second before it loads.
+  useEffect(() => {
+    if (!uid || !loaded) return;
+    setDoc(doc(db, "aiChats", uid), { messages, updatedAt: serverTimestamp() })
+      .catch(err => console.error("AiChatRoom save error:", err));
+  }, [messages, uid, loaded, db]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
@@ -55,6 +84,11 @@ export default function AiChatRoom() {
     }
   };
 
+  const newConversation = () => {
+    if (sending) return;
+    setMessages([]);
+  };
+
   return (
     <>
       {/* Header */}
@@ -64,6 +98,16 @@ export default function AiChatRoom() {
           <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>1.0 EVON AI</div>
           <div style={{ fontSize: 11, color: "var(--text-faint)" }}>有問題都可以問我</div>
         </div>
+        <div style={{ flex: 1 }} />
+        <button onClick={newConversation} disabled={sending || messages.length === 0}
+          style={{
+            background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
+            padding: "6px 14px", color: "var(--text-muted)", fontSize: 12, fontWeight: 600,
+            cursor: (sending || messages.length === 0) ? "default" : "pointer",
+            opacity: (sending || messages.length === 0) ? 0.5 : 1,
+          }}>
+          🆕 新對話
+        </button>
       </div>
 
       {/* Messages */}
