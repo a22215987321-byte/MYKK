@@ -13,3 +13,11 @@ export const VideoEditorLazy = dynamic(() => import("./VideoEditor"), {
   ssr: false,
   loading: () => <LoadingState label="載入編輯器..." minHeight="100dvh" />,
 });
+
+// Inline layout for the standalone 圖片編輯室 — same fabric.js core as
+// PhotoEditorLazy, laid out to embed in the page instead of a fullscreen
+// overlay (see components/media-editor/PhotoEditorEmbedded.js).
+export const PhotoEditorEmbeddedLazy = dynamic(() => import("./PhotoEditorEmbedded"), {
+  ssr: false,
+  loading: () => <LoadingState label="載入編輯器..." minHeight="400px" />,
+});

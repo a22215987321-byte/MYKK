@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { PhotoEditorLazy } from "./media-editor";
+import { PhotoEditorEmbeddedLazy } from "./media-editor";
 import { toast } from "../lib/toast";
 
-// Standalone "圖片編輯" room — reuses the same fabric.js-based PhotoEditor
+// Standalone "圖片編輯" room — reuses the same fabric.js-based editor core
 // that already powers post/avatar image editing (see Feed.js, profile/[uid].js),
-// instead of pulling in a second, unrelated canvas library just for this entry.
+// but through the embedded layout instead of their fullscreen one: editing
+// happens inline in this room's own content area, sidebar/calendar stay
+// visible the whole time, nothing covers the screen.
 export default function ImageEditorRoom() {
   const [originalFile, setOriginalFile] = useState(null);
   const [editingPhoto, setEditingPhoto] = useState(false);
@@ -63,6 +65,8 @@ export default function ImageEditorRoom() {
     setEditingPhoto(false);
   };
 
+  const showEditor = editingPhoto && originalFile;
+
   return (
     <>
       {/* Header */}
@@ -76,14 +80,32 @@ export default function ImageEditorRoom() {
 
       <input ref={fileInputRef} type="file" accept="image/*" onChange={onFileChosen} style={{ display: "none" }} />
 
-      {/* Body */}
+      {/* Body — empty/result states stay centered; the embedded editor
+          manages its own internal layout and just fills this area. */}
       <div style={{
-        flex: 1, minHeight: 0, overflowY: "auto", padding: "24px 28px",
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        flex: 1, minHeight: 0, overflowY: "auto",
+        padding: showEditor ? 16 : "24px 28px",
+        display: "flex", flexDirection: "column",
+        alignItems: showEditor ? "stretch" : "center",
+        justifyContent: showEditor ? "flex-start" : "center",
         border: pasteFlash ? "2px solid var(--accent)" : "2px solid transparent",
         boxSizing: "border-box", transition: "border-color 0.2s",
       }}>
-        {!result && (
+        {showEditor && (
+          <div style={{ flex: 1, minHeight: 480, borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+            <PhotoEditorEmbeddedLazy
+              file={originalFile}
+              onCancel={() => setEditingPhoto(false)}
+              onExport={(blob) => {
+                if (result?.url) URL.revokeObjectURL(result.url);
+                setResult({ url: URL.createObjectURL(blob), blob });
+                setEditingPhoto(false);
+              }}
+            />
+          </div>
+        )}
+
+        {!showEditor && !result && (
           <div style={{ textAlign: "center", color: "var(--text-dim)" }}>
             <div style={{ fontSize: 56, marginBottom: 16 }}>🖼️</div>
             <div style={{ fontSize: 16, color: "var(--text-faint)", marginBottom: 8 }}>選一張圖片開始編輯</div>
@@ -95,7 +117,7 @@ export default function ImageEditorRoom() {
           </div>
         )}
 
-        {result && (
+        {!showEditor && result && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, maxWidth: 480 }}>
             <img src={result.url} alt="編輯結果" style={{ maxWidth: "100%", maxHeight: 420, borderRadius: "var(--radius-lg)", border: "1px solid var(--panel)" }} />
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
@@ -115,18 +137,6 @@ export default function ImageEditorRoom() {
           </div>
         )}
       </div>
-
-      {editingPhoto && originalFile && (
-        <PhotoEditorLazy
-          file={originalFile}
-          onCancel={() => setEditingPhoto(false)}
-          onExport={(blob) => {
-            if (result?.url) URL.revokeObjectURL(result.url);
-            setResult({ url: URL.createObjectURL(blob), blob });
-            setEditingPhoto(false);
-          }}
-        />
-      )}
     </>
   );
 }

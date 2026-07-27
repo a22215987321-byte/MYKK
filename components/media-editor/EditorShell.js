@@ -55,29 +55,9 @@ export default function EditorShell({
         background: "#111", borderTop: "1px solid rgba(255,255,255,0.08)",
         boxShadow: "0 -6px 14px rgba(0,0,0,0.3)", position: "relative", zIndex: 1,
       }}>
-        {tools.map(t => {
-          const isActive = activeTool === t.id;
-          return (
-            <button key={t.id} onClick={() => onSelectTool(t.id)}
-              style={{
-                flexShrink: 0, minWidth: t.elevated ? 60 : 56, minHeight: t.elevated ? 52 : 44,
-                display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center", gap: 2,
-                borderRadius: t.elevated ? 26 : 14, border: "none",
-                marginTop: t.elevated ? -14 : 0,
-                boxShadow: t.elevated ? (isActive ? "0 4px 16px rgba(0,0,0,0.45)" : "0 4px 12px rgba(0,0,0,0.35)") : "none",
-                background: isActive
-                  ? "linear-gradient(135deg,var(--accent),var(--accent-2))"
-                  : (t.elevated ? "#242424" : "transparent"),
-                color: isActive ? "var(--accent-text)" : (t.elevated ? "#ddd" : "#aaa"),
-                cursor: "pointer", padding: "4px 8px",
-                transition: "background 0.15s, color 0.15s",
-              }}>
-              <span style={{ fontSize: t.elevated ? 22 : 18, lineHeight: 1 }} aria-hidden="true">{t.icon}</span>
-              <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{t.label}</span>
-            </button>
-          );
-        })}
+        {tools.map(t => (
+          <ToolButton key={t.id} tool={t} active={activeTool === t.id} onClick={() => onSelectTool(t.id)} />
+        ))}
       </div>
 
       {/* Bottom drawer (tool settings) */}
@@ -94,7 +74,34 @@ export default function EditorShell({
   );
 }
 
-function IconButton({ label, onClick, disabled, children }) {
+// One tool-strip button: transparent when idle, filled with the accent
+// gradient when selected; `elevated` (the fullscreen mobile 編輯 hub) gets a
+// bigger raised circular treatment on top of the same fill logic. Shared by
+// EditorShell's own strip and the embedded 圖片編輯室 layout's tool row.
+export function ToolButton({ tool, active, onClick }) {
+  return (
+    <button onClick={onClick}
+      style={{
+        flexShrink: 0, minWidth: tool.elevated ? 60 : 56, minHeight: tool.elevated ? 52 : 44,
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center", gap: 2,
+        borderRadius: tool.elevated ? 26 : 14, border: "none",
+        marginTop: tool.elevated ? -14 : 0,
+        boxShadow: tool.elevated ? (active ? "0 4px 16px rgba(0,0,0,0.45)" : "0 4px 12px rgba(0,0,0,0.35)") : "none",
+        background: active
+          ? "linear-gradient(135deg,var(--accent),var(--accent-2))"
+          : (tool.elevated ? "#242424" : "transparent"),
+        color: active ? "var(--accent-text)" : (tool.elevated ? "#ddd" : "#aaa"),
+        cursor: "pointer", padding: "4px 8px",
+        transition: "background 0.15s, color 0.15s",
+      }}>
+      <span style={{ fontSize: tool.elevated ? 22 : 18, lineHeight: 1 }} aria-hidden="true">{tool.icon}</span>
+      <span style={{ fontSize: 10, whiteSpace: "nowrap" }}>{tool.label}</span>
+    </button>
+  );
+}
+
+export function IconButton({ label, onClick, disabled, children }) {
   return (
     <button onClick={onClick} disabled={disabled} aria-label={label} title={label}
       style={{
