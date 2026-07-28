@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ToolButton, IconButton, DrawerChipRow } from "./EditorShell";
+import { ToolButton, IconButton, DrawerChipRow, ExportOptions } from "./EditorShell";
 import useIsMobile from "../../lib/useIsMobile";
 import usePhotoEditorCore, {
   renderPhotoEditorDrawer, TOOLS, MOBILE_TOOLS, EDIT_GROUP_IDS, TRIM_TOOL, toolById, withPhotoToolState,
@@ -37,6 +37,7 @@ export default function PhotoEditorEmbedded({ file, initialScene, draftId, onCan
     canvasElRef, containerRef, ready, activeTool, setActiveTool, selectTool, busy, canUndo, canRedo,
     undo, redo, eraseStrokeAt, handleExport, hasImage, isDirty, importPhoto,
     zoomPct, applyZoomPct, snapEnabled, setSnapEnabled,
+    exportFormat, setExportFormat, exportQuality, setExportQuality,
   } = core;
   const importInputRef = useRef(null);
   // Non-null while a confirm dialog is up — either "leave with unsaved
@@ -148,6 +149,8 @@ export default function PhotoEditorEmbedded({ file, initialScene, draftId, onCan
           }}>
           {snapEnabled ? "✓ 對齊輔助（開發中）" : "對齊輔助（開發中）"}
         </button>
+
+        <ExportOptions format={exportFormat} quality={exportQuality} onFormatChange={setExportFormat} onQualityChange={setExportQuality} />
 
         <button onClick={handleExport} disabled={!ready || busy}
           style={{

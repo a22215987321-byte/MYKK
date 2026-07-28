@@ -114,6 +114,31 @@ export function ToolButton({ tool, active, onClick, disabled, title }) {
   );
 }
 
+// Export format + quality control, shared by the fullscreen (via EditorShell's
+// beforeNext slot) and embedded 圖片編輯室 top bars. Quality only applies to
+// jpeg/webp — hidden for png since that's always lossless.
+export function ExportOptions({ format, quality, onFormatChange, onQualityChange }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <select value={format} onChange={e => onFormatChange(e.target.value)}
+        title="匯出格式"
+        style={{
+          minHeight: 36, borderRadius: 8, border: "1px solid var(--pe-border)",
+          background: "var(--pe-control-bg)", color: "var(--pe-text)", fontSize: 12, padding: "0 6px",
+        }}>
+        <option value="jpeg">JPEG</option>
+        <option value="png">PNG（透明背景）</option>
+        <option value="webp">WebP</option>
+      </select>
+      {format !== "png" && (
+        <input type="range" min={0.5} max={1} step={0.05} value={quality}
+          onChange={e => onQualityChange(Number(e.target.value))}
+          title={`匯出品質 ${Math.round(quality * 100)}%`} style={{ width: 60, cursor: "pointer" }} />
+      )}
+    </div>
+  );
+}
+
 export function IconButton({ label, onClick, disabled, children }) {
   return (
     <button onClick={onClick} disabled={disabled} aria-label={label} title={label}

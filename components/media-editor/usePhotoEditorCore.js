@@ -3,18 +3,37 @@ import * as fabric from "fabric";
 import { DrawerSlider, DrawerChipRow } from "./EditorShell";
 import { saveDraft } from "./editorDb";
 
-// Working resolution cap — social output never needs more than this, and
-// capping it keeps both the live canvas and the exported Blob fast on
-// mid-range phones (see "降解析度預覽" in the perf requirements). If a
+// Working resolution cap — raised from the original 1440 so exports (in
+// particular the member-facing 圖片編輯室) hold up at social/print sizes
+// instead of visibly soft output; still capped rather than unbounded so a
+// giant source photo can't tank canvas perf on a mid-range phone. If a
 // photo is smaller than this to begin with, it's used at its own size.
-const MAX_EDIT_DIMENSION = 1440;
+const MAX_EDIT_DIMENSION = 2400;
 const HISTORY_LIMIT = 30;
 // Default working size when the editor opens with no photo at all (see the
 // `file` being null/undefined below) — a blank sheet to draw/type/stick on.
 const BLANK_CANVAS_SIZE = 1080;
 
+// Reads a File as a data: URL instead of an object: URL. Object URLs
+// (URL.createObjectURL) only stay valid for the lifetime of the page that
+// created them — fine for a same-session import, but once a fabric image
+// built from one gets serialized into canvas.toJSON() and persisted as a
+// draft (see saveDraft in handleExport), reopening that draft after a real
+// page reload/browser restart would try to reload a blob: URL that no
+// longer resolves to anything, silently dropping the photo. A data: URL has
+// no such lifetime limit, so it round-trips through a draft correctly.
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export const ASPECTS = [
   { id: "original", label: "原圖", ratio: null },
+  { id: "free", label: "自由", ratio: null, freeform: true },
   { id: "1:1", label: "1:1", ratio: 1 },
   { id: "4:5", label: "4:5", ratio: 4 / 5 },
   { id: "9:16", label: "9:16", ratio: 9 / 16 },
@@ -157,6 +176,8 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
   const [brushColor, setBrushColor] = useState("#ff3b30");
   const [brushWidth, setBrushWidth] = useState(6);
   const [privacyMode, setPrivacyMode] = useState("pixelate"); // pixelate | blur
+  const [exportFormat, setExportFormat] = useState("jpeg"); // jpeg | png | webp
+  const [exportQuality, setExportQuality] = useState(0.92); // ignored for png
 
   // Display-only zoom (canvas.setZoom) — a "camera" over the canvas's own
   // coordinate space, independent of fitCanvasToContainer's CSS-level
@@ -196,7 +217,6 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
   // ---- init ----
   useEffect(() => {
     let disposed = false;
-    let objectUrl = null;
 
     async function init() {
       const canvas = new fabric.Canvas(canvasElRef.current, {
@@ -213,8 +233,8 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
         if (disposed) return;
         canvas.renderAll();
       } else if (file) {
-        objectUrl = URL.createObjectURL(file);
-        const img = await fabric.FabricImage.fromURL(objectUrl, { crossOrigin: "anonymous" });
+        const dataUrl = await fileToDataURL(file);
+        const img = await fabric.FabricImage.fromURL(dataUrl, { crossOrigin: "anonymous" });
         if (disposed) return;
 
         const scale = Math.min(1, MAX_EDIT_DIMENSION / Math.max(img.width, img.height));
@@ -262,7 +282,6 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
     init();
     return () => {
       disposed = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
       fabricCanvasRef.current?.dispose();
       fabricCanvasRef.current = null;
     };
@@ -304,9 +323,11 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
     if (!file) return;
     const canvas = fabricCanvasRef.current;
     if (!canvas) return;
-    const url = URL.createObjectURL(file);
-    const img = await fabric.FabricImage.fromURL(url, { crossOrigin: "anonymous" });
-    URL.revokeObjectURL(url);
+    // Data URL, not an object URL — this image can end up serialized into a
+    // saved draft (see fileToDataURL's comment above), which needs to survive
+    // past this page load.
+    const dataUrl = await fileToDataURL(file);
+    const img = await fabric.FabricImage.fromURL(dataUrl, { crossOrigin: "anonymous" });
     const existingBase = getBaseImage(canvas);
     if (existingBase && replace) canvas.remove(existingBase);
     const becomesBase = !existingBase || replace;
@@ -441,6 +462,10 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
   }, [presetFilter, brightness, contrast, saturation, ready]);
 
   const commitAdjustments = () => pushHistory();
+  // Zeroes the sliders back to "no change" — deliberately leaves presetFilter
+  // alone, since that's a separate tool tab (濾鏡) with its own chip row, not
+  // part of what "重設" on the 調整 sliders means.
+  const resetAdjustments = () => { setBrightness(0); setContrast(0); setSaturation(0); };
 
   // ---- tool: crop — a real draggable/resizable window, not just an
   // auto-centered guess. The aspect ratio is still locked to one of the
@@ -460,12 +485,17 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
     if (!canvas) return;
     removeCropOverlay();
     const def = ASPECTS.find(a => a.id === aspectId);
-    if (!def?.ratio) return;
+    if (!def || aspectId === "original") return;
     const { width, height } = canvas;
     const ratio = def.ratio;
-    const curRatio = width / height;
     let w, h;
-    if (curRatio > ratio) { h = height * 0.9; w = h * ratio; } else { w = width * 0.9; h = w / ratio; }
+    if (ratio) {
+      const curRatio = width / height;
+      if (curRatio > ratio) { h = height * 0.9; w = h * ratio; } else { w = width * 0.9; h = w / ratio; }
+    } else {
+      // Freeform ("自由") — no locked ratio, just a generous starting box.
+      w = width * 0.8; h = height * 0.8;
+    }
 
     const rect = new fabric.Rect({
       left: (width - w) / 2, top: (height - h) / 2, width: w, height: h,
@@ -475,14 +505,19 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
       excludeFromExport: true, // never let this ghost box end up in history/export JSON
     });
     rect.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false, mtr: false });
-    // Corner drag resizes both handles at once by design, but we still snap
-    // height back to width*ratio on every tick so it can never drift off
-    // the locked aspect ratio (fabric's own corner controls don't enforce
-    // a *specific* ratio on their own, only proportional-from-origin).
-    rect.on("scaling", () => {
-      const w2 = rect.width * rect.scaleX;
-      rect.set({ height: w2 / ratio, scaleY: rect.scaleX });
-    });
+    if (ratio) {
+      // Corner drag resizes both handles at once by design, but we still snap
+      // height back to width*ratio on every tick so it can never drift off
+      // the locked aspect ratio (fabric's own corner controls don't enforce
+      // a *specific* ratio on their own, only proportional-from-origin).
+      rect.on("scaling", () => {
+        const w2 = rect.width * rect.scaleX;
+        rect.set({ height: w2 / ratio, scaleY: rect.scaleX });
+      });
+    }
+    // Freeform: no scaling handler at all — corner drag is left to fabric's
+    // own default (independent width/height), which is exactly what "自由"
+    // means here.
     canvas.add(rect);
     canvas.setActiveObject(rect);
     canvas.renderAll();
@@ -557,8 +592,10 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
   const addImageSticker = async (fileList) => {
     const f = fileList?.[0];
     if (!f) return;
-    const url = URL.createObjectURL(f);
-    const img = await fabric.FabricImage.fromURL(url);
+    // Data URL — see fileToDataURL's comment on importPhoto above; a sticker
+    // image gets serialized into the canvas JSON the same as the base photo.
+    const dataUrl = await fileToDataURL(f);
+    const img = await fabric.FabricImage.fromURL(dataUrl);
     const canvas = fabricCanvasRef.current;
     const scale = Math.min(1, (canvas.width * 0.4) / img.width);
     img.set({ scaleX: scale, scaleY: scale });
@@ -567,7 +604,6 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
     img.setCoords();
     canvas.setActiveObject(img);
     canvas.renderAll();
-    URL.revokeObjectURL(url);
   };
 
   const deleteActiveObject = () => {
@@ -715,8 +751,19 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
     setBusy(true);
     try {
       canvas.discardActiveObject();
+      // A blank canvas (no imported photo) always carries an explicit white
+      // backgroundColor so it doesn't flatten to black as JPEG (see the init
+      // effect's blank-canvas branch) — but that's wrong for PNG/WebP with no
+      // base photo, where a member exporting e.g. a sticker/text composition
+      // actually wants real transparency. Temporarily clear it for just this
+      // export when that applies, then restore it for continued editing.
+      const hadBase = !!getBaseImage(canvas);
+      const wantsTransparency = exportFormat !== "jpeg" && !hadBase;
+      const prevBg = canvas.backgroundColor;
+      if (wantsTransparency) canvas.backgroundColor = "";
       canvas.renderAll();
-      const blob = await canvas.toBlob({ format: "jpeg", quality: 0.92 });
+      const blob = await canvas.toBlob({ format: exportFormat, quality: exportQuality });
+      if (wantsTransparency) { canvas.backgroundColor = prevBg; canvas.renderAll(); }
       // Passed back to the caller (and optionally persisted as a draft) so
       // "重新編輯" can reload the exact finished canvas instead of restarting
       // from the original source file — width/height travel alongside the
@@ -739,11 +786,12 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
     aspect, presetFilter, setPresetFilter, brightness, setBrightness, contrast, setContrast,
     saturation, setSaturation, brushColor, setBrushColor, brushWidth, setBrushWidth, privacyMode, setPrivacyMode,
     zoomPct, applyZoomPct, snapEnabled, setSnapEnabled,
+    exportFormat, setExportFormat, exportQuality, setExportQuality,
     selectedObj, selTick, updateTextProp, commitTextProp, updateTextShadow, alignObjectToCanvas,
     undo, redo,
     rotate90, flip,
     setAspect: selectAspect, applyCrop,
-    commitAdjustments,
+    commitAdjustments, resetAdjustments,
     addText, addEmojiSticker, addImageSticker, deleteActiveObject,
     eraseStrokeAt,
     startPrivacySelection, applyPrivacyRegion,
@@ -790,7 +838,10 @@ export function renderPhotoEditorDrawer(p) {
           <DrawerSlider label="亮度" value={p.brightness} min={-1} max={1} step={0.05} onChange={p.setBrightness} disabled={!p.hasImage} />
           <DrawerSlider label="對比" value={p.contrast} min={-1} max={1} step={0.05} onChange={p.setContrast} disabled={!p.hasImage} />
           <DrawerSlider label="飽和度" value={p.saturation} min={-1} max={1} step={0.05} onChange={p.setSaturation} disabled={!p.hasImage} />
-          <button onClick={p.commitAdjustments} disabled={!p.hasImage} style={disabledStyle(applyBtnStyle, !p.hasImage)}>完成調整</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={p.resetAdjustments} disabled={!p.hasImage} style={disabledStyle({ ...toolBtnStyle, marginTop: 10, flex: 1 }, !p.hasImage)}>重設</button>
+            <button onClick={p.commitAdjustments} disabled={!p.hasImage} style={disabledStyle({ ...applyBtnStyle, flex: 2 }, !p.hasImage)}>完成調整</button>
+          </div>
           {!p.hasImage && <div style={{ fontSize: 11, color: "var(--pe-text-dim)", marginTop: 4 }}>{DISABLED_HINT}</div>}
         </div>
       );
