@@ -98,6 +98,16 @@ export function withPhotoToolState(tools, hasImage) {
   ));
 }
 
+// The base photo is tagged with data.role="base" at creation instead of
+// tracked via a separate ref — a plain ref goes stale the moment the canvas
+// is rebuilt from JSON (undo/redo, restoring a previous session), since the
+// old object instance it points to is no longer part of the live canvas.
+// Reading the tag straight off whatever's actually on the canvas right now
+// can't drift out of sync the way a cached reference can.
+export function getBaseImage(canvas) {
+  return canvas?.getObjects().find(o => o.data?.role === "base") || null;
+}
+
 export function fitCanvasToContainer(canvas, container) {
   if (!container || !canvas) return;
   const pad = 16;
@@ -115,10 +125,9 @@ export function fitCanvasToContainer(canvas, container) {
 // chrome renders around it — the fullscreen EditorShell wrapper
 // (PhotoEditor.js) and the inline 圖片編輯室 layout (PhotoEditorEmbedded.js)
 // both call this and just differ in how they lay out the returned pieces.
-export default function usePhotoEditorCore({ file, draftId, onExport }) {
+export default function usePhotoEditorCore({ file, initialScene, draftId, onExport }) {
   const canvasElRef = useRef(null);
   const fabricCanvasRef = useRef(null);
-  const imageObjRef = useRef(null);
   const containerRef = useRef(null);
   const cropRectRef = useRef(null);
   const historyRef = useRef({ stack: [], index: -1, suspend: false });
@@ -128,11 +137,16 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   const [busy, setBusy] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
-  // Mirror imageObjRef/canvas-object-count into state so tool buttons and
+  // Mirror base-image-presence/canvas-object-count into state so tool buttons and
   // drawer controls can reactively grey themselves out — refs alone don't
   // trigger a re-render when they change.
   const [hasImage, setHasImage] = useState(false);
   const [hasObjects, setHasObjects] = useState(false);
+  // True once anything has changed since the session opened (or since the
+  // last successful export) — drives the leave-without-saving confirmation.
+  // Deliberately NOT reset by undo/redo: navigating history still leaves the
+  // canvas different from whatever was last exported/loaded.
+  const [isDirty, setIsDirty] = useState(false);
   const addOffsetRef = useRef(0);
 
   const [aspect, setAspectState] = useState("original");
@@ -163,7 +177,11 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     const canvas = fabricCanvasRef.current;
     if (!canvas || historyRef.current.suspend) return;
     const h = historyRef.current;
-    const json = JSON.stringify(canvas.toJSON());
+    const isFirst = h.stack.length === 0;
+    // ["data"] keeps the base-image role tag (see getBaseImage) round-tripping
+    // through undo/redo and session restore — fabric's default serialization
+    // drops any custom property that isn't explicitly requested.
+    const json = JSON.stringify(canvas.toJSON(["data"]));
     h.stack = h.stack.slice(0, h.index + 1);
     h.stack.push(json);
     if (h.stack.length > HISTORY_LIMIT) h.stack.shift();
@@ -171,6 +189,8 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     setCanUndo(h.index > 0);
     setCanRedo(false);
     setHasObjects(canvas.getObjects().length > 0);
+    setHasImage(!!getBaseImage(canvas));
+    if (!isFirst) setIsDirty(true);
   }, []);
 
   // ---- init ----
@@ -185,7 +205,14 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
       });
       fabricCanvasRef.current = canvas;
 
-      if (file) {
+      if (initialScene) {
+        // Restoring a previously-finished session ("重新編輯") — the exact
+        // canvas that was last exported, not the original source file.
+        canvas.setDimensions({ width: initialScene.width, height: initialScene.height });
+        await canvas.loadFromJSON(initialScene.canvasJSON);
+        if (disposed) return;
+        canvas.renderAll();
+      } else if (file) {
         objectUrl = URL.createObjectURL(file);
         const img = await fabric.FabricImage.fromURL(objectUrl, { crossOrigin: "anonymous" });
         if (disposed) return;
@@ -194,11 +221,12 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
         canvas.setDimensions({ width: w, height: h });
-        img.set({ left: 0, top: 0, scaleX: w / img.width, scaleY: h / img.height, selectable: false, evented: false });
+        img.set({
+          left: 0, top: 0, scaleX: w / img.width, scaleY: h / img.height,
+          selectable: false, evented: false, data: { role: "base" },
+        });
         canvas.add(img);
         canvas.renderAll();
-        imageObjRef.current = img;
-        setHasImage(true);
       } else {
         // No photo — a blank sheet to draw/type/stick on. Sized to match
         // the container's own aspect ratio (falling back to a square if the
@@ -214,8 +242,6 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
         canvas.setDimensions({ width: blankW, height: blankH });
         canvas.backgroundColor = "#ffffff";
         canvas.renderAll();
-        imageObjRef.current = null;
-        setHasImage(false);
       }
 
       fitCanvasToContainer(canvas, containerRef.current);
@@ -240,8 +266,11 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
       fabricCanvasRef.current?.dispose();
       fabricCanvasRef.current = null;
     };
+    // `initialScene`/`file` are only meant to be read once per mount (the
+    // parent room fully unmounts/remounts the editor for each new session
+    // rather than swapping these props on a live instance).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file]);
+  }, [file, initialScene]);
 
   // Refit whenever the container's actual size changes — a window resize in
   // the fullscreen wrapper, or (in the embedded layout) the canvas area
@@ -267,18 +296,25 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   // filter/adjust/privacy. If a base photo already exists, the imported
   // photo is added as a regular selectable/movable object instead (so a
   // second import can't silently replace edits already made to the first).
-  const importPhoto = async (file) => {
+  // `replace: true` is how the UI honors the user's choice when importing a
+  // photo while a base image already exists (see the replace-vs-add prompt
+  // in PhotoEditorEmbedded) — without it, a second import always adds as a
+  // regular movable object instead of silently replacing prior edits.
+  const importPhoto = async (file, { replace = false } = {}) => {
     if (!file) return;
     const canvas = fabricCanvasRef.current;
     if (!canvas) return;
     const url = URL.createObjectURL(file);
     const img = await fabric.FabricImage.fromURL(url, { crossOrigin: "anonymous" });
     URL.revokeObjectURL(url);
-    const becomesBase = !imageObjRef.current;
+    const existingBase = getBaseImage(canvas);
+    if (existingBase && replace) canvas.remove(existingBase);
+    const becomesBase = !existingBase || replace;
     const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
     img.set({
       scaleX: scale, scaleY: scale,
       selectable: !becomesBase, evented: !becomesBase,
+      ...(becomesBase ? { data: { role: "base" } } : {}),
     });
     canvas.add(img);
     // canvas.centerObject() instead of hand-rolled left/top math — it
@@ -290,11 +326,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     //留白 tool below), not something importing a photo does on its own.
     canvas.centerObject(img);
     img.setCoords();
-    if (becomesBase) {
-      canvas.sendObjectToBack(img);
-      imageObjRef.current = img;
-      setHasImage(true);
-    }
+    if (becomesBase) canvas.sendObjectToBack(img);
     canvas.renderAll();
     pushHistory();
   };
@@ -306,7 +338,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   // since auto-shrinking surprised users who expected the canvas to stay put.
   const trimToContent = () => {
     const canvas = fabricCanvasRef.current;
-    const img = imageObjRef.current;
+    const img = getBaseImage(canvas);
     if (!canvas || !img) return;
     const bounds = img.getBoundingRect();
     const dx = bounds.left, dy = bounds.top;
@@ -327,13 +359,24 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     const h = historyRef.current;
     if (!canvas || index < 0 || index >= h.stack.length) return;
     h.suspend = true;
+    // selectable/evented are standard fabric properties and already
+    // round-trip through toJSON/loadFromJSON on their own — no need to
+    // re-guess which object is the base image by array position (that
+    // assumption broke as soon as z-order changed, e.g. after 去除留白 or
+    // any tool that reorders objects).
     await canvas.loadFromJSON(JSON.parse(h.stack[index]));
-    canvas.getObjects().forEach(o => { if (o === canvas.getObjects()[0]) o.set({ selectable: false, evented: false }); });
     canvas.renderAll();
     h.index = index;
     h.suspend = false;
     setCanUndo(h.index > 0);
     setCanRedo(h.index < h.stack.length - 1);
+    // pushHistory() normally keeps these mirrors in sync, but it's suspended
+    // during a restore — update them explicitly so tool-disabled states and
+    // the text panel don't go stale after undo/redo.
+    setHasImage(!!getBaseImage(canvas));
+    setHasObjects(canvas.getObjects().length > 0);
+    setSelectedObj(canvas.getActiveObject() || null);
+    setIsDirty(true);
   }, []);
 
   const undo = () => restoreHistory(historyRef.current.index - 1);
@@ -377,7 +420,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
 
   // ---- tool: filters / adjust ----
   const applyImageFilters = useCallback((preset, b, c, s) => {
-    const img = imageObjRef.current;
+    const img = getBaseImage(fabricCanvasRef.current);
     if (!img) return;
     const list = [];
     const presetDef = PRESET_FILTERS.find(p => p.id === preset);
@@ -488,7 +531,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
     const off = nextAddOffset();
     // White+outline reads on a photo; on a blank (white) canvas that same
     // combo would be invisible, so it defaults to dark ink instead.
-    const hasBase = !!imageObjRef.current;
+    const hasBase = !!getBaseImage(canvas);
     const text = new fabric.IText("雙擊編輯文字", {
       left: canvas.width / 2 - 60 + off, top: canvas.height / 2 - 15 + off,
       fontSize: 32, fontFamily: "sans-serif", fontWeight: 700,
@@ -530,7 +573,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   const deleteActiveObject = () => {
     const canvas = fabricCanvasRef.current;
     const obj = canvas.getActiveObject();
-    if (obj && obj !== imageObjRef.current) canvas.remove(obj);
+    if (obj && obj.data?.role !== "base") canvas.remove(obj);
   };
 
   // ---- display zoom (embedded 圖片編輯室's zoom dropdown) ----
@@ -634,7 +677,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   const applyPrivacyRegion = async () => {
     const canvas = fabricCanvasRef.current;
     const sel = canvas.getActiveObject();
-    const img = imageObjRef.current;
+    const img = getBaseImage(canvas);
     if (!sel || !img) return; // no base photo (blank canvas) — nothing to mosaic/blur
     const bounds = sel.getBoundingRect();
     canvas.remove(sel);
@@ -674,11 +717,16 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
       canvas.discardActiveObject();
       canvas.renderAll();
       const blob = await canvas.toBlob({ format: "jpeg", quality: 0.92 });
-      const json = canvas.toJSON();
+      // Passed back to the caller (and optionally persisted as a draft) so
+      // "重新編輯" can reload the exact finished canvas instead of restarting
+      // from the original source file — width/height travel alongside the
+      // object JSON since fabric's own toJSON doesn't include canvas dimensions.
+      const scene = { canvasJSON: canvas.toJSON(["data"]), width: canvas.width, height: canvas.height };
       if (draftId) {
-        await saveDraft({ id: draftId, type: "photo", updatedAt: Date.now(), json });
+        await saveDraft({ id: draftId, type: "photo", updatedAt: Date.now(), scene });
       }
-      onExport(blob, json);
+      onExport(blob, scene);
+      setIsDirty(false);
     } finally {
       setBusy(false);
     }
@@ -687,7 +735,7 @@ export default function usePhotoEditorCore({ file, draftId, onExport }) {
   return {
     canvasElRef, containerRef,
     ready, activeTool, setActiveTool, selectTool, busy, canUndo, canRedo,
-    hasImage, hasObjects, importPhoto, trimToContent,
+    hasImage, hasObjects, isDirty, importPhoto, trimToContent,
     aspect, presetFilter, setPresetFilter, brightness, setBrightness, contrast, setContrast,
     saturation, setSaturation, brushColor, setBrushColor, brushWidth, setBrushWidth, privacyMode, setPrivacyMode,
     zoomPct, applyZoomPct, snapEnabled, setSnapEnabled,

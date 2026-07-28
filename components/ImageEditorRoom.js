@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { PhotoEditorEmbeddedLazy } from "./media-editor";
+import { validatePhotoFile } from "./media-editor/mediaValidation";
 import { toast } from "../lib/toast";
 import useIsMobile from "../lib/useIsMobile";
 
@@ -19,7 +20,7 @@ export default function ImageEditorRoom() {
   const isMobile = useIsMobile();
   const [originalFile, setOriginalFile] = useState(null);
   const [editingPhoto, setEditingPhoto] = useState(false);
-  const [result, setResult] = useState(null); // { url, blob }
+  const [result, setResult] = useState(null); // { url, blob, sceneJSON }
   const [pasteFlash, setPasteFlash] = useState(false);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -47,6 +48,8 @@ export default function ImageEditorRoom() {
   // adds a photo into an already-open session instead of starting one.)
   const attachFile = (file) => {
     if (!file) return;
+    const err = validatePhotoFile(file);
+    if (err) { toast(err, "error"); return; }
     setResult(prev => { if (prev?.url) URL.revokeObjectURL(prev.url); return null; });
     setOriginalFile(file);
     setEditingPhoto(true);
@@ -126,10 +129,11 @@ export default function ImageEditorRoom() {
           <div style={{ flex: 1, minHeight: 360, borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
             <PhotoEditorEmbeddedLazy
               file={originalFile}
+              initialScene={result?.sceneJSON}
               onCancel={() => setEditingPhoto(false)}
-              onExport={(blob) => {
+              onExport={(blob, sceneJSON) => {
                 if (result?.url) URL.revokeObjectURL(result.url);
-                setResult({ url: URL.createObjectURL(blob), blob });
+                setResult({ url: URL.createObjectURL(blob), blob, sceneJSON });
                 setEditingPhoto(false);
               }}
             />

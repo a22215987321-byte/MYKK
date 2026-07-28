@@ -14,6 +14,7 @@ import { formatDate } from "../../lib/format";
 import { toast } from "../../lib/toast";
 import { PhotoEditorLazy, VideoEditorLazy } from "../../components/media-editor";
 import { validatePhotoFile, validateVideoFile } from "../../components/media-editor/mediaValidation";
+import { getNotificationVolume, setNotificationVolume, playNotificationSound } from "../../lib/notificationSound";
 import {
   doc, getDoc, onSnapshot, collection, query, where, orderBy, getDocs, addDoc,
   updateDoc, serverTimestamp, arrayUnion, arrayRemove,
@@ -41,6 +42,15 @@ const VISIBILITY_OPTS = [
 ];
 
 const LANGUAGE_OPTIONS = ["西班牙語", "英語（IELTS）", "法語"];
+
+// Compact profile-header badge for whatever the user is currently learning
+// (reuses the same learningLanguages field already editable in the 關於 tab —
+// no separate schema needed just to show it more prominently up top).
+const LANGUAGE_BADGES = {
+  "西班牙語": { code: "ES", label: "西語入門" },
+  "英語（IELTS）": { code: "EN", label: "英語 IELTS" },
+  "法語": { code: "FR", label: "法語入門" },
+};
 
 // Every badge is computed from data the app already tracks elsewhere
 // (Spanish course progress, Feed hashtags, friend count, join date) —
@@ -796,6 +806,13 @@ export default function ProfilePublicPage() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [cropTarget, setCropTarget] = useState(null); // "avatar" | "cover" | null
   const [pendingFile, setPendingFile] = useState(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  // Starts at the same default the getter falls back to, then corrected from
+  // localStorage client-side only — reading localStorage during the initial
+  // render would mismatch what the statically-generated HTML shipped with.
+  const [notifVolume, setNotifVolumeState] = useState(70);
+  useEffect(() => { setNotifVolumeState(getNotificationVolume()); }, []);
+  const changeNotifVolume = (v) => { setNotifVolumeState(v); setNotificationVolume(v); };
   const avatarFileRef = useRef();
   const coverFileRef = useRef();
   const isMobile = useIsMobile();
@@ -1044,8 +1061,7 @@ export default function ProfilePublicPage() {
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
         .pp-stat-clickable { cursor: pointer; }
-        .pp-stat-clickable .pp-stat-num { color: #3ee0f5; }
-        .pp-stat-clickable:hover .pp-stat-num { text-decoration: underline; }
+        .pp-stat-clickable:hover { background: var(--panel-hover); }
 
         @media (max-width: 767px) {
           /* Prevent iOS Safari auto-zoom on input focus (needs >=16px) */
@@ -1126,11 +1142,72 @@ export default function ProfilePublicPage() {
             <div style={{ fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{profile.nickname}</div>
             <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{visiblePosts.length} 則貼文</div>
           </div>
+
+          <div style={{ flex: 1 }} />
+
+          {/* Quick account menu — this is the logged-in viewer's own
+              settings (e.g. notification sound volume), not something about
+              whichever profile happens to be open, so it uses myProfile and
+              shows regardless of isOwner. */}
+          {myProfile && (
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setAccountMenuOpen(v => !v)} aria-label="帳號選項" aria-expanded={accountMenuOpen}
+                style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 20 }}>
+                {myProfile.avatarImage
+                  ? <img src={myProfile.avatarImage} alt="我的頭像" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
+                  : <div style={{ width: 28, height: 28, borderRadius: "50%", background: myProfile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{myProfile.avatar || "😊"}</div>
+                }
+                <span style={{ color: "#f1f5f9", fontSize: 10 }}>▾</span>
+              </button>
+              {accountMenuOpen && (
+                <>
+                  <div onClick={() => setAccountMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 91, minWidth: 220, padding: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 10 }}>快速設定</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text)", marginBottom: 6 }}>
+                      <span>🔊 新訊息音量</span>
+                      <span style={{ color: "var(--text-faint)" }}>{notifVolume}%</span>
+                    </div>
+                    <input type="range" min={0} max={100} value={notifVolume}
+                      onChange={e => changeNotifVolume(Number(e.target.value))}
+                      style={{ width: "100%" }} aria-label="新訊息通知音量" />
+                    <button onClick={() => playNotificationSound()}
+                      style={{ marginTop: 10, width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 0", color: "var(--text)", fontSize: 12, cursor: "pointer" }}>
+                      🔔 測試音效
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </header>
 
         <main>
         {/* Banner */}
-        <div className="pp-banner" style={{ height: 200, position: "relative", ...bannerStyle }}>
+        <div className="pp-banner" style={{ height: 200, position: "relative", overflow: "hidden", ...bannerStyle }}>
+          {/* Star-field texture — only over the default/custom-color gradient;
+              a real cover photo shouldn't get a scattering of fake stars
+              drawn on top of it. */}
+          {profile.profileBgType !== "image" && (
+            <div aria-hidden="true" style={{
+              position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.6,
+              backgroundImage: [
+                "radial-gradient(1.5px 1.5px at 8% 22%, #fff, transparent)",
+                "radial-gradient(1px 1px at 22% 65%, #fff, transparent)",
+                "radial-gradient(2px 2px at 38% 12%, #fff, transparent)",
+                "radial-gradient(1px 1px at 52% 48%, #fff, transparent)",
+                "radial-gradient(1.5px 1.5px at 64% 75%, #fff, transparent)",
+                "radial-gradient(1px 1px at 76% 20%, #fff, transparent)",
+                "radial-gradient(2px 2px at 90% 55%, #fff, transparent)",
+                "radial-gradient(1px 1px at 14% 85%, #fff, transparent)",
+                "radial-gradient(1.5px 1.5px at 46% 88%, #fff, transparent)",
+                "radial-gradient(1px 1px at 82% 8%, #fff, transparent)",
+                "radial-gradient(1px 1px at 96% 80%, #fff, transparent)",
+                "radial-gradient(1.5px 1.5px at 30% 35%, #fff, transparent)",
+              ].join(","),
+              backgroundSize: "100% 100%",
+            }} />
+          )}
           {isOwner && (
             <>
               <EditOverlay label="更換封面" onClick={() => coverFileRef.current?.click()} />
@@ -1170,7 +1247,7 @@ export default function ProfilePublicPage() {
                 <Link href="/?view=editProfile" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 16px", color: "var(--text)", textDecoration: "none", fontSize: 14, fontWeight: 700, display: "inline-block" }}
                   onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
                   onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
-                  ⚙️ 編輯個人資料
+                  👤 編輯個人資料
                 </Link>
                 <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 10px", display: "flex", alignItems: "center" }}>
                   <ThemeToggle mode="inline" openUp />
@@ -1244,7 +1321,7 @@ export default function ProfilePublicPage() {
           {/* Name + status */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: "#f1f5f9", lineHeight: 1.2 }}>{profile.nickname}</h1>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", lineHeight: 1.2 }}>{profile.nickname}</h1>
               {profile.status === "offline" ? (
                 <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 600 }}>
                   {profile.lastActiveAt ? `最後上線於 ${formatDate(profile.lastActiveAt)}` : "離線"}
@@ -1260,33 +1337,64 @@ export default function ProfilePublicPage() {
             )}
           </div>
 
+          {(profile.learningLanguages || []).some(l => LANGUAGE_BADGES[l]) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+              {(profile.learningLanguages || []).map(lang => {
+                const badge = LANGUAGE_BADGES[lang];
+                if (!badge) return null;
+                return (
+                  <span key={lang} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--accent-active)", border: "1px solid var(--accent-border, var(--border))", borderRadius: 20, padding: "4px 12px 4px 4px", fontSize: 12, fontWeight: 700, color: "var(--text)" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "var(--accent)", color: "var(--accent-text)", fontSize: 9, fontWeight: 800 }}>{badge.code}</span>
+                    {badge.label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
           <AchievementsRow profile={profile} posts={posts} />
 
           {profile.bio && (
             <div style={{ fontSize: 15, color: "var(--text-subtle)", marginBottom: 12, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{profile.bio}</div>
           )}
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
-            {profile.statusText && (
+          {profile.statusText && (
+            <div style={{ marginBottom: 12 }}>
               <span style={{ fontSize: 13, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>💬 {profile.statusText}</span>
-            )}
-            {profile.createdAt && (
-              <span style={{ fontSize: 13, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>📅 加入於 {formatJoinDate(profile.createdAt)}</span>
-            )}
-          </div>
+            </div>
+          )}
 
-          <div style={{ display: "flex", gap: 20, marginBottom: 16 }}>
-            <div className="pp-stat-clickable" onClick={() => setTab("friends")} style={{ display: "flex", gap: 4 }}>
-              <span className="pp-stat-num" style={{ fontWeight: 700, fontSize: 14, color: "#f1f5f9" }}>{friendUids.length}</span>
-              <span style={{ fontSize: 14, color: "var(--text-faint)" }}>好友</span>
+          {/* Stat card — joined-date + friend/post/like counts share one row
+              instead of a plain text line, matching the rest of the app's
+              bordered-card visual language (var(--card-shadow) etc). */}
+          <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "var(--panel)", boxShadow: "var(--card-shadow)", marginBottom: 16, overflow: "hidden" }}>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">📅</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>加入於</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{profile.createdAt ? formatJoinDate(profile.createdAt) : "—"}</div>
+              </div>
             </div>
-            <div className="pp-stat-clickable" onClick={() => setTab("posts")} style={{ display: "flex", gap: 4 }}>
-              <span className="pp-stat-num" style={{ fontWeight: 700, fontSize: 14, color: "#f1f5f9" }}>{visiblePosts.length}</span>
-              <span style={{ fontSize: 14, color: "var(--text-faint)" }}>貼文</span>
+            <div className="pp-stat-clickable" onClick={() => setTab("friends")} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">👥</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{friendUids.length}</div>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>好友</div>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 4 }}>
-              <span style={{ fontWeight: 700, fontSize: 14, color: "#f1f5f9" }}>{totalLikes}</span>
-              <span style={{ fontSize: 14, color: "var(--text-faint)" }}>獲讚總數</span>
+            <div className="pp-stat-clickable" onClick={() => setTab("posts")} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">📄</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{visiblePosts.length}</div>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>貼文</div>
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">♡</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{totalLikes}</div>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>獲讚總數</div>
+              </div>
             </div>
           </div>
 
@@ -1299,7 +1407,7 @@ export default function ProfilePublicPage() {
               ["about", "關於"],
             ].map(([key, label]) => (
               <button key={key} onClick={() => setTab(key)}
-                style={{ flex: 1, padding: "14px 0", background: "none", border: "none", borderBottom: tab === key ? "2px solid var(--accent)" : "2px solid transparent", color: tab === key ? "#f1f5f9" : "var(--text-faint)", fontSize: 14, fontWeight: tab === key ? 700 : 500, cursor: "pointer", transition: "color 0.15s" }}>
+                style={{ flex: 1, padding: "14px 0", background: "none", border: "none", borderBottom: tab === key ? "2px solid var(--accent)" : "2px solid transparent", color: tab === key ? "var(--text)" : "var(--text-faint)", fontSize: 14, fontWeight: tab === key ? 700 : 500, cursor: "pointer", transition: "color 0.15s" }}>
                 {label}
               </button>
             ))}

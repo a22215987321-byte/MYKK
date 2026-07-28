@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { auth, db } from "../lib/firebase";
 import { uploadToR2 } from "../lib/uploadToR2";
 import { toast } from "../lib/toast";
+import { playNotificationSound } from "../lib/notificationSound";
 import AvatarCreator from "./AvatarCreator";
 import CalendarMemo from "./CalendarMemo";
 import PageNotes from "./PageNotes";
@@ -966,17 +967,37 @@ export default function ChatApp({ user }) {
     });
   }, [friendsKey]);
 
+  // Guards the first snapshot of each message listener below, which fires
+  // with the whole existing history as a batch of "added" docChanges —
+  // without this, opening a chat would play one ding per historical message
+  // instead of only for genuinely new ones that arrive afterward.
+  const hallSoundReadyRef = useRef(false);
+  const privateSoundReadyRef = useRef(false);
+  const groupSoundReadyRef = useRef(false);
+
+  // Plays at most one ding per snapshot batch, only for messages someone
+  // else sent — sending your own message shouldn't ding yourself.
+  const notifyIfIncoming = (docChanges, readyRef) => {
+    if (!readyRef.current) { readyRef.current = true; return; }
+    const hasIncoming = docChanges.some(c => c.type === "added" && c.doc.data().senderId !== uid);
+    if (hasIncoming) playNotificationSound();
+  };
+
   useEffect(() => {
+    hallSoundReadyRef.current = false;
     const q = query(collection(db, 'hall_messages'), orderBy('createdAt'), limitToLast(50));
     return onSnapshot(q, snap => {
+      notifyIfIncoming(snap.docChanges(), hallSoundReadyRef);
       setHallMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   }, []);
 
   useEffect(() => {
     if (!activeFriendId) { setPrivateMessages([]); return; }
+    privateSoundReadyRef.current = false;
     const q = query(collection(db, 'private_chats', chatId, 'messages'), orderBy('createdAt'), limitToLast(50));
     return onSnapshot(q, snap => {
+      notifyIfIncoming(snap.docChanges(), privateSoundReadyRef);
       setPrivateMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   }, [uid, activeFriendId]);
@@ -992,8 +1013,10 @@ export default function ChatApp({ user }) {
   // Group messages listener
   useEffect(() => {
     if (!activeGroupId) { setGroupMessages([]); return; }
+    groupSoundReadyRef.current = false;
     const q = query(collection(db, 'groups', activeGroupId, 'messages'), orderBy('createdAt'), limitToLast(50));
     return onSnapshot(q, snap => {
+      notifyIfIncoming(snap.docChanges(), groupSoundReadyRef);
       setGroupMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   }, [activeGroupId]);
@@ -2508,7 +2531,7 @@ export default function ChatApp({ user }) {
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>大家都可以看到這裡的訊息</div>
                 </div>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center" }}>
                 <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 12, padding: "8px 0 16px" }}>
                   今天 · {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric" })}
                 </div>
@@ -2575,7 +2598,7 @@ export default function ChatApp({ user }) {
                   ℹ️ 個人檔案
                 </Link>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0)", backgroundSize: "28px 28px" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "var(--chat-world-bg-size, 28px 28px)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center" }}>
                 <div style={{ textAlign: "center", marginBottom: 16 }}>
                   <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={56} />
                   <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{activeFriendProfile.nickname}</div>
@@ -2628,7 +2651,7 @@ export default function ChatApp({ user }) {
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(activeGroup.members || []).length} 位成員</div>
                 </div>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center" }}>
                 {groupMessages.length === 0 && (
                   <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
                     <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>

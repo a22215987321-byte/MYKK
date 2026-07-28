@@ -5,6 +5,9 @@ import usePhotoEditorCore, {
   renderPhotoEditorDrawer, TOOLS, MOBILE_TOOLS, EDIT_GROUP_IDS, TRIM_TOOL, toolById, withPhotoToolState,
 } from "./usePhotoEditorCore";
 import TextPanel from "./TextPanel";
+import ConfirmDialog from "./ConfirmDialog";
+import { validatePhotoFile } from "./mediaValidation";
+import { toast } from "../../lib/toast";
 
 const ZOOM_OPTIONS = [50, 75, 100, 125, 150, 200, 300, 400];
 // 去除留白 only exists here (see TRIM_TOOL) — appended after 馬賽克 on desktop's
@@ -26,16 +29,34 @@ const embeddedToolById = (id) => (id === "trim" ? TRIM_TOOL : toolById(id));
 // fullscreen editor (ToolButton, IconButton, DrawerSlider/ChipRow,
 // toolBtnStyle) — EditorShell.js sets the same variables to the original
 // dark literals, so that component's own appearance is untouched.
-export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport }) {
+export default function PhotoEditorEmbedded({ file, initialScene, draftId, onCancel, onExport }) {
   const isMobile = useIsMobile();
   const [editHubOpen, setEditHubOpen] = useState(false);
-  const core = usePhotoEditorCore({ file, draftId, onExport });
+  const core = usePhotoEditorCore({ file, initialScene, draftId, onExport });
   const {
     canvasElRef, containerRef, ready, activeTool, setActiveTool, selectTool, busy, canUndo, canRedo,
-    undo, redo, eraseStrokeAt, handleExport, hasImage, importPhoto,
+    undo, redo, eraseStrokeAt, handleExport, hasImage, isDirty, importPhoto,
     zoomPct, applyZoomPct, snapEnabled, setSnapEnabled,
   } = core;
   const importInputRef = useRef(null);
+  // Non-null while a confirm dialog is up — either "leave with unsaved
+  // changes?" or "replace the current base image or add this as a new
+  // object?". Only one can be open at a time.
+  const [pendingLeave, setPendingLeave] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState(null);
+
+  const requestLeave = () => {
+    if (isDirty) setPendingLeave(true);
+    else onCancel();
+  };
+
+  const handleFileChosen = (file) => {
+    if (!file) return;
+    const err = validatePhotoFile(file);
+    if (err) { toast(err, "error"); return; }
+    if (hasImage) setPendingImportFile(file);
+    else importPhoto(file);
+  };
 
   const isEditGroupActive = EMBEDDED_EDIT_GROUP_IDS.includes(activeTool);
 
@@ -85,12 +106,12 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport 
         borderTopLeftRadius: "var(--radius-lg)", borderTopRightRadius: "var(--radius-lg)",
         flexWrap: "wrap", rowGap: 8,
       }}>
-        <IconButton label="返回" onClick={onCancel}>✕</IconButton>
+        <IconButton label="返回" onClick={requestLeave}>✕</IconButton>
         <IconButton label="復原" onClick={undo} disabled={!canUndo}>↶</IconButton>
         <IconButton label="重做" onClick={redo} disabled={!canRedo}>↷</IconButton>
 
         <input ref={importInputRef} type="file" accept="image/*" style={{ display: "none" }}
-          onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importPhoto(f); }} />
+          onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; handleFileChosen(f); }} />
         <button onClick={() => importInputRef.current?.click()}
           style={{
             display: "flex", alignItems: "center", gap: 6, minHeight: 36, padding: "0 12px", borderRadius: 8,
@@ -114,15 +135,18 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport 
         </label>
 
         {/* Snap-to-guides is currently just this on/off switch — the actual
-            guide-line/snap-correction behavior isn't built yet (see chat). */}
+            guide-line/snap-correction behavior isn't built yet (see chat).
+            Label says so explicitly rather than looking like a finished
+            feature that happens to do nothing. */}
         <button onClick={() => setSnapEnabled(v => !v)} aria-pressed={snapEnabled}
+          title="開發中：目前僅為開關，尚未提供實際吸附/參考線效果"
           style={{
             minHeight: 36, padding: "0 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
             border: snapEnabled ? "1px solid var(--accent)" : "1px solid var(--pe-border)",
             background: snapEnabled ? "var(--accent-active)" : "var(--pe-control-bg)",
             color: "var(--pe-text)",
           }}>
-          {snapEnabled ? "✓ 對齊輔助" : "對齊輔助"}
+          {snapEnabled ? "✓ 對齊輔助（開發中）" : "對齊輔助（開發中）"}
         </button>
 
         <button onClick={handleExport} disabled={!ready || busy}
@@ -188,6 +212,31 @@ export default function PhotoEditorEmbedded({ file, draftId, onCancel, onExport 
           )}
         </div>
       </div>
+
+      {pendingLeave && (
+        <ConfirmDialog
+          title="尚有未儲存的變更"
+          message="離開後這次編輯的內容將會遺失，確定要離開嗎？"
+          onDismiss={() => setPendingLeave(false)}
+          actions={[
+            { label: "繼續編輯", onClick: () => setPendingLeave(false) },
+            { label: "放棄變更並離開", variant: "danger", onClick: () => { setPendingLeave(false); onCancel(); } },
+          ]}
+        />
+      )}
+
+      {pendingImportFile && (
+        <ConfirmDialog
+          title="已經有一張底圖"
+          message="要用這張新照片取代目前的底圖，還是把它加入為可移動的新物件？"
+          onDismiss={() => setPendingImportFile(null)}
+          actions={[
+            { label: "取代目前底圖", variant: "primary", onClick: () => { importPhoto(pendingImportFile, { replace: true }); setPendingImportFile(null); } },
+            { label: "加入為新物件", onClick: () => { importPhoto(pendingImportFile); setPendingImportFile(null); } },
+            { label: "取消", onClick: () => setPendingImportFile(null) },
+          ]}
+        />
+      )}
     </div>
   );
 }

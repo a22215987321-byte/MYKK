@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import ChatRoom from '../components/ChatRoom';
+import LoadingState from '../components/LoadingState';
 import { auth, db, googleProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+
+const AUTH_TIMEOUT_MS = 12000;
 
 const AVATAR_EMOJIS = ["😊","👨‍💻","📚","🏃","🎮","🎨","🍜","🌸","🦊","🐼","🎧","⚡"];
 const COLORS = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06b6d4","#84cc16"];
@@ -266,7 +269,8 @@ function getErrorMessage(code) {
 export default function Home() {
   const router = useRouter();
   const [user, setUser] = useState(null);
-  const [step, setStep] = useState('loading'); // loading | login | setup | chat
+  const [step, setStep] = useState('loading'); // loading | login | setup | chat | error
+  const [authErrorMsg, setAuthErrorMsg] = useState('');
 
   // Login / Register form state
   const [tab, setTab] = useState('login');
@@ -287,25 +291,47 @@ export default function Home() {
     const unsub = auth.onAuthStateChanged(async (u) => {
       if (!u) { setUser(null); setStep('login'); return; }
       setUser(u);
-      const snap = await getDoc(doc(db, 'users', u.uid));
-      if (snap.exists()) {
-        // The splash screen is a once-per-session boot animation, not a
-        // per-navigation one — every client-side nav back to "/" (the
-        // 返回聊天室 link on /profile or /feed, browser back, etc.) remounts
-        // this component fresh, so without this check it would replay the
-        // "PRESS START" screen every single time. sessionStorage survives
-        // across that remount (unlike React state) but resets on an actual
-        // new tab/browser session, which is the boot-once behavior we want.
-        let splashShown = false;
-        try { splashShown = sessionStorage.getItem('evonchat-splash-shown') === '1'; } catch {}
-        setStep((splashShown || router.query.view) ? 'chat' : 'splash');
-      } else {
-        setSetupNickname(u.displayName || '');
-        setStep('setup');
+      try {
+        const snap = await getDoc(doc(db, 'users', u.uid));
+        if (snap.exists()) {
+          // The splash screen is a once-per-session boot animation, not a
+          // per-navigation one — every client-side nav back to "/" (the
+          // 返回聊天室 link on /profile or /feed, browser back, etc.) remounts
+          // this component fresh, so without this check it would replay the
+          // "PRESS START" screen every single time. sessionStorage survives
+          // across that remount (unlike React state) but resets on an actual
+          // new tab/browser session, which is the boot-once behavior we want.
+          let splashShown = false;
+          try { splashShown = sessionStorage.getItem('evonchat-splash-shown') === '1'; } catch {}
+          setStep((splashShown || router.query.view) ? 'chat' : 'splash');
+        } else {
+          setSetupNickname(u.displayName || '');
+          setStep('setup');
+        }
+      } catch (e) {
+        console.error('[Home] failed to load user profile', e);
+        setAuthErrorMsg('無法連線到伺服器，請檢查網路連線後再試一次');
+        setStep('error');
       }
+    }, (e) => {
+      console.error('[Home] auth state listener failed', e);
+      setAuthErrorMsg('登入狀態驗證失敗，請重新整理頁面');
+      setStep('error');
     });
     return unsub;
   }, []);
+
+  // Safety net: if Firebase never calls back at all (blocked request, dead
+  // network, stuck offline-persistence handshake) don't leave the user
+  // staring at a spinner forever — surface a retry after a timeout.
+  useEffect(() => {
+    if (step !== 'loading') return;
+    const t = setTimeout(() => {
+      setAuthErrorMsg('載入時間過長，可能是網路連線問題');
+      setStep('error');
+    }, AUTH_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [step]);
 
   const handleLogin = async () => {
     setAuthError('');
@@ -366,20 +392,16 @@ export default function Home() {
 
   // ── Loading ──
   if (step === 'loading') {
+    return <LoadingState label="載入中..." />;
+  }
+
+  // ── Error (auth check failed, or timed out) ──
+  if (step === 'error') {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-        <style>{`
-          @keyframes evon-spin { to { transform: rotate(360deg); } }
-          .evon-spinner {
-            width: 48px; height: 48px; border-radius: 50%;
-            border: 4px solid var(--panel);
-            border-top-color: var(--accent-2);
-            animation: evon-spin 0.8s linear infinite;
-          }
-        `}</style>
-        <div className="evon-spinner" />
-        <div style={{ color: 'var(--text-dim)', fontSize: 14, letterSpacing: 1 }}>載入中...</div>
-      </div>
+      <LoadingState
+        error={authErrorMsg || '發生錯誤，請稍後再試'}
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 
@@ -397,30 +419,30 @@ export default function Home() {
   // ── First-time profile setup (Google users) ──
   if (step === 'setup') {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <main style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
         <div style={{ width: '100%', maxWidth: 420 }}>
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>👋</div>
+            <div aria-hidden="true" style={{ fontSize: 48, marginBottom: 12 }}>👋</div>
             <h1 style={{ color: 'var(--text)', fontSize: 22, fontWeight: 700, margin: 0 }}>建立你的個人資料</h1>
             <p style={{ color: 'var(--text-faint)', fontSize: 14, marginTop: 6 }}>讓大家認識你</p>
           </div>
           <div style={{ background: 'var(--panel)', borderRadius: 'var(--radius-lg)', padding: 28, border: '1px solid var(--border)', backdropFilter: 'var(--panel-blur)', WebkitBackdropFilter: 'var(--panel-blur)' }}>
             <div style={{ marginBottom: 18 }}>
-              <label style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 6, display: 'block' }}>選擇頭像</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+              <span id="setup-avatar-label" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 6, display: 'block' }}>選擇頭像</span>
+              <div role="group" aria-labelledby="setup-avatar-label" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                 {AVATAR_EMOJIS.map(e => (
-                  <button key={e} onClick={() => setSetupAvatar(e)} style={{ width: 38, height: 38, borderRadius: '50%', border: setupAvatar === e ? '2px solid var(--accent)' : '2px solid transparent', background: setupColor, cursor: 'pointer', fontSize: 18 }}>{e}</button>
+                  <button key={e} type="button" onClick={() => setSetupAvatar(e)} aria-label={`頭像 ${e}`} aria-pressed={setupAvatar === e} style={{ width: 38, height: 38, borderRadius: '50%', border: setupAvatar === e ? '2px solid var(--accent)' : '2px solid transparent', background: setupColor, cursor: 'pointer', fontSize: 18 }}>{e}</button>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div role="group" aria-label="選擇頭像底色" style={{ display: 'flex', gap: 6 }}>
                 {COLORS.map(c => (
-                  <button key={c} onClick={() => setSetupColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, border: setupColor === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer' }} />
+                  <button key={c} type="button" onClick={() => setSetupColor(c)} aria-label={`底色 ${c}`} aria-pressed={setupColor === c} style={{ width: 24, height: 24, borderRadius: '50%', background: c, border: setupColor === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer' }} />
                 ))}
               </div>
             </div>
             <div style={{ marginBottom: 20 }}>
-              <label style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>暱稱</label>
-              <input value={setupNickname} onChange={e => setSetupNickname(e.target.value)}
+              <label htmlFor="setup-nickname" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>暱稱</label>
+              <input id="setup-nickname" value={setupNickname} onChange={e => setSetupNickname(e.target.value)}
                 placeholder="你的暱稱" onKeyDown={e => e.key === 'Enter' && handleSetup()}
                 style={inputStyle} />
             </div>
@@ -433,24 +455,24 @@ export default function Home() {
             </button>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   // ── Login / Register ──
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ width: '100%', maxWidth: 400 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
+          <div aria-hidden="true" style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
           <h1 style={{ color: 'var(--text)', fontSize: 24, fontWeight: 700, margin: 0 }}>聊天社交平台</h1>
           <p style={{ color: 'var(--text-faint)', fontSize: 14, marginTop: 6 }}>與朋友保持聯繫</p>
         </div>
         <div style={{ background: 'var(--panel)', borderRadius: 'var(--radius-lg)', padding: 28, border: '1px solid var(--border)', backdropFilter: 'var(--panel-blur)', WebkitBackdropFilter: 'var(--panel-blur)' }}>
           {/* Tab switch */}
-          <div style={{ display: 'flex', marginBottom: 20, background: 'var(--panel-alt)', borderRadius: 'var(--radius-md)', padding: 4 }}>
+          <div role="tablist" aria-label="登入或註冊" style={{ display: 'flex', marginBottom: 20, background: 'var(--panel-alt)', borderRadius: 'var(--radius-md)', padding: 4 }}>
             {['login','register'].map(t => (
-              <button key={t} onClick={() => { setTab(t); setAuthError(''); }} style={{
+              <button key={t} role="tab" aria-selected={tab === t} onClick={() => { setTab(t); setAuthError(''); }} style={{
                 flex: 1, padding: '8px 0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                 background: tab === t ? 'var(--accent)' : 'transparent',
                 color: tab === t ? '#fff' : 'var(--text-faint)', fontSize: 14, fontWeight: 600,
@@ -461,15 +483,15 @@ export default function Home() {
           {/* Avatar picker (register only) */}
           {tab === 'register' && (
             <div style={{ marginBottom: 16 }}>
-              <label style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 6, display: 'block' }}>選擇頭像</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+              <span id="reg-avatar-label" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 6, display: 'block' }}>選擇頭像</span>
+              <div role="group" aria-labelledby="reg-avatar-label" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                 {AVATAR_EMOJIS.map(e => (
-                  <button key={e} onClick={() => setAvatar(e)} style={{ width: 38, height: 38, borderRadius: '50%', border: avatar === e ? '2px solid var(--accent)' : '2px solid transparent', background: color, cursor: 'pointer', fontSize: 18 }}>{e}</button>
+                  <button key={e} type="button" onClick={() => setAvatar(e)} aria-label={`頭像 ${e}`} aria-pressed={avatar === e} style={{ width: 38, height: 38, borderRadius: '50%', border: avatar === e ? '2px solid var(--accent)' : '2px solid transparent', background: color, cursor: 'pointer', fontSize: 18 }}>{e}</button>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div role="group" aria-label="選擇頭像底色" style={{ display: 'flex', gap: 6 }}>
                 {COLORS.map(c => (
-                  <button key={c} onClick={() => setColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, border: color === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer' }} />
+                  <button key={c} type="button" onClick={() => setColor(c)} aria-label={`底色 ${c}`} aria-pressed={color === c} style={{ width: 24, height: 24, borderRadius: '50%', background: c, border: color === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer' }} />
                 ))}
               </div>
             </div>
@@ -477,25 +499,25 @@ export default function Home() {
 
           {tab === 'register' && (
             <div style={{ marginBottom: 12 }}>
-              <label style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>暱稱</label>
-              <input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="你的暱稱" style={inputStyle} />
+              <label htmlFor="reg-nickname" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>暱稱</label>
+              <input id="reg-nickname" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="你的暱稱" style={inputStyle} />
             </div>
           )}
 
           <div style={{ marginBottom: 12 }}>
-            <label style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>電子郵件</label>
-            <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="your@email.com" style={inputStyle} />
+            <label htmlFor="auth-email" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>電子郵件</label>
+            <input id="auth-email" value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="your@email.com" style={inputStyle} />
           </div>
 
           <div style={{ marginBottom: 20 }}>
-            <label style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>密碼</label>
-            <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="••••••••"
+            <label htmlFor="auth-password" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>密碼</label>
+            <input id="auth-password" value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="••••••••"
               onKeyDown={e => e.key === 'Enter' && (tab === 'login' ? handleLogin() : handleRegister())}
               style={inputStyle} />
           </div>
 
           {authError && (
-            <div style={{ background: '#450a0a', border: '1px solid #ef4444', borderRadius: 'var(--radius-sm)', padding: '8px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 14 }}>
+            <div role="alert" style={{ background: '#450a0a', border: '1px solid #ef4444', borderRadius: 'var(--radius-sm)', padding: '8px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 14 }}>
               {authError}
             </div>
           )}
@@ -530,6 +552,6 @@ export default function Home() {
           </button>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

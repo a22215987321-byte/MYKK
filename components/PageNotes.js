@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import useIsMobile from "../lib/useIsMobile";
 
 const NOTE_TYPES = ["初學者會疑惑", "翻譯不自然", "缺少句子拆解", "單字查不到", "發音問題", "頁面設計問題", "其他"];
 const SEVERITIES = ["低", "中", "高", "必修"];
@@ -150,6 +151,7 @@ export default function PageNotes({ noteKey, pageTitle }) {
   const [notes, setNotes] = useState(emptyNotes());
   const [loaded, setLoaded] = useState(false);
   const [expandedIndex, setExpandedIndex] = useState(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!noteKey) return;
@@ -172,7 +174,6 @@ export default function PageNotes({ noteKey, pageTitle }) {
 
   if (!noteKey || !loaded) return null;
 
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 680;
   const pathLabel = (typeof window !== "undefined" ? window.location.pathname : "") + "#" + noteKey;
 
   return (

@@ -1,3 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Deliberately NOT `@import "tailwindcss";` — that also pulls in Tailwind's
+   Preflight reset (`*,::before,::after { box-sizing:border-box; margin:0;
+   padding:0; border:0 }`), which would silently change spacing/sizing on
+   every existing element in this app (built entirely with inline styles
+   against the browser's normal default box model, never against Preflight).
+   Importing just the theme tokens + utilities keeps className="bg-black
+   flex ..." (used by pages/chat.js) working without that blast radius. */
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css";

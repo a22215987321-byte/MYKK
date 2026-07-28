@@ -14,6 +14,12 @@ export default function Document() {
           dangerouslySetInnerHTML={{
             __html: `(function(){try{
               var t=localStorage.getItem('theme');
+              if(!t){
+                // No explicit choice saved yet — follow the OS/browser dark-mode
+                // preference instead of always defaulting to the light theme.
+                // Not persisted, so it keeps tracking the OS setting on later visits.
+                t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'neon':'default';
+              }
               if(t&&t!=='default'){document.documentElement.setAttribute('data-theme',t);}
               if(t==='pastel-pearl'){
                 var palettes=['champagne','coral-peach','mist-blue','lavender','pearl-silver','mint-sea-salt'];
@@ -21,6 +27,9 @@ export default function Document() {
                 if(palettes.indexOf(p)===-1)p='mist-blue';
                 document.documentElement.setAttribute('data-pastel-palette',p);
               }
+              var colors={default:'#f4f3f9',neon:'#090812',glass:'#eef1f7','pastel-pearl':'#f7f4ef'};
+              var meta=document.querySelector('meta[name="theme-color"]');
+              if(meta&&colors[t])meta.setAttribute('content',colors[t]);
             }catch(e){}})();`,
           }}
         />

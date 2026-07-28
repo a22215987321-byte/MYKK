@@ -5,6 +5,7 @@ import { collection, query, where, getDocs, doc, getDoc, updateDoc } from "fireb
 import { lookupDeep } from "../lib/spanishDeepDict";
 import { getFrenchShard, normalizeFrench } from "../lib/frenchDictionary";
 import GrammarLearningCard from "./GrammarLearningCard";
+import { toast } from "../lib/toast";
 
 const EN_LETTERS = "abcdefghijklmnopqrstuvwxyz".split("");
 const ES_LETTERS = [...EN_LETTERS, "ñ"];
@@ -332,7 +333,7 @@ export default function DictionaryRoom() {
       setShardData(prev => ({ ...prev, [editModal.word]: { ...(prev[editModal.word] || {}), ...saved } }));
       setEditModal(null);
     } catch {
-      alert("儲存失敗。請到 Firebase Console → Firestore → 規則，確認 dictEdits 集合允許寫入。");
+      toast("儲存失敗。請到 Firebase Console → Firestore → 規則，確認 dictEdits 集合允許寫入。");
     }
     setSaving(false);
   };
@@ -362,7 +363,7 @@ export default function DictionaryRoom() {
         setTimeout(() => { setAddSuccess(null); setVocabModal(null); }, 1200);
       }
     } catch {
-      alert("加入失敗，請稍後重試");
+      toast("加入失敗，請稍後重試");
     }
     setAddingList(null);
   };

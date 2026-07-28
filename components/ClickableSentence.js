@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { lookupWord } from "../lib/dictionary";
 import { loadAllEdits, saveEdit } from "../lib/dictEdits";
+import { toast } from "../lib/toast";
 import ClickableSpanishText from "./ClickableSpanishText";
 
 const TAG_LABELS = { zk: "中考", gk: "高考", ky: "考研", cet4: "CET4", cet6: "CET6", ielts: "IELTS", toefl: "TOEFL", gre: "GRE" };
@@ -43,7 +44,7 @@ function WordPopup({ word, data: initialData, loading, pos, lang, onClose }) {
       setData(d => ({ ...(d || {}), ...saved }));
       setEditing(false);
     } catch {
-      alert("儲存失敗，請確認 Firebase dictEdits 集合的安全規則。");
+      toast("儲存失敗，請確認 Firebase dictEdits 集合的安全規則。");
     }
     setSaving(false);
   };

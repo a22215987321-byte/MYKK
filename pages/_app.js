@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import Head from "next/head";
+import "../globals.css";
 import "../styles/theme.css";
 import ThemeToggle from "../components/ThemeToggle";
 import InstallPrompt from "../components/InstallPrompt";
+import ToastHost from "../components/ToastHost";
 
 export default function App({ Component, pageProps }) {
   useEffect(() => {
@@ -18,6 +20,7 @@ export default function App({ Component, pageProps }) {
       <ThemeToggle />
       <Component {...pageProps} />
       <InstallPrompt />
+      <ToastHost />
     </>
   );
 }

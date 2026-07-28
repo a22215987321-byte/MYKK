@@ -27,8 +27,12 @@
   --radius-md: 14px;
   --radius-lg: 20px;
 
-  --font-body: 'Inter', 'Helvetica Neue', 'Noto Sans TC', sans-serif;
-  --font-heading: 'Inter', 'Helvetica Neue', 'Noto Sans TC', sans-serif;
+  /* Was 'Inter' first — but only Press Start 2P is ever linked in
+     _document.js, so Inter never loaded and every page silently rendered
+     its fallback the whole time. Declaring the system stack that's
+     actually on screen instead of a font nothing ever fetched. */
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans TC', sans-serif;
+  --font-heading: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans TC', sans-serif;
 
   --card-shadow: 0 2px 12px rgba(40, 36, 80, 0.07);
   --glow-border: none;
@@ -42,6 +46,14 @@
   --shell-margin: 0px;
   --shell-radius: 0px;
   --shell-shadow: none;
+
+  /* Height of ChatMobileTabBar (see components/ChatMobileTabBar.js). Pages
+     that mount it via MobileTabBarLayout (outside ChatRoom's own shell,
+     e.g. /feed, /profile/[uid]) must reserve this much bottom padding on
+     their scroll container or their own content ends up hidden behind the
+     bar. Kept as one variable instead of a 56px literal copy-pasted into
+     each page's stylesheet, so a future resize only needs one edit. */
+  --mobile-tabbar-h: 56px;
 }
 
 html[data-theme="neon"] {
@@ -243,4 +255,36 @@ html[data-theme="neon"] .glow-frame {
   background-origin: border-box;
   background-clip: padding-box, border-box;
   box-shadow: var(--glow-shadow);
+}
+
+/* Keyboard focus must always be visible — mouse/touch clicks don't get the ring. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Visually hidden but still reachable by screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Shared loading spinner (see components/LoadingState.js) */
+@keyframes evon-spin { to { transform: rotate(360deg); } }
+.evon-spinner {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 4px solid var(--panel);
+  border-top-color: var(--accent-2);
+  animation: evon-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evon-spinner { animation: none; opacity: 0.75; }
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
 }

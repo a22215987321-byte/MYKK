@@ -5,6 +5,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import ClickableSentence from "./ClickableSentence";
+import { toast } from "../lib/toast";
 
 function shuffle(arr) {
   const a = [...arr];
@@ -732,7 +733,7 @@ export default function CustomVocabRoom({ user, db }) {
       });
       setShowCreateModal(false);
     } catch (e) {
-      alert("建立失敗，請到 Firebase Console 新增 vocabLists 的安全規則，或確認已登入");
+      toast("建立失敗，請到 Firebase Console 新增 vocabLists 的安全規則，或確認已登入");
     }
   };
 

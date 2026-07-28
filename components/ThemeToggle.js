@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import useIsMobile from "../lib/useIsMobile";
+import { CHAT_WORLDS, getWorldById, getSavedWorldId, getSavedVariantId, applyWorld } from "../lib/chatWorlds";
 
 const THEMES = [
   { id: "default", label: "☀️ 淺色預設" },
@@ -68,9 +69,73 @@ function PaletteGrid({ selected, onSelect }) {
   );
 }
 
+// Same swatch-grid interaction as PaletteSwatch/PaletteGrid above, but each
+// swatch previews an actual thumbnail crop of the world image instead of a
+// flat color circle. "無背景" has no thumbnail — falls back to its own emoji.
+function WorldSwatch({ world, thumbSrc, selected, onSelect }) {
+  return (
+    <button
+      onClick={() => onSelect(world.id)}
+      aria-label={`${world.label}${selected ? "（目前選中）" : ""}`}
+      aria-pressed={selected}
+      style={{
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5,
+        minWidth: 44, minHeight: 44, padding: "8px 4px",
+        background: selected ? "var(--panel-hover)" : "transparent",
+        border: selected ? "1.5px solid var(--accent)" : "1.5px solid transparent",
+        borderRadius: 12, cursor: "pointer", fontFamily: "var(--font-body)",
+      }}
+    >
+      <span style={{
+        width: 30, height: 30, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+        border: "1px solid rgba(0,0,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center",
+        background: thumbSrc ? `url(${thumbSrc}) center/cover` : "var(--panel-alt)", fontSize: 16,
+      }}>
+        {!thumbSrc && "🚫"}
+        {selected && <span aria-hidden="true" style={{ fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 0 3px rgba(0,0,0,0.8)" }}>✓</span>}
+      </span>
+      <span style={{ fontSize: 10, color: "var(--text)", whiteSpace: "nowrap", lineHeight: 1.2 }}>{world.label.replace(/^\S+\s/, "")}</span>
+    </button>
+  );
+}
+
+function WorldGrid({ selected, onSelect }) {
+  return (
+    <div role="group" aria-label="選擇聊天背景" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, padding: "6px 8px 10px" }}>
+      {CHAT_WORLDS.map(w => (
+        <WorldSwatch key={w.id} world={w} thumbSrc={w.variants?.[0]?.src} selected={selected === w.id} onSelect={onSelect} />
+      ))}
+    </div>
+  );
+}
+
+// Sub-picker shown only for worlds with more than one image (currently just
+// 水世界's 皇宮/小怪物) — same swatch style, one level deeper.
+function WorldVariantGrid({ world, selected, onSelect }) {
+  return (
+    <div role="group" aria-label={`選擇${world.label}款式`} style={{ display: "flex", gap: 4, padding: "0 8px 10px", justifyContent: "center" }}>
+      {world.variants.map(v => (
+        <button key={v.id} onClick={() => onSelect(v.id)}
+          aria-label={`${v.label}${selected === v.id ? "（目前選中）" : ""}`} aria-pressed={selected === v.id}
+          style={{
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: 4,
+            background: selected === v.id ? "var(--panel-hover)" : "transparent",
+            border: selected === v.id ? "1.5px solid var(--accent)" : "1.5px solid transparent",
+            borderRadius: 10, cursor: "pointer",
+          }}>
+          <span style={{ width: 52, height: 36, borderRadius: 6, overflow: "hidden", background: `url(${v.src}) center/cover`, border: "1px solid rgba(0,0,0,0.15)" }} />
+          <span style={{ fontSize: 10, color: "var(--text)" }}>{v.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp = false, msgFontSize, onChangeMsgFontSize, onResetMsgFontSize }) {
   const [theme, setTheme] = useState("default");
   const [pastelPalette, setPastelPalette] = useState(DEFAULT_PASTEL_PALETTE);
+  const [chatWorld, setChatWorld] = useState("none");
+  const [chatWorldVariant, setChatWorldVariant] = useState(null);
   const [open, setOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const menuRef = useRef(null);
@@ -91,6 +156,15 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
 
     const savedPalette = localStorage.getItem("pastelPalette");
     setPastelPalette(PASTEL_PALETTE_IDS.includes(savedPalette) ? savedPalette : DEFAULT_PASTEL_PALETTE);
+
+    const savedWorld = getSavedWorldId();
+    const savedVariant = getSavedVariantId(savedWorld);
+    setChatWorld(savedWorld);
+    setChatWorldVariant(savedVariant);
+    // Unlike theme/palette (already set on <html> by the anti-flicker inline
+    // script in _document.js before React even mounts), nothing has applied
+    // the saved world's CSS variable yet — this is the first thing that does.
+    applyWorld(savedWorld, savedVariant);
   }, []);
 
   useEffect(() => onAuthStateChanged(auth, u => setLoggedIn(!!u)), []);
@@ -125,6 +199,28 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
   const selectPalette = (id) => {
     setPastelPalette(id);
     applyPalette(id);
+    setOpen(false);
+  };
+
+  const selectWorld = (id) => {
+    setChatWorld(id);
+    const world = CHAT_WORLDS.find(w => w.id === id);
+    if (world?.variants) {
+      const variant = getSavedVariantId(id);
+      setChatWorldVariant(variant);
+      applyWorld(id, variant);
+      // Keep the menu open so 水世界's variant row (rendered below) is
+      // reachable in the same interaction — same reasoning as pastel-pearl.
+    } else {
+      setChatWorldVariant(null);
+      applyWorld(id, null);
+      setOpen(false);
+    }
+  };
+
+  const selectWorldVariant = (variantId) => {
+    setChatWorldVariant(variantId);
+    applyWorld(chatWorld, variantId);
     setOpen(false);
   };
 
@@ -234,6 +330,16 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
               dropdown's own width/height. */}
           {showPaletteGrid && !isMobile && (
             <PaletteGrid selected={pastelPalette} onSelect={selectPalette} />
+          )}
+
+          {/* Chat background ("世界") — per-device/browser only, applied to
+              大廳/私訊/群組 message areas via a CSS variable (see chatWorlds.js). */}
+          <div style={{ borderTop: "1px solid var(--border-soft)", padding: "8px 14px 0" }}>
+            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>聊天背景</div>
+          </div>
+          <WorldGrid selected={chatWorld} onSelect={selectWorld} />
+          {chatWorld === "water" && (
+            <WorldVariantGrid world={getWorldById("water")} selected={chatWorldVariant} onSelect={selectWorldVariant} />
           )}
         </div>
       )}
