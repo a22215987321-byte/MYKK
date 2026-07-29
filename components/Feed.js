@@ -925,10 +925,26 @@ export default function FeedApp({ user, embedded = false }) {
           .feed-page-root { padding-bottom: calc(var(--mobile-tabbar-h) + env(safe-area-inset-bottom)); }
         }
       `}</style>
-      <div className="feed-page-root" style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-body)", boxSizing: "border-box" }}>
+      <div className="feed-page-root" style={{
+        minHeight: "100dvh", color: "var(--text)", fontFamily: "var(--font-body)", boxSizing: "border-box",
+        // Same self-painted chat "世界" background as ChatRoom.js's sidebar/
+        // header/input-bar and CalendarMemo.js (see lib/chatWorlds.js) —
+        // falls back to the exact opaque var(--bg) this always had when no
+        // world is selected.
+        backgroundColor: "var(--bg)",
+        backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
+        backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
+        backgroundAttachment: "fixed, fixed",
+      }}>
 
         {/* Mobile top nav — 清楚的「← 聊天」返回，不依賴瀏覽器返回鍵 */}
-        <header className="feed-mobile-topnav feed-topnav" style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, padding: "0 12px", height: 52 }}>
+        <header className="feed-mobile-topnav feed-topnav" style={{
+          position: "sticky", top: 0, zIndex: 50, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, padding: "0 12px", height: 52,
+          backgroundColor: "var(--panel-alt)",
+          backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
+          backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
+          backgroundAttachment: "fixed, fixed",
+        }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)", textDecoration: "none", fontSize: 15, fontWeight: 700, flexShrink: 0 }}>
             <span aria-hidden="true" style={{ fontSize: 20 }}>←</span> 聊天
           </Link>

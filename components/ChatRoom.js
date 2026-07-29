@@ -1659,21 +1659,22 @@ export default function ChatApp({ user }) {
            pixel-aligned with <body>'s copy and the message list's, so it
            reads as one continuous scene) instead of relying on transparency
            bleeding through .cr-shell/.cr-main — those are opaque, and with
-           this many nested layers each individually turning "82% opaque"
-           compounds to near-total opacity loss (2-3 stacked translucent
-           layers ≈ 1-3% of the image actually visible), which is what made
-           the sidebar/calendar read as flat white instead of tinted-through.
-           Both custom properties are unset by default, so with no world
-           selected this resolves to the exact same opaque var(--panel-alt)
-           these already had — zero visual change until a world is picked. */
+           several nested layers each individually turning "82% opaque"
+           compounded to near-total opacity loss, which is what made the
+           sidebar/calendar read as flat white instead of tinted-through.
+           A solid --chat-world-tint wash (as its own background-image layer,
+           painted on top of the photo, both above the plain background-color
+           fallback) keeps text/icons legible over a busy photo without
+           needing backdrop-filter at all — every property here is unset by
+           default, so with no world selected this resolves to the exact same
+           opaque var(--panel-alt) these already had. */
         .cr-sidebar, .cr-chat-header, .cr-input-bar {
-          background-color: color-mix(in srgb, var(--panel-alt) var(--chat-world-panel-opacity, 100%), transparent);
-          background-image: var(--chat-world-bg, none);
-          background-size: cover;
-          background-position: center;
-          background-attachment: fixed;
-          backdrop-filter: var(--chat-world-panel-blur, none);
-          -webkit-backdrop-filter: var(--chat-world-panel-blur, none);
+          background-color: var(--panel-alt);
+          background-image: linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none);
+          background-size: cover, cover;
+          background-position: center, center;
+          background-repeat: no-repeat, no-repeat;
+          background-attachment: fixed, fixed;
         }
 
         @media (max-width: 767px) {

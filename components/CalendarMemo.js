@@ -90,11 +90,19 @@ export default function CalendarMemo({ uid }) {
 
   return (
     <div className="cal-inner" style={{
-      // See lib/chatWorlds.js — falls back to the exact opaque var(--panel-alt)
-      // this always had, and only turns translucent once a chat "世界"
-      // background is actually selected.
-      background: "color-mix(in srgb, var(--panel-alt) var(--chat-world-panel-opacity, 100%), transparent)",
-      backdropFilter: "var(--chat-world-panel-blur, none)", WebkitBackdropFilter: "var(--chat-world-panel-blur, none)",
+      // See lib/chatWorlds.js and the matching .cr-sidebar rule in
+      // ChatRoom.js — paints its own copy of the world image plus a
+      // --chat-world-tint wash (fixed attachment keeps it aligned with the
+      // other panels' copies) rather than relying on ancestor transparency,
+      // which used to compound across .cr-shell + this element into a
+      // near-opaque flat white. Falls back to the exact opaque
+      // var(--panel-alt) this always had when no world is selected.
+      backgroundColor: "var(--panel-alt)",
+      backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
+      backgroundSize: "cover, cover",
+      backgroundPosition: "center, center",
+      backgroundRepeat: "no-repeat, no-repeat",
+      backgroundAttachment: "fixed, fixed",
       display: "flex",
       flexDirection: "column", flexShrink: 0, overflow: "hidden",
       borderTop: "1px solid var(--panel)",
