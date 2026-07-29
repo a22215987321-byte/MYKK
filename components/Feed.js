@@ -898,15 +898,15 @@ export default function FeedApp({ user, embedded = false }) {
         <div style={{
           minHeight: "100%",
           backgroundColor: "var(--bg)",
-          backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
+          backgroundImage: "var(--chat-world-bg, none)",
           // fixed (not scroll) so this lines up with the exact same
           // viewport-relative crop the sidebar/calendar/message-list panels
           // show — otherwise each panel's "cover" fit is computed against
           // its own (differently sized/positioned) box, and the same photo
           // ends up looking like several different, misaligned pictures
           // instead of one continuous scene.
-          backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
-          backgroundAttachment: "fixed, fixed",
+          backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed",
         }}>
           {content}
         </div>
@@ -953,18 +953,18 @@ export default function FeedApp({ user, embedded = false }) {
         // falls back to the exact opaque var(--bg) this always had when no
         // world is selected.
         backgroundColor: "var(--bg)",
-        backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
-        backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
-        backgroundAttachment: "fixed, fixed",
+        backgroundImage: "var(--chat-world-bg, none)",
+        backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+        backgroundAttachment: "fixed",
       }}>
 
         {/* Mobile top nav — 清楚的「← 聊天」返回，不依賴瀏覽器返回鍵 */}
         <header className="feed-mobile-topnav feed-topnav" style={{
           position: "sticky", top: 0, zIndex: 50, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, padding: "0 12px", height: 52,
           backgroundColor: "var(--panel-alt)",
-          backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
-          backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
-          backgroundAttachment: "fixed, fixed",
+          backgroundImage: "var(--chat-world-bg, none)",
+          backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed",
         }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)", textDecoration: "none", fontSize: 15, fontWeight: 700, flexShrink: 0 }}>
             <span aria-hidden="true" style={{ fontSize: 20 }}>←</span> 聊天

@@ -257,7 +257,7 @@ export default function AiChatRoom({ user, db }) {
 
       {/* Messages — same --chat-world-bg wiring as the other 3 chat rooms
           (see ChatRoom.js's hall/private/group message containers). */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14, backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)", backgroundSize: "cover, var(--chat-world-bg-size, auto)", backgroundRepeat: "no-repeat, var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
         {messages.length === 0 && (
           <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "80px 0" }}>
             <div style={{ fontSize: 14 }}>打個招呼開始對話吧</div>

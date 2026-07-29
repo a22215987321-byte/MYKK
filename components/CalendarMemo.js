@@ -91,18 +91,18 @@ export default function CalendarMemo({ uid }) {
   return (
     <div className="cal-inner" style={{
       // See lib/chatWorlds.js and the matching .cr-sidebar rule in
-      // ChatRoom.js — paints its own copy of the world image plus a
-      // --chat-world-tint wash (fixed attachment keeps it aligned with the
-      // other panels' copies) rather than relying on ancestor transparency,
-      // which used to compound across .cr-shell + this element into a
-      // near-opaque flat white. Falls back to the exact opaque
-      // var(--panel-alt) this always had when no world is selected.
+      // ChatRoom.js — paints its own copy of the world image, full quality
+      // (fixed attachment aligns it with the other panels' copies) rather
+      // than relying on ancestor transparency, which used to compound across
+      // .cr-shell + this element into a near-opaque flat white. Falls back
+      // to the exact opaque var(--panel-alt) this always had when no world
+      // is selected.
       backgroundColor: "var(--panel-alt)",
-      backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
-      backgroundSize: "cover, cover",
-      backgroundPosition: "center, center",
-      backgroundRepeat: "no-repeat, no-repeat",
-      backgroundAttachment: "fixed, fixed",
+      backgroundImage: "var(--chat-world-bg, none)",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat",
+      backgroundAttachment: "fixed",
       display: "flex",
       flexDirection: "column", flexShrink: 0, overflow: "hidden",
       borderTop: "1px solid var(--panel)",
