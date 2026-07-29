@@ -2777,7 +2777,18 @@ export default function ChatApp({ user }) {
         )}
 
         {/* Right panel: calendar overlay on mobile, sidebar on desktop */}
-        <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{ width: calWidth, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", borderLeft: "1px solid var(--panel)", transition: resizingPanel === "cal" ? undefined : "width 0.2s ease" }}>
+        <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{
+          width: calWidth, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden",
+          borderLeft: "1px solid var(--panel)", transition: resizingPanel === "cal" ? undefined : "width 0.2s ease",
+          // CalendarMemo's own root (cal-inner, has the same world-background
+          // treatment) only grows to fit its own content — it doesn't stretch
+          // to fill this column's full height, so the leftover space below it
+          // needs the same treatment here or it shows .cr-shell's opaque
+          // background instead.
+          backgroundColor: "var(--panel-alt)",
+          backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
+          backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
+        }}>
           {isMobile && (
             <div style={{ padding: "calc(env(safe-area-inset-top) + 8px) 14px 8px", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
               <span style={{ flex: 1, fontWeight: 700, fontSize: 14, color: "var(--text)" }}>📅 日曆備忘錄</span>

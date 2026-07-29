@@ -888,7 +888,21 @@ export default function FeedApp({ user, embedded = false }) {
     return (
       <>
         <style>{FEED_INTERACTION_CSS}</style>
-        {content}
+        {/* `content` itself has no background — this used to just show
+            whatever ChatRoom.js's own wrapper/.cr-main happened to be
+            (opaque), since the chat "世界" background treatment on
+            feed-page-root below only applies to the standalone /feed page's
+            own return path, never reached here. minHeight:"100%" so the
+            tint still covers the full pane even when there are few/no posts,
+            not just however tall `content`'s own text happens to be. */}
+        <div style={{
+          minHeight: "100%",
+          backgroundColor: "var(--bg)",
+          backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
+          backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
+        }}>
+          {content}
+        </div>
       </>
     );
   }
