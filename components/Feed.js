@@ -933,8 +933,13 @@ export default function FeedApp({ user, embedded = false }) {
         // world is selected.
         backgroundColor: "var(--bg)",
         backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
+        // No `fixed` attachment here (unlike the sidebar/header/input-bar/
+        // calendar) — this panel can be embedded inside a scrollable/
+        // transformed ancestor (ChatRoom's mobile drawer uses transform for
+        // its slide animation), and background-attachment:fixed on a
+        // descendant of a transformed ancestor is undefined/often just
+        // fails to render at all rather than merely repositioning.
         backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
-        backgroundAttachment: "fixed, fixed",
       }}>
 
         {/* Mobile top nav — 清楚的「← 聊天」返回，不依賴瀏覽器返回鍵 */}
@@ -943,7 +948,6 @@ export default function FeedApp({ user, embedded = false }) {
           backgroundColor: "var(--panel-alt)",
           backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
           backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
-          backgroundAttachment: "fixed, fixed",
         }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)", textDecoration: "none", fontSize: 15, fontWeight: 700, flexShrink: 0 }}>
             <span aria-hidden="true" style={{ fontSize: 20 }}>←</span> 聊天
