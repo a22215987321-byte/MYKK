@@ -295,7 +295,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
                 <span style={{ fontSize: 12, color: "var(--text-muted)" }}>訊息文字大小</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{msgFontSize}</span>
-                  <button onClick={onResetMsgFontSize} title="復原預設值"
+                  <button onClick={onResetMsgFontSize} title="復原文字大小與側欄/日曆版面尺寸"
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "1px 6px", color: "var(--text-faint)", fontSize: 11, cursor: "pointer" }}>
                     復原
                   </button>

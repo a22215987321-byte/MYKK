@@ -25,6 +25,7 @@ import EnglishPronunciation from "./EnglishPronunciation";
 import IeltsBand4 from "./IeltsBand4";
 import ImageEditorRoom from "./ImageEditorRoom";
 import AiChatRoom from "./AiChatRoom";
+import { DocConvertRoomLazy } from "./doc-convert";
 import EmojiStickerPicker from "./EmojiStickerPicker";
 import LoadingState from "./LoadingState";
 import useIsMobile from "../lib/useIsMobile";
@@ -784,6 +785,7 @@ export default function ChatApp({ user }) {
   const [showFeed,           setShowFeed]           = useState(false);
   const [showImageEditor,    setShowImageEditor]    = useState(false);
   const [showAiChat,         setShowAiChat]         = useState(false);
+  const [showDocConvert,     setShowDocConvert]     = useState(false);
 
   // Mobile / sidebar states
   const isMobile = useIsMobile();
@@ -874,6 +876,14 @@ export default function ChatApp({ user }) {
       try { localStorage.setItem("cr-cal-width", String(CAL_DEFAULT_WIDTH)); } catch {}
     }
   }, []);
+  // The only way to trigger the reset above used to be double-clicking the
+  // (undiscoverable, unlabeled) drag handle — folded into the settings
+  // menu's existing 復原 button (see the ThemeToggle usage below) instead of
+  // adding a second one, so there's one obvious "put things back" action.
+  const resetPanelWidths = useCallback(() => {
+    resetPanelWidth("sidebar");
+    resetPanelWidth("cal");
+  }, [resetPanelWidth]);
 
   const resetAllViews = useCallback(() => {
     setActiveFriendId(null); setActiveGroupId(null);
@@ -1471,7 +1481,7 @@ export default function ChatApp({ user }) {
   // bar entry — reaching it should highlight "圖片編輯", not "更多".
   const inMoreTool = showLeaderboard || showCinema || showVocab || showSpanish || showSpanishCourse ||
     showCustomVocab || showDict || showSpanishPron || showSpanishGrammar || showSpanishVerbs ||
-    showEnglishPron || showIeltsBand4 || showAiChat;
+    showEnglishPron || showIeltsBand4 || showAiChat || showDocConvert;
   const inTool = inMoreTool || showImageEditor;
   const inThread = !!activeFriendId || !!activeGroupId;
 
@@ -1967,7 +1977,7 @@ export default function ChatApp({ user }) {
                 <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                   <ThemeToggle mode="inline" onOpenProfile={() => setShowProfile(true)}
                     msgFontSize={msgFontSize} onChangeMsgFontSize={setMsgFontSize}
-                    onResetMsgFontSize={() => setMsgFontSize(DEFAULT_MSG_FONT_SIZE)} />
+                    onResetMsgFontSize={() => { setMsgFontSize(DEFAULT_MSG_FONT_SIZE); resetPanelWidths(); }} />
                   <button onClick={() => auth.signOut()} title="登出" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>🚪</button>
                 </div>
               </div>
