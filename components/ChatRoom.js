@@ -1659,21 +1659,26 @@ export default function ChatApp({ user }) {
         .cr-cal { flex-shrink: 0; }
 
         /* ── Chat "世界" background skin (lib/chatWorlds.js) ──
-           Sidebar, chat header, and input bar each paint their own copy of
-           the world image directly, full quality, no wash/tint over it —
-           background-attachment: fixed keeps every panel's copy aligned to
-           the same viewport-relative crop, so it reads as one continuous
-           picture instead of each panel showing its own independently-
-           cropped slice. Unset by default, so with no world selected this
-           resolves to the exact same opaque var(--panel-alt) these already
-           had. */
-        .cr-sidebar, .cr-chat-header, .cr-input-bar {
+           Only the sidebar shows the photo (with a single flat
+           rgba(255,255,255,0.18) wash so its own text/icons — which stay at
+           opacity:1, only the background-color has any alpha — stay
+           legible). Chat header and input bar are card-like controls, same
+           as post/feature cards, and stay their original plain opaque
+           background regardless of world selection. background-attachment:
+           fixed keeps the sidebar's copy aligned to the same viewport-
+           relative crop as the calendar and message-list panels, so it
+           reads as one continuous picture rather than an independently
+           cropped slice. */
+        .cr-sidebar {
           background-color: var(--panel-alt);
-          background-image: var(--chat-world-bg, none);
-          background-size: cover;
-          background-position: center;
-          background-repeat: no-repeat;
-          background-attachment: fixed;
+          background-image: linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.18)), var(--chat-world-bg, none);
+          background-size: cover, cover;
+          background-position: center, center;
+          background-repeat: no-repeat, no-repeat;
+          background-attachment: fixed, fixed;
+        }
+        .cr-chat-header, .cr-input-bar {
+          background-color: var(--panel-alt);
         }
 
         @media (max-width: 767px) {
@@ -2791,15 +2796,16 @@ export default function ChatApp({ user }) {
         <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{
           width: calWidth, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden",
           borderLeft: "1px solid var(--panel)", transition: resizingPanel === "cal" ? undefined : "width 0.2s ease",
-          // CalendarMemo's own root (cal-inner, has the same world-background
-          // treatment) only grows to fit its own content — it doesn't stretch
-          // to fill this column's full height, so the leftover space below it
-          // needs the same treatment here or it shows .cr-shell's opaque
-          // background instead.
+          // This is the ONE layer that paints the photo+wash for the whole
+          // calendar column — CalendarMemo's own root (cal-inner) is plain
+          // transparent so it doesn't stack a second wash on top of this one
+          // wherever the two overlap. cal-inner also doesn't stretch to fill
+          // this column's full height, so this needs to cover the leftover
+          // space below it too.
           backgroundColor: "var(--panel-alt)",
-          backgroundImage: "var(--chat-world-bg, none)",
-          backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
-          backgroundAttachment: "fixed",
+          backgroundImage: "linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.18)), var(--chat-world-bg, none)",
+          backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
+          backgroundAttachment: "fixed, fixed",
         }}>
           {isMobile && (
             <div style={{ padding: "calc(env(safe-area-inset-top) + 8px) 14px 8px", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>

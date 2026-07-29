@@ -90,19 +90,13 @@ export default function CalendarMemo({ uid }) {
 
   return (
     <div className="cal-inner" style={{
-      // See lib/chatWorlds.js and the matching .cr-sidebar rule in
-      // ChatRoom.js — paints its own copy of the world image, full quality
-      // (fixed attachment aligns it with the other panels' copies) rather
-      // than relying on ancestor transparency, which used to compound across
-      // .cr-shell + this element into a near-opaque flat white. Falls back
-      // to the exact opaque var(--panel-alt) this always had when no world
-      // is selected.
-      backgroundColor: "var(--panel-alt)",
-      backgroundImage: "var(--chat-world-bg, none)",
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundRepeat: "no-repeat",
-      backgroundAttachment: "fixed",
+      // Deliberately plain/transparent — the world-background photo+wash for
+      // the whole calendar column is painted once by .cr-cal in ChatRoom.js
+      // (this element doesn't stretch to fill that column's full height, so
+      // it can't be the single source of truth for that background). Staying
+      // transparent here lets .cr-cal's one layer show through cleanly
+      // instead of stacking a second wash on top of it.
+      background: "transparent",
       display: "flex",
       flexDirection: "column", flexShrink: 0, overflow: "hidden",
       borderTop: "1px solid var(--panel)",

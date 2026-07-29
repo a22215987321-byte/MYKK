@@ -958,13 +958,13 @@ export default function FeedApp({ user, embedded = false }) {
         backgroundAttachment: "fixed",
       }}>
 
-        {/* Mobile top nav — 清楚的「← 聊天」返回，不依賴瀏覽器返回鍵 */}
+        {/* Mobile top nav — 清楚的「← 聊天」返回，不依賴瀏覽器返回鍵。Same
+            treatment as .cr-chat-header: a header bar is a control surface
+            like a card, not a world-background panel, so it stays plain
+            regardless of world selection. */}
         <header className="feed-mobile-topnav feed-topnav" style={{
           position: "sticky", top: 0, zIndex: 50, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, padding: "0 12px", height: 52,
           backgroundColor: "var(--panel-alt)",
-          backgroundImage: "var(--chat-world-bg, none)",
-          backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
-          backgroundAttachment: "fixed",
         }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)", textDecoration: "none", fontSize: 15, fontWeight: 700, flexShrink: 0 }}>
             <span aria-hidden="true" style={{ fontSize: 20 }}>←</span> 聊天
