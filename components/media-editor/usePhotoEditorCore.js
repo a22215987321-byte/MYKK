@@ -193,6 +193,10 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
   // trigger a re-render.
   const [selectedObj, setSelectedObj] = useState(null);
   const [selTick, setSelTick] = useState(0);
+  // Timestamp of the last successful periodic autosave (see the autosave
+  // effect below) — surfaced so the embedded layout can show a small "已自動
+  //儲存 HH:MM:SS" hint instead of the save happening invisibly.
+  const [lastAutosaveAt, setLastAutosaveAt] = useState(null);
 
   const pushHistory = useCallback(() => {
     const canvas = fabricCanvasRef.current;
@@ -290,6 +294,41 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
     // rather than swapping these props on a live instance).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file, initialScene]);
+
+  // ---- autosave ----
+  // Periodic snapshot to IndexedDB, independent of the explicit "完成" export
+  // — saveDraft in handleExport only ever ran when the user finished and
+  // clicked 完成, so a crash/accidental tab close/navigating away mid-edit
+  // still lost everything since the last export. Only runs when the caller
+  // opted in with a draftId (Feed.js's and profile/[uid].js's "quick edit
+  // before posting" flow never pass one, so this never touches their
+  // behavior — see PhotoEditor.js). lastSavedJsonRef tracks the last JSON
+  // actually written so a tick with nothing changed since is a no-op instead
+  // of a redundant IndexedDB write every interval regardless of activity.
+  const lastSavedJsonRef = useRef(null);
+  useEffect(() => {
+    if (!draftId || !ready) return;
+    const AUTOSAVE_INTERVAL_MS = 5000;
+    const tick = async () => {
+      const canvas = fabricCanvasRef.current;
+      if (!canvas) return;
+      const json = JSON.stringify(canvas.toJSON(["data"]));
+      if (json === lastSavedJsonRef.current) return;
+      try {
+        await saveDraft({
+          id: draftId, type: "photo", updatedAt: Date.now(),
+          scene: { canvasJSON: JSON.parse(json), width: canvas.width, height: canvas.height },
+        });
+        lastSavedJsonRef.current = json;
+        setLastAutosaveAt(Date.now());
+      } catch {
+        // Best-effort — a failed autosave (e.g. storage quota) shouldn't
+        // interrupt editing; the next tick or the explicit export will retry.
+      }
+    };
+    const timer = setInterval(tick, AUTOSAVE_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [draftId, ready]);
 
   // Refit whenever the container's actual size changes — a window resize in
   // the fullscreen wrapper, or (in the embedded layout) the canvas area
@@ -771,6 +810,10 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
       const scene = { canvasJSON: canvas.toJSON(["data"]), width: canvas.width, height: canvas.height };
       if (draftId) {
         await saveDraft({ id: draftId, type: "photo", updatedAt: Date.now(), scene });
+        // Keeps the autosave tick above from immediately rewriting the exact
+        // same snapshot it just saw get saved here.
+        lastSavedJsonRef.current = JSON.stringify(scene.canvasJSON);
+        setLastAutosaveAt(Date.now());
       }
       onExport(blob, scene);
       setIsDirty(false);
@@ -787,6 +830,7 @@ export default function usePhotoEditorCore({ file, initialScene, draftId, onExpo
     saturation, setSaturation, brushColor, setBrushColor, brushWidth, setBrushWidth, privacyMode, setPrivacyMode,
     zoomPct, applyZoomPct, snapEnabled, setSnapEnabled,
     exportFormat, setExportFormat, exportQuality, setExportQuality,
+    lastAutosaveAt,
     selectedObj, selTick, updateTextProp, commitTextProp, updateTextShadow, alignObjectToCanvas,
     undo, redo,
     rotate90, flip,

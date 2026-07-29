@@ -37,7 +37,7 @@ export default function PhotoEditorEmbedded({ file, initialScene, draftId, onCan
     canvasElRef, containerRef, ready, activeTool, setActiveTool, selectTool, busy, canUndo, canRedo,
     undo, redo, eraseStrokeAt, handleExport, hasImage, isDirty, importPhoto,
     zoomPct, applyZoomPct, snapEnabled, setSnapEnabled,
-    exportFormat, setExportFormat, exportQuality, setExportQuality,
+    exportFormat, setExportFormat, exportQuality, setExportQuality, lastAutosaveAt,
   } = core;
   const importInputRef = useRef(null);
   // Non-null while a confirm dialog is up — either "leave with unsaved
@@ -123,6 +123,12 @@ export default function PhotoEditorEmbedded({ file, initialScene, draftId, onCan
         </button>
 
         <div style={{ flex: 1, minWidth: 8 }} />
+
+        {lastAutosaveAt && (
+          <span style={{ fontSize: 11, color: "var(--pe-text-dim)", whiteSpace: "nowrap" }}>
+            已自動儲存 {new Date(lastAutosaveAt).toLocaleTimeString("zh-TW", { hour12: false })}
+          </span>
+        )}
 
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--pe-text-dim)" }}>
           縮放
@@ -218,12 +224,14 @@ export default function PhotoEditorEmbedded({ file, initialScene, draftId, onCan
 
       {pendingLeave && (
         <ConfirmDialog
-          title="尚有未儲存的變更"
-          message="離開後這次編輯的內容將會遺失，確定要離開嗎？"
+          title="尚未完成編輯"
+          message={draftId
+            ? "最近的進度已自動儲存為草稿，離開後下次可以繼續（僅可能漏掉最後幾秒的變更）。確定要先離開嗎？"
+            : "離開後這次編輯的內容將會遺失，確定要離開嗎？"}
           onDismiss={() => setPendingLeave(false)}
           actions={[
             { label: "繼續編輯", onClick: () => setPendingLeave(false) },
-            { label: "放棄變更並離開", variant: "danger", onClick: () => { setPendingLeave(false); onCancel(); } },
+            { label: draftId ? "先離開" : "放棄變更並離開", variant: "danger", onClick: () => { setPendingLeave(false); onCancel(); } },
           ]}
         />
       )}
