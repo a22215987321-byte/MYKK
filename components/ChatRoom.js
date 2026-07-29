@@ -1659,26 +1659,20 @@ export default function ChatApp({ user }) {
         .cr-cal { flex-shrink: 0; }
 
         /* ── Chat "世界" background skin (lib/chatWorlds.js) ──
-           Only the sidebar shows the photo (with a single flat
-           rgba(255,255,255,0.18) wash so its own text/icons — which stay at
-           opacity:1, only the background-color has any alpha — stay
-           legible). Chat header and input bar are card-like controls, same
-           as post/feature cards, and stay their original plain opaque
-           background regardless of world selection. background-attachment:
-           fixed keeps the sidebar's copy aligned to the same viewport-
-           relative crop as the calendar and message-list panels, so it
-           reads as one continuous picture rather than an independently
-           cropped slice. */
+           The photo is painted exactly once, as <body>'s own background (see
+           theme.css) — every panel here just goes fully transparent
+           (var(--chat-world-transparent) resolves to literal "transparent"
+           only while a world is selected; unset otherwise, so each falls
+           back to its own normal opaque color) so that single copy shows
+           through everywhere uniformly. No opacity/filter/backdrop-filter
+           anywhere in this chain — text/icons/buttons are never touched,
+           only background-color. */
         .cr-sidebar {
-          background-color: var(--panel-alt);
-          background-image: linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.18)), var(--chat-world-bg, none);
-          background-size: cover, cover;
-          background-position: center, center;
-          background-repeat: no-repeat, no-repeat;
-          background-attachment: fixed, fixed;
+          background-color: var(--chat-world-transparent, var(--panel-alt));
+          background-image: none;
         }
         .cr-chat-header, .cr-input-bar {
-          background-color: var(--panel-alt);
+          background-color: var(--chat-world-transparent, var(--panel-alt));
         }
 
         @media (max-width: 767px) {
@@ -1901,14 +1895,12 @@ export default function ChatApp({ user }) {
         marginBottom: "calc(var(--shell-margin) + env(safe-area-inset-bottom))",
         marginLeft: "calc(var(--shell-margin) + env(safe-area-inset-left))",
         marginRight: "calc(var(--shell-margin) + env(safe-area-inset-right))",
-        // Plain and opaque — the sidebar/header/input-bar/cal panels each
-        // paint their own copy of the chat "世界" background directly (see
-        // the .cr-sidebar rule above and CalendarMemo.js), so this layer
-        // doesn't need to go translucent too. It used to (via color-mix),
-        // but stacking translucent layers on top of more translucent layers
-        // compounds toward opaque instead of toward see-through — that's
-        // what made the sidebar/calendar read as flat white.
-        background: "var(--shell-bg)",
+        // Goes fully transparent while a world is selected (see
+        // lib/chatWorlds.js) — this sits directly between <body> (which
+        // paints the one shared copy of the photo) and every panel below,
+        // so it has to get out of the way for any of them to show it.
+        // Otherwise it's exactly the same opaque var(--shell-bg) as before.
+        background: "var(--chat-world-transparent, var(--shell-bg))",
         color: "var(--text)", fontFamily: "var(--font-body)", overflow: "hidden",
         borderRadius: "var(--shell-radius)", boxShadow: "var(--shell-shadow)",
         backdropFilter: "var(--shell-blur)", WebkitBackdropFilter: "var(--shell-blur)",
@@ -2316,11 +2308,8 @@ export default function ChatApp({ user }) {
         <main ref={mainElRef} className="cr-main"
           style={{
             flex: 1, display: (isMobile && mobileView === 'more') ? "none" : "flex", flexDirection: "column", minWidth: 0, minHeight: 0,
-            // Same reasoning as .cr-shell above — plain and opaque, since the
-            // header/message-list/input-bar inside already paint their own
-            // copy of the chat "世界" background rather than depending on
-            // this layer going translucent too.
-            background: "var(--bg)",
+            // Same reasoning as .cr-shell above.
+            background: "var(--chat-world-transparent, var(--bg))",
           }}>
 
           {/* Feed view — embedded so switching here never leaves this SPA */}
@@ -2604,7 +2593,7 @@ export default function ChatApp({ user }) {
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>大家都可以看到這裡的訊息</div>
                 </div>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, background: "transparent" }}>
                 <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 12, padding: "8px 0 16px" }}>
                   今天 · {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric" })}
                 </div>
@@ -2671,7 +2660,7 @@ export default function ChatApp({ user }) {
                   ℹ️ 個人檔案
                 </Link>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "var(--chat-world-bg-size, 28px 28px)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-no-image, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "28px 28px" }}>
                 <div style={{ textAlign: "center", marginBottom: 16 }}>
                   <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={56} />
                   <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{activeFriendProfile.nickname}</div>
@@ -2724,7 +2713,7 @@ export default function ChatApp({ user }) {
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(activeGroup.members || []).length} 位成員</div>
                 </div>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, background: "transparent" }}>
                 {groupMessages.length === 0 && (
                   <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
                     <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
@@ -2796,16 +2785,12 @@ export default function ChatApp({ user }) {
         <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{
           width: calWidth, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden",
           borderLeft: "1px solid var(--panel)", transition: resizingPanel === "cal" ? undefined : "width 0.2s ease",
-          // This is the ONE layer that paints the photo+wash for the whole
-          // calendar column — CalendarMemo's own root (cal-inner) is plain
-          // transparent so it doesn't stack a second wash on top of this one
-          // wherever the two overlap. cal-inner also doesn't stretch to fill
-          // this column's full height, so this needs to cover the leftover
-          // space below it too.
-          backgroundColor: "var(--panel-alt)",
-          backgroundImage: "linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.18)), var(--chat-world-bg, none)",
-          backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
-          backgroundAttachment: "fixed, fixed",
+          // Goes fully transparent while a world is selected, same as
+          // .cr-shell/.cr-main/.cr-sidebar — CalendarMemo's own root
+          // (cal-inner) is plain transparent too, so <body>'s single copy of
+          // the photo shows through both of them with nothing painted twice.
+          backgroundColor: "var(--chat-world-transparent, var(--panel-alt))",
+          backgroundImage: "none",
         }}>
           {isMobile && (
             <div style={{ padding: "calc(env(safe-area-inset-top) + 8px) 14px 8px", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
