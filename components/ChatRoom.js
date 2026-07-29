@@ -2588,7 +2588,7 @@ export default function ChatApp({ user }) {
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>大家都可以看到這裡的訊息</div>
                 </div>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)", backgroundSize: "cover, var(--chat-world-bg-size, auto)", backgroundRepeat: "no-repeat, var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
                 <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 12, padding: "8px 0 16px" }}>
                   今天 · {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric" })}
                 </div>
@@ -2655,7 +2655,7 @@ export default function ChatApp({ user }) {
                   ℹ️ 個人檔案
                 </Link>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "var(--chat-world-bg-size, 28px 28px)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "cover, var(--chat-world-bg-size, 28px 28px)", backgroundRepeat: "no-repeat, var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
                 <div style={{ textAlign: "center", marginBottom: 16 }}>
                   <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={56} />
                   <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{activeFriendProfile.nickname}</div>
@@ -2708,7 +2708,7 @@ export default function ChatApp({ user }) {
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(activeGroup.members || []).length} 位成員</div>
                 </div>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)", backgroundSize: "cover, var(--chat-world-bg-size, auto)", backgroundRepeat: "no-repeat, var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
                 {groupMessages.length === 0 && (
                   <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
                     <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
