@@ -892,7 +892,7 @@ export default function ChatApp({ user }) {
     setShowCustomVocab(false); setShowDict(false); setFrenchView(null);
     setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false);
     setShowEnglishPron(false); setShowIeltsBand4(false);
-    setShowFeed(false); setShowImageEditor(false); setShowAiChat(false);
+    setShowFeed(false); setShowImageEditor(false); setShowAiChat(false); setShowDocConvert(false);
   }, []);
 
   // Cinema states
@@ -1654,14 +1654,24 @@ export default function ChatApp({ user }) {
         .cr-cal { flex-shrink: 0; }
 
         /* ── Chat "世界" background skin (lib/chatWorlds.js) ──
-           Sidebar, chat header, and input bar all go translucent together so
-           the full-viewport image on <body> (see theme.css) shows through
-           everywhere, not just inside the message list. Both custom
-           properties are unset by default, so with no world selected this
-           resolves to the exact same opaque var(--panel-alt) these already
-           had — zero visual change until a world is actually picked. */
+           Sidebar, chat header, and input bar each paint their own copy of
+           the world image directly (background-attachment: fixed keeps it
+           pixel-aligned with <body>'s copy and the message list's, so it
+           reads as one continuous scene) instead of relying on transparency
+           bleeding through .cr-shell/.cr-main — those are opaque, and with
+           this many nested layers each individually turning "82% opaque"
+           compounds to near-total opacity loss (2-3 stacked translucent
+           layers ≈ 1-3% of the image actually visible), which is what made
+           the sidebar/calendar read as flat white instead of tinted-through.
+           Both custom properties are unset by default, so with no world
+           selected this resolves to the exact same opaque var(--panel-alt)
+           these already had — zero visual change until a world is picked. */
         .cr-sidebar, .cr-chat-header, .cr-input-bar {
-          background: color-mix(in srgb, var(--panel-alt) var(--chat-world-panel-opacity, 100%), transparent);
+          background-color: color-mix(in srgb, var(--panel-alt) var(--chat-world-panel-opacity, 100%), transparent);
+          background-image: var(--chat-world-bg, none);
+          background-size: cover;
+          background-position: center;
+          background-attachment: fixed;
           backdrop-filter: var(--chat-world-panel-blur, none);
           -webkit-backdrop-filter: var(--chat-world-panel-blur, none);
         }
@@ -1885,13 +1895,14 @@ export default function ChatApp({ user }) {
         marginBottom: "calc(var(--shell-margin) + env(safe-area-inset-bottom))",
         marginLeft: "calc(var(--shell-margin) + env(safe-area-inset-left))",
         marginRight: "calc(var(--shell-margin) + env(safe-area-inset-right))",
-        // color-mix (not a bare var(--shell-bg)) so a chat "世界" background
-        // can actually reach the sidebar/header/input-bar's own translucency
-        // below — --shell-bg is fully opaque for every theme except glass,
-        // which otherwise blocks body's full-viewport image from ever being
-        // visible at all outside the message list, no matter how translucent
-        // those other panels are individually set up to be.
-        background: "color-mix(in srgb, var(--shell-bg) var(--chat-world-panel-opacity, 100%), transparent)",
+        // Plain and opaque — the sidebar/header/input-bar/cal panels each
+        // paint their own copy of the chat "世界" background directly (see
+        // the .cr-sidebar rule above and CalendarMemo.js), so this layer
+        // doesn't need to go translucent too. It used to (via color-mix),
+        // but stacking translucent layers on top of more translucent layers
+        // compounds toward opaque instead of toward see-through — that's
+        // what made the sidebar/calendar read as flat white.
+        background: "var(--shell-bg)",
         color: "var(--text)", fontFamily: "var(--font-body)", overflow: "hidden",
         borderRadius: "var(--shell-radius)", boxShadow: "var(--shell-shadow)",
         backdropFilter: "var(--shell-blur)", WebkitBackdropFilter: "var(--shell-blur)",
@@ -2031,7 +2042,7 @@ export default function ChatApp({ user }) {
                 </div>
               </button>
               {(() => {
-                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat;
+                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert;
                 return (
                   <button onClick={() => { resetAllViews(); if (isMobile) settleDrawer(false); }}
                     style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: hallActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
@@ -2058,7 +2069,7 @@ export default function ChatApp({ user }) {
               {/* Hall button */}
               <div style={{ padding: "4px 10px 0" }}>
                 <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧"
-                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat}
+                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert}
                   onClick={() => { resetAllViews(); }} />
               </div>
             </>
@@ -2088,6 +2099,12 @@ export default function ChatApp({ user }) {
           <div style={{ padding: "0 10px 6px" }}>
             <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel="有問題都可以問我"
               active={showAiChat} onClick={() => { resetAllViews(); setShowAiChat(true); }} />
+          </div>
+
+          {/* Doc convert button */}
+          <div style={{ padding: "0 10px 6px" }}>
+            <NavItem icon="🔄" iconBg="linear-gradient(135deg,#0d9488,#0891b2)" label="文檔轉換" sublabel="圖片・影音格式互轉"
+              active={showDocConvert} onClick={() => { resetAllViews(); setShowDocConvert(true); }} />
           </div>
 
           {/* English section label */}
@@ -2287,11 +2304,11 @@ export default function ChatApp({ user }) {
         <main ref={mainElRef} className="cr-main"
           style={{
             flex: 1, display: (isMobile && mobileView === 'more') ? "none" : "flex", flexDirection: "column", minWidth: 0, minHeight: 0,
-            // Same reasoning as .cr-shell above — this sits between the shell
-            // and the header/message-list/input-bar, so it also has to let a
-            // chat "世界" background through instead of blocking it with an
-            // opaque var(--bg).
-            background: "color-mix(in srgb, var(--bg) var(--chat-world-panel-opacity, 100%), transparent)",
+            // Same reasoning as .cr-shell above — plain and opaque, since the
+            // header/message-list/input-bar inside already paint their own
+            // copy of the chat "世界" background rather than depending on
+            // this layer going translucent too.
+            background: "var(--bg)",
           }}>
 
           {/* Feed view — embedded so switching here never leaves this SPA */}
@@ -2496,67 +2513,72 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Image editor view */}
-          {showImageEditor && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && (
+          {showImageEditor && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showDocConvert && (
             <ImageEditorRoom />
           )}
 
           {/* AI chat view */}
-          {showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && (
+          {showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showDocConvert && (
             <AiChatRoom user={user} db={db} />
           )}
 
+          {/* Doc convert view */}
+          {showDocConvert && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && (
+            <DocConvertRoomLazy />
+          )}
+
           {/* Vocab view */}
-          {showVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && (
+          {showVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <VocabRoom user={user} db={db} />
           )}
 
           {/* Spanish view */}
-          {showSpanish && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showFeed && !showImageEditor && !showAiChat && (
+          {showSpanish && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <SpanishRoom user={user} db={db} />
           )}
 
           {/* Spanish Course view */}
-          {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showFeed && !showImageEditor && !showAiChat && (
+          {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <SpanishCourseRoom user={user} db={db} onContextChange={setSpanishCourseNoteContext} />
           )}
 
           {/* Spanish Pronunciation view */}
-          {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && (
+          {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishPronunciation onNav={() => { setShowSpanishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Grammar view */}
-          {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && (
+          {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishGrammar onNav={() => { setShowSpanishGrammar(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Verb Conjugator view */}
-          {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && (
+          {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><SpanishVerbConjugator onNav={() => { setShowSpanishVerbs(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* English Pronunciation view */}
-          {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && !showImageEditor && !showAiChat && (
+          {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishPronunciation user={user} db={db} onNav={() => { setShowEnglishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Custom vocab view */}
-          {showCustomVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showFeed && !showImageEditor && !showAiChat && (
+          {showCustomVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <CustomVocabRoom user={myProfile || user} db={db} />
           )}
 
           {/* Dictionary view */}
-          {showDict && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showFeed && !showImageEditor && !showAiChat && (
+          {showDict && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <DictionaryRoom />
           )}
 
           {/* Public hall */}
           {/* IELTS Band 4 view */}
-          {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showFeed && !showImageEditor && !showAiChat && (
+          {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><IeltsBand4 onNav={() => { setShowIeltsBand4(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
-          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && (
+          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
             <>
               <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
                 <span style={{ fontSize: 20 }}>💬</span>
@@ -2565,7 +2587,7 @@ export default function ChatApp({ user }) {
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>大家都可以看到這裡的訊息</div>
                 </div>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
                 <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 12, padding: "8px 0 16px" }}>
                   今天 · {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric" })}
                 </div>
@@ -2632,7 +2654,7 @@ export default function ChatApp({ user }) {
                   ℹ️ 個人檔案
                 </Link>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "var(--chat-world-bg-size, 28px 28px)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "var(--chat-world-bg-size, 28px 28px)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
                 <div style={{ textAlign: "center", marginBottom: 16 }}>
                   <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={56} />
                   <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{activeFriendProfile.nickname}</div>
@@ -2685,7 +2707,7 @@ export default function ChatApp({ user }) {
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(activeGroup.members || []).length} 位成員</div>
                 </div>
               </div>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
                 {groupMessages.length === 0 && (
                   <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
                     <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
@@ -2733,8 +2755,8 @@ export default function ChatApp({ user }) {
         {/* 更多選單（手機版「更多」分頁） */}
         {isMobile && mobileView === 'more' && (
           <ChatMoreMenu
-            state={{ showLeaderboard, showCinema, showAiChat, showEnglishPron, showIeltsBand4, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showCustomVocab, showDict }}
-            setters={{ setShowLeaderboard, setShowCinema, setShowAiChat, setShowEnglishPron, setShowIeltsBand4, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowCustomVocab, setShowDict }}
+            state={{ showLeaderboard, showCinema, showAiChat, showDocConvert, showEnglishPron, showIeltsBand4, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showCustomVocab, showDict }}
+            setters={{ setShowLeaderboard, setShowCinema, setShowAiChat, setShowDocConvert, setShowEnglishPron, setShowIeltsBand4, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowCustomVocab, setShowDict }}
             onOpen={(setter) => { resetAllViews(); setter(true); setMobileView(null); }}
           />
         )}
