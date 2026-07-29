@@ -1875,7 +1875,14 @@ export default function ChatApp({ user }) {
         marginBottom: "calc(var(--shell-margin) + env(safe-area-inset-bottom))",
         marginLeft: "calc(var(--shell-margin) + env(safe-area-inset-left))",
         marginRight: "calc(var(--shell-margin) + env(safe-area-inset-right))",
-        background: "var(--shell-bg)", color: "var(--text)", fontFamily: "var(--font-body)", overflow: "hidden",
+        // color-mix (not a bare var(--shell-bg)) so a chat "世界" background
+        // can actually reach the sidebar/header/input-bar's own translucency
+        // below — --shell-bg is fully opaque for every theme except glass,
+        // which otherwise blocks body's full-viewport image from ever being
+        // visible at all outside the message list, no matter how translucent
+        // those other panels are individually set up to be.
+        background: "color-mix(in srgb, var(--shell-bg) var(--chat-world-panel-opacity, 100%), transparent)",
+        color: "var(--text)", fontFamily: "var(--font-body)", overflow: "hidden",
         borderRadius: "var(--shell-radius)", boxShadow: "var(--shell-shadow)",
         backdropFilter: "var(--shell-blur)", WebkitBackdropFilter: "var(--shell-blur)",
       }}>
@@ -2269,7 +2276,12 @@ export default function ChatApp({ user }) {
             跟 sidebar 同步、零延遲；抽屜關閉時固定在 translateX(0)。 */}
         <main ref={mainElRef} className="cr-main"
           style={{
-            flex: 1, display: (isMobile && mobileView === 'more') ? "none" : "flex", flexDirection: "column", background: "var(--bg)", minWidth: 0, minHeight: 0,
+            flex: 1, display: (isMobile && mobileView === 'more') ? "none" : "flex", flexDirection: "column", minWidth: 0, minHeight: 0,
+            // Same reasoning as .cr-shell above — this sits between the shell
+            // and the header/message-list/input-bar, so it also has to let a
+            // chat "世界" background through instead of blocking it with an
+            // opaque var(--bg).
+            background: "color-mix(in srgb, var(--bg) var(--chat-world-panel-opacity, 100%), transparent)",
           }}>
 
           {/* Feed view — embedded so switching here never leaves this SPA */}
