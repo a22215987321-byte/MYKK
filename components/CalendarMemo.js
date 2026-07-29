@@ -90,7 +90,12 @@ export default function CalendarMemo({ uid }) {
 
   return (
     <div className="cal-inner" style={{
-      background: "var(--panel-alt)", display: "flex",
+      // See lib/chatWorlds.js — falls back to the exact opaque var(--panel-alt)
+      // this always had, and only turns translucent once a chat "世界"
+      // background is actually selected.
+      background: "color-mix(in srgb, var(--panel-alt) var(--chat-world-panel-opacity, 100%), transparent)",
+      backdropFilter: "var(--chat-world-panel-blur, none)", WebkitBackdropFilter: "var(--chat-world-panel-blur, none)",
+      display: "flex",
       flexDirection: "column", flexShrink: 0, overflow: "hidden",
       borderTop: "1px solid var(--panel)",
     }}>

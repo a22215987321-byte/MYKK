@@ -233,10 +233,19 @@ html[data-theme="pastel-pearl"][data-pastel-palette="pearl-silver"] :focus-visib
 
 body {
   margin: 0;
-  background: var(--page-bg);
+  background-color: var(--page-bg);
   color: var(--text);
   font-family: var(--font-body);
   overflow-wrap: break-word;
+  /* Chat "世界" background skin (see lib/chatWorlds.js) — unset by default,
+     so this is a no-op until a world is actually selected. Fixed viewport
+     coverage is what makes it read as "the whole browser window changed"
+     rather than just scrolling along with page content. */
+  background-image: var(--chat-world-bg, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 /* Prevent oversized media/tables from forcing horizontal overflow on narrow screens */

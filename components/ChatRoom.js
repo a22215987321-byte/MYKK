@@ -1643,6 +1643,19 @@ export default function ChatApp({ user }) {
         /* ── Calendar overlay ── */
         .cr-cal { flex-shrink: 0; }
 
+        /* ── Chat "世界" background skin (lib/chatWorlds.js) ──
+           Sidebar, chat header, and input bar all go translucent together so
+           the full-viewport image on <body> (see theme.css) shows through
+           everywhere, not just inside the message list. Both custom
+           properties are unset by default, so with no world selected this
+           resolves to the exact same opaque var(--panel-alt) these already
+           had — zero visual change until a world is actually picked. */
+        .cr-sidebar, .cr-chat-header, .cr-input-bar {
+          background: color-mix(in srgb, var(--panel-alt) var(--chat-world-panel-opacity, 100%), transparent);
+          backdrop-filter: var(--chat-world-panel-blur, none);
+          -webkit-backdrop-filter: var(--chat-world-panel-blur, none);
+        }
+
         @media (max-width: 767px) {
           /* Prevent iOS Safari auto-zoom on input focus (needs >=16px) */
           input, textarea, select { font-size: 16px !important; }
@@ -1908,7 +1921,6 @@ export default function ChatApp({ user }) {
             桌面版另外還有 sidebarCollapsed（收合成寬度 0，跟手機抽屜是兩套獨立機制）。 */}
         <nav ref={sidebarElRef} className="cr-sidebar" aria-label="聊天導覽" aria-hidden={!isMobile && sidebarCollapsed} style={{
           width: (!isMobile && sidebarCollapsed) ? 0 : sidebarWidth,
-          background: "var(--panel-alt)",
           borderRight: (!isMobile && sidebarCollapsed) ? "none" : "1px solid var(--panel)",
           display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden",
           transition: (isMobile || resizingPanel === "sidebar") ? undefined : "width 0.25s ease, border-color 0.25s ease",
@@ -2524,7 +2536,7 @@ export default function ChatApp({ user }) {
 
           {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && (
             <>
-              <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
+              <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
                 <span style={{ fontSize: 20 }}>💬</span>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}># 公共大廳</div>
@@ -2553,7 +2565,7 @@ export default function ChatApp({ user }) {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0, position: "relative" }}>
+              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "1px solid var(--panel)", flexShrink: 0, position: "relative" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input ref={hallFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendHallMedia(f); e.target.value = ""; } }} />
                   <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片/影片"
@@ -2581,7 +2593,7 @@ export default function ChatApp({ user }) {
           {/* Private chat */}
           {activeFriendId && activeFriendProfile && (
             <>
-              <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
+              <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
                 <div style={{ position: "relative" }}>
                   <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={34} />
                   <span style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: getStatus(activeFriendProfile.status).color, border: "2px solid var(--panel-alt)" }} />
@@ -2611,7 +2623,7 @@ export default function ChatApp({ user }) {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0, position: "relative" }}>
+              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "1px solid var(--panel)", flexShrink: 0, position: "relative" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input ref={privateFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendPrivateMedia(f); e.target.value = ""; } }} />
                   <button onClick={() => privateFileRef.current?.click()} disabled={privateUploading} title="上傳圖片/影片"
@@ -2642,7 +2654,7 @@ export default function ChatApp({ user }) {
           {/* Group chat */}
           {activeGroupId && activeGroup && (
             <>
-              <div style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, background: "var(--panel-alt)", flexShrink: 0 }}>
+              <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
                 <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,var(--text-dim),var(--border))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
                   {activeGroup.avatar || "👥"}
                 </div>
@@ -2665,7 +2677,7 @@ export default function ChatApp({ user }) {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", background: "var(--panel-alt)", borderTop: "1px solid var(--panel)", flexShrink: 0, position: "relative" }}>
+              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "1px solid var(--panel)", flexShrink: 0, position: "relative" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input ref={groupFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendGroupMedia(f); e.target.value = ""; } }} />
                   <button onClick={() => groupFileRef.current?.click()} disabled={groupUploading} title="上傳圖片/影片"
