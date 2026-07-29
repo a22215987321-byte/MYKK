@@ -2788,6 +2788,7 @@ export default function ChatApp({ user }) {
           backgroundColor: "var(--panel-alt)",
           backgroundImage: "linear-gradient(var(--chat-world-tint, transparent), var(--chat-world-tint, transparent)), var(--chat-world-bg, none)",
           backgroundSize: "cover, cover", backgroundPosition: "center, center", backgroundRepeat: "no-repeat, no-repeat",
+          backgroundAttachment: "fixed, fixed",
         }}>
           {isMobile && (
             <div style={{ padding: "calc(env(safe-area-inset-top) + 8px) 14px 8px", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
