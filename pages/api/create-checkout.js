@@ -2,8 +2,10 @@
 // client-supplied amount for these the way the free-form donation flow
 // below does (a tip's amount is the donor's choice; a paid unlock's price
 // is not).
+// TEMP: 0.1 for a real end-to-end test with a live-mode charge — change
+// back to 168 before real users start unlocking this.
 const PRODUCT_PRICES = {
-  ai_companion_unlock: 168,
+  ai_companion_unlock: 0.1,
 };
 
 export default async function handler(req, res) {
@@ -36,7 +38,7 @@ export default async function handler(req, res) {
     params.append("mode", "payment");
     params.append("line_items[0][price_data][currency]", "hkd");
     params.append("line_items[0][price_data][product_data][name]", productName);
-    params.append("line_items[0][price_data][unit_amount]", String(finalAmount * 100));
+    params.append("line_items[0][price_data][unit_amount]", String(Math.round(finalAmount * 100)));
     params.append("line_items[0][quantity]", "1");
     params.append("metadata[userId]", userId);
     params.append("metadata[userNickname]", safeMeta(userNickname));

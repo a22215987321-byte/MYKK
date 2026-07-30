@@ -234,7 +234,7 @@ export default function AiCompanionRoom({ user, db, myProfile, onOpenCreator }) 
         </div>
         <button onClick={handleUnlock} disabled={unlocking}
           style={{ background: unlocking ? "var(--border)" : "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: "var(--radius-md)", padding: "12px 28px", color: unlocking ? "var(--text-faint)" : "var(--accent-text)", fontSize: 15, fontWeight: 700, cursor: unlocking ? "default" : "pointer" }}>
-          {unlocking ? "處理中..." : "🔓 解鎖 HK$168"}
+          {unlocking ? "處理中..." : "🔓 解鎖 HK$0.1"}
         </button>
       </div>
     );
