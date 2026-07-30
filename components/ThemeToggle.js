@@ -9,6 +9,7 @@ const THEMES = [
   { id: "neon", label: "🌌 霓虹深色" },
   { id: "glass", label: "🥂 玻璃質感" },
   { id: "pastel-pearl", label: "🪞 柔和珠光" },
+  { id: "shadow-window", label: "🌙 幽影深窗" },
 ];
 
 const PASTEL_PALETTES = [

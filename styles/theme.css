@@ -235,6 +235,46 @@ html[data-theme="pastel-pearl"][data-pastel-palette="pearl-silver"] :focus-visib
   outline-color: #444444;
 }
 
+html[data-theme="shadow-window"] {
+  /* Style 5 — 幽影深窗: deep indigo-black like a dim room at night, with a
+     soft moonlit blue-silver accent instead of neon's saturated cyan/pink
+     or glass's warm gradient — quieter and more muted than either. */
+  --bg: #0d0f1a;
+  --panel: #161927;
+  --panel-alt: #10121c;
+  --panel-hover: #1f2333;
+  --border: #2a2e42;
+  --border-soft: #1c1f2e;
+
+  --text: #dcdce6;
+  --text-muted: #8f93a8;
+  --text-faint: #9498ac;
+  --text-dim: #7c8096;
+  --text-subtle: #c4c7d6;
+
+  --accent: #7c93c4;
+  --accent-2: #4a5578;
+  --accent-active: #232840;
+  --accent-hover: #1c2035;
+
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  --glow-border: none;
+  --glow-shadow: none;
+  --bg-pattern: none;
+
+  /* Faint cool glow from the top, like moonlight through a window, rather
+     than a flat fill. */
+  --page-bg:
+    radial-gradient(ellipse at 50% -10%, rgba(124, 147, 196, 0.12), transparent 60%),
+    var(--bg);
+  --panel-blur: none;
+  --shell-bg: var(--bg);
+  --shell-blur: none;
+  --shell-margin: 0px;
+  --shell-radius: 0px;
+  --shell-shadow: none;
+}
+
 body {
   margin: 0;
   background-color: var(--page-bg);

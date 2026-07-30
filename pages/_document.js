@@ -27,7 +27,7 @@ export default function Document() {
                 if(palettes.indexOf(p)===-1)p='mist-blue';
                 document.documentElement.setAttribute('data-pastel-palette',p);
               }
-              var colors={default:'#f4f3f9',neon:'#090812',glass:'#eef1f7','pastel-pearl':'#f7f4ef'};
+              var colors={default:'#f4f3f9',neon:'#090812',glass:'#eef1f7','pastel-pearl':'#f7f4ef','shadow-window':'#0d0f1a'};
               var meta=document.querySelector('meta[name="theme-color"]');
               if(meta&&colors[t])meta.setAttribute('content',colors[t]);
             }catch(e){}})();`,
