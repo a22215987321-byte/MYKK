@@ -132,40 +132,48 @@ html[data-theme="shadow-window"] {
      below, but restructures the 3-column shell into independent rounded
      "windows" with real gaps between them, per an exact reference mock —
      not a recolor of the existing edge-to-edge dashboard layout. */
-  --panel-gap: 14px;
-  --sidebar-w-override: 330px;
-  --cal-w-override: 270px;
+  --panel-gap: 12px;
+  --sidebar-w-override: 360px;
+  --cal-w-override: 260px;
 
   --col-border: 1px solid rgba(255, 255, 255, 0.14);
   --col-border-right: 1px solid rgba(255, 255, 255, 0.14);
   --col-border-left: 1px solid rgba(255, 255, 255, 0.14);
-  --col-radius: 20px;
-  --col-shadow: 0 12px 32px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --col-radius: 18px;
+  --col-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   --col-blur: blur(18px);
   --col-margin: 0px;
 
   --navcard-bg: rgba(255, 255, 255, 0.045);
   --navcard-border: rgba(255, 255, 255, 0.08);
-  --navcard-radius: 16px;
-  --navcard-height: 68px;
+  --navcard-radius: 14px;
+  --navcard-height: 58px;
   --navcard-active-glow: 0 0 0 1px rgba(139, 92, 246, 0.25), 0 0 16px rgba(139, 92, 246, 0.18);
 
   --search-radius: 14px;
-  --search-height: 48px;
+  --search-height: 42px;
   --search-padding: 0 14px 0 40px;
   --search-icon-left: 24px;
   --search-icon-display: block;
   --inputfield-bg: rgba(10, 14, 22, 0.82);
 
-  --toolbar-panel-margin: 12px;
-  --toolbar-panel-radius: 20px;
-  --toolbar-height: 76px;
+  /* Vertical spacing between the header/chat-panel/input-bar inside
+     .cr-main comes ONLY from .cr-main's own flex `gap` below (12px) — these
+     three used to ALSO carry their own margin on top of that gap, which
+     double-stacked (gap + margin = ~24px, not 12px) and, worse, the 12px
+     *side* margins shrank each panel narrower than .cr-main itself,
+     leaving bare unstyled space beside them instead of them lining up
+     flush with the sidebar/calendar edges. Zero margin here; --panel-gap
+     on .cr-main is the single source of truth for the vertical rhythm. */
+  --toolbar-panel-margin: 0px;
+  --toolbar-panel-radius: 18px;
+  --toolbar-height: 72px;
   --toolbar-inner-divider: none;
   --toolbar-btn-bg: rgba(255, 255, 255, 0.04);
   --toolbar-btn-radius: 14px;
-  --toolbar-btn-height: 44px;
+  --toolbar-btn-height: 42px;
 
-  --chatpanel-margin: 0 12px 12px;
+  --chatpanel-margin: 0px;
   --chatpanel-radius: 18px;
   --chatpanel-glow: radial-gradient(ellipse at 50% 0%, rgba(124, 147, 196, 0.06), transparent 60%);
   --empty-title-color: rgba(255, 255, 255, 0.95);
@@ -174,23 +182,23 @@ html[data-theme="shadow-window"] {
   --empty-icon-border: 1px solid rgba(255, 255, 255, 0.12);
   --empty-line-w: 28px;
 
-  --inputbar-panel-margin: 0 12px 12px;
-  --inputbar-panel-radius: 20px;
-  --inputbar-height: 86px;
-  --inputbar-field-h: 52px;
+  --inputbar-panel-margin: 0px;
+  --inputbar-panel-radius: 18px;
+  --inputbar-height: 78px;
+  --inputbar-field-h: 48px;
   --plusbtn-display: flex;
-  --plusbtn-size: 46px;
-  --modelpicker-w: 160px;
+  --plusbtn-size: 44px;
+  --modelpicker-w: 150px;
   --modelpicker-justify: center;
   --modelpicker-radius: 14px;
-  --sendbtn-width: 92px;
-  --sendbtn-height: 52px;
+  --sendbtn-width: 88px;
+  --sendbtn-height: 48px;
   --sendbtn-bg: linear-gradient(135deg, var(--accent), var(--accent-2));
 
   --calpanel-margin: 0px;
-  --calpanel-radius: 20px;
-  --calday-size: 29px;
-  --calday-radius: 8px;
+  --calpanel-radius: 18px;
+  --calday-size: 26px;
+  --calday-radius: 999px;
   --calday-selected-bg: rgba(59, 92, 170, 0.45);
 }
 
@@ -404,7 +412,7 @@ html[data-theme="shadow-window"] {
      this theme's own frosted-glass panels. Placed first in each
      background-color/-image fallback chain (see ChatRoom.js's <style>
      block) so it wins regardless of whether a world is active. */
-  --force-panel-bg: rgba(10, 18, 28, 0.62);
+  --force-panel-bg: rgba(20, 26, 34, 0.72);
   --force-panel-blur: blur(18px);
 
   --text: rgba(255, 255, 255, 0.95);
