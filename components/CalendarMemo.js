@@ -131,9 +131,10 @@ export default function CalendarMemo({ uid }) {
             return (
               <button key={day} onClick={() => setSelected(isSelected ? null : dateStr)}
                 style={{
-                  position: "relative", aspectRatio: "1", borderRadius: 6,
+                  position: "relative", aspectRatio: "1", maxWidth: "var(--calday-size, auto)", maxHeight: "var(--calday-size, auto)", margin: "0 auto",
+                  borderRadius: "var(--calday-radius, 6px)",
                   border: isSelected ? "2px solid var(--accent)" : "1px solid transparent",
-                  background: isSelected ? "#1d4ed820" : isToday ? "var(--panel)" : "none",
+                  background: isSelected ? "var(--calday-selected-bg, #1d4ed820)" : isToday ? "var(--panel)" : "none",
                   color: isToday ? "#60a5fa" : "var(--text)",
                   cursor: "pointer", fontSize: 12, fontWeight: isToday ? 700 : 400,
                   display: "flex", alignItems: "center", justifyContent: "center",

@@ -1656,7 +1656,34 @@ export default function ChatApp({ user }) {
         .cr-sidebar-backdrop { display: none; }
 
         /* ── Calendar overlay ── */
-        .cr-cal { flex-shrink: 0; }
+        .cr-cal {
+          flex-shrink: 0;
+          border: var(--col-border, none);
+          border-radius: var(--col-radius, 0px);
+          box-shadow: var(--col-shadow, none);
+          backdrop-filter: var(--col-blur, none);
+          -webkit-backdrop-filter: var(--col-blur, none);
+        }
+
+        /* ── Floating-panel gap between sidebar / center column / calendar
+           (shadow-window only — every other theme's --panel-gap defaults to
+           0px, so .cr-shell stays one edge-to-edge card exactly as before). */
+        .cr-shell { gap: var(--panel-gap, 0px); }
+        .cr-main { gap: var(--panel-gap, 0px); }
+
+        /* Chat message panel — floating "window" for shadow-window, no-op
+           elsewhere (margin/radius/glow all default to 0/none). */
+        .cr-chat-panel {
+          margin: var(--chatpanel-margin, 0px);
+          border-radius: var(--chatpanel-radius, 0px);
+          border: var(--col-border, none);
+          box-shadow: var(--col-shadow, none);
+          background-color: var(--force-panel-bg, transparent);
+          background-image: var(--chatpanel-glow, none), var(--chat-world-tint, transparent), var(--chat-world-bg, none);
+          backdrop-filter: var(--force-panel-blur, none);
+          -webkit-backdrop-filter: var(--force-panel-blur, none);
+          position: relative;
+        }
 
         /* ── Chat "世界" background skin (lib/chatWorlds.js) ──
            The photo is painted exactly once, as <body>'s own background (see
@@ -1668,11 +1695,29 @@ export default function ChatApp({ user }) {
            anywhere in this chain — text/icons/buttons are never touched,
            only background-color. */
         .cr-sidebar {
-          background-color: var(--chat-world-transparent, var(--panel-alt));
-          background-image: none;
+          background-color: var(--force-panel-bg, var(--chat-world-transparent, var(--panel-alt)));
+          background-image: var(--chat-world-transparent, var(--panel-gradient-img, none));
+          backdrop-filter: var(--force-panel-blur, none);
+          -webkit-backdrop-filter: var(--force-panel-blur, none);
         }
         .cr-chat-header, .cr-input-bar {
-          background-color: var(--chat-world-transparent, var(--panel-alt));
+          background-color: var(--force-panel-bg, var(--chat-world-transparent, var(--panel-alt)));
+          background-image: var(--chat-world-transparent, var(--panel-gradient-img, none));
+          backdrop-filter: var(--force-panel-blur, none);
+          -webkit-backdrop-filter: var(--force-panel-blur, none);
+        }
+        .cr-chat-header {
+          margin: var(--toolbar-panel-margin, 0px);
+          border-radius: var(--toolbar-panel-radius, 0px);
+          border: var(--col-border, none);
+          box-shadow: var(--col-shadow, none);
+        }
+        .cr-input-bar {
+          margin: var(--inputbar-panel-margin, 0px);
+          border-radius: var(--inputbar-panel-radius, 0px);
+          border: var(--col-border, none);
+          box-shadow: var(--col-shadow, none);
+          min-height: var(--inputbar-height, auto);
         }
 
         @media (max-width: 767px) {
@@ -1946,8 +1991,13 @@ export default function ChatApp({ user }) {
             由 sidebarOpen 狀態＋拖曳時的即時 transform 控制（見 applyDrawerTransform）。
             桌面版另外還有 sidebarCollapsed（收合成寬度 0，跟手機抽屜是兩套獨立機制）。 */}
         <nav ref={sidebarElRef} className="cr-sidebar" aria-label="聊天導覽" aria-hidden={!isMobile && sidebarCollapsed} style={{
-          width: (!isMobile && sidebarCollapsed) ? 0 : sidebarWidth,
-          borderRight: (!isMobile && sidebarCollapsed) ? "none" : "1px solid var(--panel)",
+          width: (!isMobile && sidebarCollapsed) ? 0 : `var(--sidebar-w-override, ${sidebarWidth}px)`,
+          border: (!isMobile && sidebarCollapsed) ? "none" : "var(--col-border, none)",
+          borderRight: (!isMobile && sidebarCollapsed) ? "none" : "var(--col-border-right, 1px solid var(--panel))",
+          borderRadius: "var(--col-radius, 0px)",
+          boxShadow: "var(--col-shadow, none)",
+          backdropFilter: "var(--col-blur, none)", WebkitBackdropFilter: "var(--col-blur, none)",
+          margin: (!isMobile && sidebarCollapsed) ? 0 : "var(--col-margin, 0px)",
           display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden",
           transition: (isMobile || resizingPanel === "sidebar") ? undefined : "width 0.25s ease, border-color 0.25s ease",
         }}>
@@ -2020,9 +2070,10 @@ export default function ChatApp({ user }) {
               </div>
             </div>
           ) : (
-            <div style={{ padding: "10px 12px 6px" }}>
+            <div style={{ padding: "10px 12px 6px", position: "relative" }}>
+              <Search size={15} style={{ position: "absolute", left: "calc(var(--search-icon-left, 24px))", top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", pointerEvents: "none", display: "var(--search-icon-display, none)" }} />
               <input type="text" placeholder="搜尋好友..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                style={{ width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "7px 12px", color: "var(--text)", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                style={{ width: "100%", height: "var(--search-height, auto)", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "var(--search-padding, 7px 12px 7px 12px)", color: "var(--text)", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
             </div>
           )}
 
@@ -2783,14 +2834,19 @@ export default function ChatApp({ user }) {
 
         {/* Right panel: calendar overlay on mobile, sidebar on desktop */}
         <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{
-          width: calWidth, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden",
-          borderLeft: "1px solid var(--panel)", transition: resizingPanel === "cal" ? undefined : "width 0.2s ease",
+          width: `var(--cal-w-override, ${calWidth}px)`, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden",
+          border: "var(--col-border, none)",
+          borderLeft: "var(--col-border-left, 1px solid var(--panel))",
+          borderRadius: "var(--calpanel-radius, var(--col-radius, 0px))",
+          margin: "var(--calpanel-margin, 0px)",
+          transition: resizingPanel === "cal" ? undefined : "width 0.2s ease",
           // Goes fully transparent while a world is selected, same as
           // .cr-shell/.cr-main/.cr-sidebar — CalendarMemo's own root
           // (cal-inner) is plain transparent too, so <body>'s single copy of
           // the photo shows through both of them with nothing painted twice.
-          backgroundColor: "var(--chat-world-transparent, var(--panel-alt))",
-          backgroundImage: "none",
+          backgroundColor: "var(--force-panel-bg, var(--chat-world-transparent, var(--panel-alt)))",
+          backgroundImage: "var(--chat-world-transparent, var(--panel-gradient-img, none))",
+          backdropFilter: "var(--force-panel-blur, none)", WebkitBackdropFilter: "var(--force-panel-blur, none)",
         }}>
           {isMobile && (
             <div style={{ padding: "calc(env(safe-area-inset-top) + 8px) 14px 8px", background: "var(--panel-alt)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>

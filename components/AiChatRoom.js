@@ -199,7 +199,7 @@ export default function AiChatRoom({ user, db }) {
           ChatRoom.js's <style> block (this component always renders inside
           ChatRoom's tree), so it gets the same "世界" background translucency
           as 大廳/私訊/群組 for free. */}
-      <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
+      <div className="cr-chat-header" style={{ height: "var(--toolbar-height, 56px)", borderBottom: "var(--toolbar-inner-divider, 1px solid var(--panel))", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0, boxSizing: "border-box" }}>
         <img src="/ai-avatar.jpg" alt="EVON AI" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
         <div>
           <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>1.0 EVON AI</div>
@@ -209,7 +209,7 @@ export default function AiChatRoom({ user, db }) {
 
         <div ref={historyRef} style={{ position: "relative" }}>
           <button onClick={() => setHistoryOpen(v => !v)}
-            style={{ background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "6px 14px", color: "var(--text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            style={{ height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", padding: "6px 14px", color: "var(--text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
             🕘 歷史對話{conversations.length > 0 ? ` (${conversations.length})` : ""}
           </button>
           {historyOpen && (
@@ -246,7 +246,8 @@ export default function AiChatRoom({ user, db }) {
 
         <button onClick={newConversation} disabled={sending || messages.length === 0}
           style={{
-            background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
+            height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box",
+            background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))",
             padding: "6px 14px", color: "var(--text-muted)", fontSize: 12, fontWeight: 600,
             cursor: (sending || messages.length === 0) ? "default" : "pointer",
             opacity: (sending || messages.length === 0) ? 0.5 : 1,
@@ -255,19 +256,28 @@ export default function AiChatRoom({ user, db }) {
         </button>
       </div>
 
-      {/* Messages — same --chat-world-bg wiring as the other 3 chat rooms
-          (see ChatRoom.js's hall/private/group message containers). */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14, backgroundImage: "var(--chat-world-bg, none)", backgroundSize: "var(--chat-world-bg-size, auto)", backgroundRepeat: "var(--chat-world-bg-repeat, repeat)", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
+      {/* Messages — className="cr-chat-panel" gives this its own floating
+          "window" treatment under 幽影深窗 (background/border/radius/glow —
+          see the .cr-chat-panel rule in ChatRoom.js's <style> block); every
+          other theme's --chatpanel-* tokens default to 0/none so this stays
+          a plain flush container exactly as before. */}
+      <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14, backgroundSize: "var(--chat-world-bg-size, auto), cover", backgroundRepeat: "var(--chat-world-bg-repeat, repeat), no-repeat", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
         {messages.length === 0 && (
-          <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "80px 0" }}>
-            <div style={{ fontSize: 14 }}>打個招呼開始對話吧</div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--empty-icon-bg, none)", border: "var(--empty-icon-border, none)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "var(--empty-title-color)" }}>💬</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--empty-title-color)" }}>有什麼問題開始對話吧</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: "var(--empty-line-w, 0px)", height: 1, background: "var(--empty-sub-color)", opacity: 0.3 }} />
+              <span style={{ fontSize: 13, color: "var(--empty-sub-color)" }}>我可以幫你回答問題、提供建議、撰寫內容等</span>
+              <span style={{ width: "var(--empty-line-w, 0px)", height: 1, background: "var(--empty-sub-color)", opacity: 0.3 }} />
+            </div>
           </div>
         )}
         {messages.map((m, i) => (
           <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
             <div style={{
               maxWidth: "70%", padding: "10px 14px", borderRadius: "var(--radius-lg)",
-              background: m.role === "user" ? "var(--accent)" : "var(--panel-alt)",
+              background: m.role === "user" ? "var(--accent)" : "var(--bubble-assistant-bg, var(--panel-alt))",
               color: m.role === "user" ? "var(--accent-text)" : "var(--text)",
               fontSize: 14, whiteSpace: "pre-wrap", wordBreak: "break-word",
             }}>
@@ -277,7 +287,7 @@ export default function AiChatRoom({ user, db }) {
         ))}
         {sending && (
           <div style={{ display: "flex", justifyContent: "flex-start" }}>
-            <div style={{ padding: "10px 14px", borderRadius: "var(--radius-lg)", background: "var(--panel-alt)", color: "var(--text-faint)", fontSize: 14 }}>
+            <div style={{ padding: "10px 14px", borderRadius: "var(--radius-lg)", background: "var(--bubble-assistant-bg, var(--panel-alt))", color: "var(--text-faint)", fontSize: 14 }}>
               思考中...
             </div>
           </div>
@@ -289,17 +299,31 @@ export default function AiChatRoom({ user, db }) {
           reuses .cr-input-bar for the same reason as the header above
           (also gives it the opaque panel the other 3 rooms' input bars
           already had, which this one was previously missing). */}
-      <div className="cr-input-bar" style={{ padding: "12px 16px", borderTop: "1px solid var(--panel)", display: "flex", gap: 8, flexShrink: 0 }}>
+      <div className="cr-input-bar" style={{ padding: "12px 16px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, boxSizing: "border-box" }}>
+        {/* Decorative under 幽影深窗 only (--plusbtn-display defaults to
+            none everywhere else) — DeepSeek's text-only API has nowhere to
+            send an attachment yet, so this doesn't wire up a real upload. */}
+        <button type="button" onClick={() => toast("附加檔案功能即將推出")}
+          style={{
+            display: "var(--plusbtn-display, none)", width: "var(--plusbtn-size, 0px)", height: "var(--plusbtn-size, 0px)",
+            flexShrink: 0, alignItems: "center", justifyContent: "center",
+            background: "var(--toolbar-btn-bg, var(--panel-alt))", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))",
+            color: "var(--text)", fontSize: 22, cursor: "pointer", lineHeight: 1,
+          }}>
+          +
+        </button>
+
         <input type="text" value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && send()}
           placeholder="輸入訊息..." disabled={sending}
-          style={{ flex: 1, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
+          style={{ flex: 1, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
 
-        <div ref={modelMenuRef} style={{ position: "relative", flexShrink: 0 }}>
+        <div ref={modelMenuRef} style={{ position: "relative", flexShrink: 0, width: "var(--modelpicker-w, auto)" }}>
           <button onClick={() => setModelMenuOpen(v => !v)}
             style={{
-              display: "inline-flex", alignItems: "center", gap: 6, height: "100%",
-              background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 999,
+              display: "inline-flex", alignItems: "center", justifyContent: "var(--modelpicker-justify, flex-start)", gap: 6,
+              width: "100%", height: "var(--inputbar-field-h, 100%)", boxSizing: "border-box",
+              background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--modelpicker-radius, 999px)",
               padding: "0 14px", color: "var(--text)", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
             }}>
             {model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
@@ -329,7 +353,12 @@ export default function AiChatRoom({ user, db }) {
         </div>
 
         <button onClick={send} disabled={sending || !input.trim()}
-          style={{ background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 18px", color: "var(--accent-text)", fontSize: 14, fontWeight: 600, cursor: sending ? "default" : "pointer", opacity: sending || !input.trim() ? 0.6 : 1, flexShrink: 0 }}>
+          style={{
+            width: "var(--sendbtn-width, auto)", height: "var(--sendbtn-height, auto)", boxSizing: "border-box",
+            background: "var(--sendbtn-bg, var(--accent))", border: "none", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))",
+            padding: "9px 18px", color: "var(--accent-text)", fontSize: 14, fontWeight: 600,
+            cursor: sending ? "default" : "pointer", opacity: sending || !input.trim() ? 0.6 : 1, flexShrink: 0,
+          }}>
           傳送
         </button>
       </div>

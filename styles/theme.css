@@ -54,6 +54,144 @@
      bar. Kept as one variable instead of a 56px literal copy-pasted into
      each page's stylesheet, so a future resize only needs one edit. */
   --mobile-tabbar-h: 56px;
+
+  /* Per-column "floating panel" tokens (sidebar / center column / calendar).
+     Every one of these defaults to a no-op that reproduces the existing
+     edge-to-edge dashboard look exactly — only html[data-theme="shadow-window"]
+     below gives them real values. Lets ChatRoom.js/NavItem.js/CalendarMemo.js
+     read a single set of variables instead of branching on the theme id
+     themselves, and keeps every other theme pixel-identical to before. */
+  --col-border: none;
+  --col-border-right: 1px solid var(--panel);
+  --col-border-left: 1px solid var(--panel);
+  --col-radius: 0px;
+  --col-shadow: none;
+  --col-blur: none;
+  --col-margin: 0px;
+  --panel-gradient-img: none;
+  /* --force-panel-bg / --force-panel-blur are deliberately left undefined
+     here (not even set to "none") — an undefined custom property makes
+     var(--force-panel-bg, fallback) use the fallback; a defined-but-invalid
+     one (e.g. "none" isn't a valid <color> for background-color) makes the
+     whole declaration invalid instead, which is a different, wrong outcome. */
+  --bubble-assistant-bg: var(--panel-alt);
+
+  --navcard-bg: transparent;
+  --navcard-border: transparent;
+  --navcard-radius: var(--radius-md);
+  --navcard-height: auto;
+  --navcard-active-glow: none;
+
+  --search-radius: var(--radius-md);
+  --search-height: auto;
+  --search-padding: 7px 12px 7px 12px;
+  --search-icon-left: 24px;
+  --search-icon-display: none;
+  --inputfield-bg: var(--panel);
+
+  --toolbar-panel-margin: 0px;
+  --toolbar-panel-radius: 0px;
+  --toolbar-height: 56px;
+  --toolbar-inner-divider: 1px solid var(--panel);
+  --toolbar-btn-bg: none;
+  --toolbar-btn-radius: var(--radius-md);
+  --toolbar-btn-height: auto;
+
+  --chatpanel-margin: 0px;
+  --chatpanel-radius: 0px;
+  --chatpanel-glow: none;
+  --empty-title-color: var(--text-dim);
+  --empty-sub-color: var(--text-dim);
+  --empty-icon-bg: none;
+  --empty-icon-border: none;
+  --empty-line-w: 0px;
+
+  --inputbar-panel-margin: 0px;
+  --inputbar-panel-radius: 0px;
+  --inputbar-height: auto;
+  --inputbar-field-h: auto;
+  --plusbtn-display: none;
+  --plusbtn-size: 0px;
+  --modelpicker-w: auto;
+  --modelpicker-justify: flex-start;
+  --modelpicker-radius: 999px;
+  --sendbtn-width: auto;
+  --sendbtn-height: auto;
+  --sendbtn-bg: var(--accent);
+
+  --calpanel-margin: 0px;
+  --calpanel-radius: 0px;
+  --calday-size: auto;
+  --calday-radius: 6px;
+  --calday-selected-bg: #1d4ed820;
+}
+
+html[data-theme="shadow-window"] {
+  /* Style 5b — floating-panel dashboard skin for 幽影深窗: same deep
+     indigo-black/moonlight-accent palette as the base shadow-window block
+     below, but restructures the 3-column shell into independent rounded
+     "windows" with real gaps between them, per an exact reference mock —
+     not a recolor of the existing edge-to-edge dashboard layout. */
+  --panel-gap: 14px;
+  --sidebar-w-override: 330px;
+  --cal-w-override: 270px;
+
+  --col-border: 1px solid rgba(255, 255, 255, 0.14);
+  --col-border-right: 1px solid rgba(255, 255, 255, 0.14);
+  --col-border-left: 1px solid rgba(255, 255, 255, 0.14);
+  --col-radius: 20px;
+  --col-shadow: 0 12px 32px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --col-blur: blur(18px);
+  --col-margin: 0px;
+
+  --navcard-bg: rgba(255, 255, 255, 0.045);
+  --navcard-border: rgba(255, 255, 255, 0.08);
+  --navcard-radius: 16px;
+  --navcard-height: 68px;
+  --navcard-active-glow: 0 0 0 1px rgba(139, 92, 246, 0.25), 0 0 16px rgba(139, 92, 246, 0.18);
+
+  --search-radius: 14px;
+  --search-height: 48px;
+  --search-padding: 0 14px 0 40px;
+  --search-icon-left: 24px;
+  --search-icon-display: block;
+  --inputfield-bg: rgba(10, 14, 22, 0.82);
+
+  --toolbar-panel-margin: 12px;
+  --toolbar-panel-radius: 20px;
+  --toolbar-height: 76px;
+  --toolbar-inner-divider: none;
+  --toolbar-btn-bg: rgba(255, 255, 255, 0.04);
+  --toolbar-btn-radius: 14px;
+  --toolbar-btn-height: 44px;
+
+  --chatpanel-margin: 0 12px 12px;
+  --chatpanel-radius: 18px;
+  --chatpanel-glow: radial-gradient(ellipse at 50% 0%, rgba(124, 147, 196, 0.06), transparent 60%);
+  --empty-title-color: rgba(255, 255, 255, 0.95);
+  --empty-sub-color: rgba(255, 255, 255, 0.58);
+  --empty-icon-bg: rgba(255, 255, 255, 0.06);
+  --empty-icon-border: 1px solid rgba(255, 255, 255, 0.12);
+  --empty-line-w: 28px;
+
+  --inputbar-panel-margin: 0 12px 12px;
+  --inputbar-panel-radius: 20px;
+  --inputbar-height: 86px;
+  --inputbar-field-h: 52px;
+  --plusbtn-display: flex;
+  --plusbtn-size: 46px;
+  --modelpicker-w: 160px;
+  --modelpicker-justify: center;
+  --modelpicker-radius: 14px;
+  --sendbtn-width: 92px;
+  --sendbtn-height: 52px;
+  --sendbtn-bg: linear-gradient(135deg, var(--accent), var(--accent-2));
+
+  --calpanel-margin: 0px;
+  --calpanel-radius: 20px;
+  --calday-size: 29px;
+  --calday-radius: 8px;
+  --calday-selected-bg: rgba(59, 92, 170, 0.45);
 }
 
 html[data-theme="neon"] {
@@ -236,41 +374,64 @@ html[data-theme="pastel-pearl"][data-pastel-palette="pearl-silver"] :focus-visib
 }
 
 html[data-theme="shadow-window"] {
-  /* Style 5 — 幽影深窗: deep indigo-black like a dim room at night, with a
-     soft moonlit blue-silver accent instead of neon's saturated cyan/pink
-     or glass's warm gradient — quieter and more muted than either. */
-  --bg: #0d0f1a;
-  --panel: #161927;
-  --panel-alt: #10121c;
-  --panel-hover: #1f2333;
-  --border: #2a2e42;
-  --border-soft: #1c1f2e;
+  /* Style 5 — 幽影深窗: dark gray-black floating-panel dashboard, per an
+     exact reference mock (see the layout-token block above) rather than a
+     freeform dark theme — deep neutral grays (not neon's cyan/pink, not a
+     blue-indigo tint), with a purple-blue accent for the active nav item
+     and primary actions. --panel/--panel-alt stay solid colors (several
+     existing color-mix() calls elsewhere require an actual <color>, not a
+     gradient) — the panel look's diagonal gradient lives in --panel-gradient
+     instead, used only by the new floating panels below. */
+  --bg: #0d0e12;
+  --panel: #1a1e26;
+  --panel-alt: #14171f;
+  --panel-hover: #232836;
+  /* Dedicated token instead of repurposing --panel-alt (that's read all
+     over the app — dropdowns, hover states, etc. — for a solid-ish
+     surface; overloading it with this low alpha would make those
+     translucent too). Only AiChatRoom.js's assistant-side bubble reads
+     this one. */
+  --bubble-assistant-bg: rgba(8, 10, 16, 0.82);
+  --border: rgba(255, 255, 255, 0.14);
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --panel-gradient: linear-gradient(145deg, rgba(31, 36, 44, 0.92), rgba(17, 21, 27, 0.96));
+  --panel-gradient-img: var(--panel-gradient);
+  /* Escape hatch so every floating panel below keeps this exact glass tint
+     even while a chat "世界" photo is selected — normally panels go fully
+     transparent for a selected world (see --chat-world-transparent in
+     chatWorlds.js) so body's one shared copy shows through untouched, but
+     that read as "background photo swamping the UI" once combined with
+     this theme's own frosted-glass panels. Placed first in each
+     background-color/-image fallback chain (see ChatRoom.js's <style>
+     block) so it wins regardless of whether a world is active. */
+  --force-panel-bg: rgba(10, 18, 28, 0.62);
+  --force-panel-blur: blur(18px);
 
-  --text: #dcdce6;
-  --text-muted: #8f93a8;
-  --text-faint: #9498ac;
-  --text-dim: #7c8096;
-  --text-subtle: #c4c7d6;
+  --text: rgba(255, 255, 255, 0.95);
+  --text-muted: rgba(255, 255, 255, 0.55);
+  --text-faint: rgba(255, 255, 255, 0.55);
+  --text-dim: rgba(255, 255, 255, 0.35);
+  --text-subtle: rgba(255, 255, 255, 0.75);
 
-  --accent: #7c93c4;
-  --accent-2: #4a5578;
-  --accent-active: #232840;
-  --accent-hover: #1c2035;
+  --accent: #6366f1;
+  --accent-2: #8b5cf6;
+  --accent-active: rgba(91, 83, 255, 0.22);
+  --accent-active-border: rgba(135, 125, 255, 0.45);
+  --accent-hover: rgba(255, 255, 255, 0.06);
 
-  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  --card-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
   --glow-border: none;
   --glow-shadow: none;
   --bg-pattern: none;
 
-  /* Faint cool glow from the top, like moonlight through a window, rather
-     than a flat fill. */
-  --page-bg:
-    radial-gradient(ellipse at 50% -10%, rgba(124, 147, 196, 0.12), transparent 60%),
-    var(--bg);
+  --page-bg: var(--bg);
   --panel-blur: none;
-  --shell-bg: var(--bg);
+  /* The outer shell becomes a transparent gutter — each column (sidebar /
+     center / calendar) below paints its own panel, so the shell itself no
+     longer needs to be one big card. */
+  --shell-bg: transparent;
   --shell-blur: none;
-  --shell-margin: 0px;
+  --shell-margin: 14px;
   --shell-radius: 0px;
   --shell-shadow: none;
 }
@@ -290,6 +451,35 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
+}
+
+/* 幽影深窗 + a chat "世界" photo together: the photo was reading as full
+   brightness/saturation and swamping the UI ("背景圖搶走 UI"), because
+   panels normally go fully transparent to let body's one shared copy show
+   through untouched. Route the photo through a filtered pseudo-element
+   instead of painting it directly on body, so it can be dimmed/desaturated
+   — body itself no longer carries the image for this theme. */
+html[data-theme="shadow-window"] body {
+  background-image: none;
+}
+html[data-theme="shadow-window"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-image: var(--chat-world-bg, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.65) saturate(0.75);
+}
+html[data-theme="shadow-window"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
 }
 
 /* Prevent oversized media/tables from forcing horizontal overflow on narrow screens */

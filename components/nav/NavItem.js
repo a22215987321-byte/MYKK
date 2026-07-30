@@ -4,10 +4,11 @@ export default function NavItem({ icon, iconBg, label, sublabel, active, onClick
       style={{
         width: "100%", display: "flex", alignItems: "center", gap: 10,
         padding: compact ? "8px 10px" : "9px 10px",
-        minHeight: mobileTouch ? 44 : undefined,
-        borderRadius: "var(--radius-md)",
-        border: active ? "1px solid var(--accent-active-border, transparent)" : "1px solid transparent",
-        background: active ? "var(--accent-active)" : "transparent",
+        minHeight: `var(--navcard-height, ${mobileTouch ? "44px" : "auto"})`,
+        borderRadius: "var(--navcard-radius, var(--radius-md))",
+        border: active ? "1px solid var(--accent-active-border, transparent)" : "1px solid var(--navcard-border, transparent)",
+        background: active ? "var(--accent-active)" : "var(--navcard-bg, transparent)",
+        boxShadow: active ? "var(--navcard-active-glow, none)" : "none",
         color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "background 0.15s",
       }}>
       <div style={{
