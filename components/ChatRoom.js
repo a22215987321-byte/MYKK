@@ -28,6 +28,7 @@ import AiChatRoom from "./AiChatRoom";
 import { DocConvertRoomLazy } from "./doc-convert";
 import AiCompanionRoom from "./AiCompanionRoom";
 import AiCompanionCreator from "./AiCompanionCreator";
+import UpgradeMembership from "./UpgradeMembership";
 import EmojiStickerPicker from "./EmojiStickerPicker";
 import LoadingState from "./LoadingState";
 import useIsMobile from "../lib/useIsMobile";
@@ -790,6 +791,7 @@ export default function ChatApp({ user }) {
   const [showDocConvert,     setShowDocConvert]     = useState(false);
   const [showAiCompanion,    setShowAiCompanion]    = useState(false);
   const [showCompanionCreator, setShowCompanionCreator] = useState(false);
+  const [showUpgrade,        setShowUpgrade]        = useState(false);
 
   // Mobile / sidebar states
   const isMobile = useIsMobile();
@@ -897,7 +899,7 @@ export default function ChatApp({ user }) {
     setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false);
     setShowEnglishPron(false); setShowIeltsBand4(false);
     setShowFeed(false); setShowImageEditor(false); setShowAiChat(false); setShowDocConvert(false);
-    setShowAiCompanion(false);
+    setShowAiCompanion(false); setShowUpgrade(false);
   }, []);
 
   // Cinema states
@@ -1486,7 +1488,7 @@ export default function ChatApp({ user }) {
   // bar entry — reaching it should highlight "圖片編輯", not "更多".
   const inMoreTool = showLeaderboard || showCinema || showVocab || showSpanish || showSpanishCourse ||
     showCustomVocab || showDict || showSpanishPron || showSpanishGrammar || showSpanishVerbs ||
-    showEnglishPron || showIeltsBand4 || showAiChat || showDocConvert || showAiCompanion;
+    showEnglishPron || showIeltsBand4 || showAiChat || showDocConvert || showAiCompanion || showUpgrade;
   const inTool = inMoreTool || showImageEditor;
   const inThread = !!activeFriendId || !!activeGroupId;
 
@@ -2070,10 +2072,31 @@ export default function ChatApp({ user }) {
               </div>
             </div>
           ) : (
-            <div style={{ padding: "10px 12px 6px", position: "relative" }}>
-              <Search size={15} style={{ position: "absolute", left: "calc(var(--search-icon-left, 24px))", top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", pointerEvents: "none", display: "var(--search-icon-display, none)" }} />
-              <input type="text" placeholder="搜尋好友..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                style={{ width: "100%", height: "var(--search-height, auto)", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "var(--search-padding, 7px 12px 7px 12px)", color: "var(--text)", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+            <div style={{ padding: "10px 12px 6px", display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                <Search size={15} style={{ position: "absolute", left: "calc(var(--search-icon-left, 24px))", top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", pointerEvents: "none", display: "var(--search-icon-display, none)" }} />
+                <input type="text" placeholder="搜尋好友..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  style={{ width: "100%", height: "var(--search-height, auto)", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "var(--search-padding, 7px 12px 7px 12px)", color: "var(--text)", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <button onClick={() => setShowFriendSearch(true)} title="新增好友"
+                style={{
+                  width: "var(--search-height, 34px)", height: "var(--search-height, 34px)", flexShrink: 0, boxSizing: "border-box",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "var(--toolbar-btn-bg, var(--panel-alt))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))",
+                  color: "var(--text-muted)", cursor: "pointer",
+                }}>
+                <Plus size={16} />
+              </button>
+            </div>
+          )}
+
+          {/* Upgrade membership — layout only for now, right under the
+              search box per explicit placement request (not where the
+              reference mock itself put it). */}
+          {!isMobile && (
+            <div style={{ padding: "0 10px 6px" }}>
+              <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
+                active={showUpgrade} onClick={() => { resetAllViews(); setShowUpgrade(true); }} />
             </div>
           )}
 
@@ -2091,7 +2114,7 @@ export default function ChatApp({ user }) {
                 </div>
               </button>
               {(() => {
-                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion;
+                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade;
                 return (
                   <button onClick={() => { resetAllViews(); if (isMobile) settleDrawer(false); }}
                     style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: hallActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
@@ -2118,7 +2141,7 @@ export default function ChatApp({ user }) {
               {/* Hall button */}
               <div style={{ padding: "4px 10px 0" }}>
                 <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧"
-                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion}
+                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade}
                   onClick={() => { resetAllViews(); }} />
               </div>
             </>
@@ -2565,77 +2588,82 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Image editor view */}
-          {showImageEditor && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showDocConvert && !showAiCompanion && (
+          {showImageEditor && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <ImageEditorRoom />
           )}
 
           {/* AI chat view */}
-          {showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showDocConvert && !showAiCompanion && (
+          {showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <AiChatRoom user={user} db={db} />
           )}
 
           {/* Doc convert view */}
-          {showDocConvert && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showAiCompanion && (
+          {showDocConvert && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showAiCompanion && !showUpgrade && (
             <DocConvertRoomLazy />
           )}
 
           {/* AI 夥伴 view */}
-          {showAiCompanion && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && (
+          {showAiCompanion && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showUpgrade && (
             <AiCompanionRoom user={user} db={db} myProfile={myProfile} onOpenCreator={() => setShowCompanionCreator(true)} />
           )}
 
+          {/* Upgrade membership view — layout only, no real Stripe wiring yet */}
+          {showUpgrade && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+            <UpgradeMembership />
+          )}
+
           {/* Vocab view */}
-          {showVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <VocabRoom user={user} db={db} />
           )}
 
           {/* Spanish view */}
-          {showSpanish && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showSpanish && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <SpanishRoom user={user} db={db} />
           )}
 
           {/* Spanish Course view */}
-          {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <SpanishCourseRoom user={user} db={db} onContextChange={setSpanishCourseNoteContext} />
           )}
 
           {/* Spanish Pronunciation view */}
-          {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishPronunciation onNav={() => { setShowSpanishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Grammar view */}
-          {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishGrammar onNav={() => { setShowSpanishGrammar(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Verb Conjugator view */}
-          {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><SpanishVerbConjugator onNav={() => { setShowSpanishVerbs(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* English Pronunciation view */}
-          {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishPronunciation user={user} db={db} onNav={() => { setShowEnglishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Custom vocab view */}
-          {showCustomVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showCustomVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <CustomVocabRoom user={myProfile || user} db={db} />
           )}
 
           {/* Dictionary view */}
-          {showDict && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showDict && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <DictionaryRoom />
           )}
 
           {/* Public hall */}
           {/* IELTS Band 4 view */}
-          {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><IeltsBand4 onNav={() => { setShowIeltsBand4(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
-          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
             <>
               <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
                 <span style={{ fontSize: 20 }}>💬</span>
@@ -2812,8 +2840,8 @@ export default function ChatApp({ user }) {
         {/* 更多選單（手機版「更多」分頁） */}
         {isMobile && mobileView === 'more' && (
           <ChatMoreMenu
-            state={{ showLeaderboard, showCinema, showAiChat, showDocConvert, showAiCompanion, showEnglishPron, showIeltsBand4, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showCustomVocab, showDict }}
-            setters={{ setShowLeaderboard, setShowCinema, setShowAiChat, setShowDocConvert, setShowAiCompanion, setShowEnglishPron, setShowIeltsBand4, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowCustomVocab, setShowDict }}
+            state={{ showLeaderboard, showCinema, showAiChat, showDocConvert, showAiCompanion, showUpgrade, showEnglishPron, showIeltsBand4, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showCustomVocab, showDict }}
+            setters={{ setShowLeaderboard, setShowCinema, setShowAiChat, setShowDocConvert, setShowAiCompanion, setShowUpgrade, setShowEnglishPron, setShowIeltsBand4, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowCustomVocab, setShowDict }}
             onOpen={(setter) => { resetAllViews(); setter(true); setMobileView(null); }}
           />
         )}

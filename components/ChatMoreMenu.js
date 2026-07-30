@@ -25,6 +25,10 @@ export default function ChatMoreMenu({ state, setters, onOpen }) {
         <NavItem icon="💞" iconBg="linear-gradient(135deg,#db2777,#9333ea)" label="AI 夥伴" sublabel="語音陪伴" mobileTouch
           active={state.showAiCompanion} onClick={() => onOpen(setters.setShowAiCompanion)} />
       </div>
+      <div style={{ padding: "0 10px 10px" }}>
+        <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗" mobileTouch
+          active={state.showUpgrade} onClick={() => onOpen(setters.setShowUpgrade)} />
+      </div>
       <div style={{ padding: "4px 14px 4px" }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>🇬🇧 英語學習</span>
       </div>
