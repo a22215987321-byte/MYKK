@@ -250,11 +250,13 @@ function PostCard({ post, myUid, myProfile }) {
     <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", marginBottom: 16, overflow: "hidden" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", position: "relative" }}>
-        <Avatar avatar={post.userAvatar} avatarImage={post.userAvatarImage} color={post.userColor} size={40} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.userNickname}</div>
-          <div style={{ fontSize: 11, color: "var(--text-muted)" }} title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</div>
-        </div>
+        <Link href={`/profile/${post.userId}`} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
+          <Avatar avatar={post.userAvatar} avatarImage={post.userAvatarImage} color={post.userColor} size={40} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.userNickname}</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }} title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</div>
+          </div>
+        </Link>
         {isMine && (
           <div style={{ position: "relative" }}>
             <button onClick={() => setMenuOpen(v => !v)}
