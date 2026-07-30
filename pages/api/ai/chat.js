@@ -39,10 +39,18 @@ const DEFAULT_MODEL_ID = "deepseek-v4-flash";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { messages, model } = req.body || {};
+  const { messages, model, systemPrompt } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "invalid messages" });
   }
+  // Optional per-caller override of the system prompt (used by the AI 夥伴
+  // voice companion, which needs its own persona instead of the generic
+  // assistant one) — capped the same way user message content is, and
+  // falling back to today's default when absent so AiChatRoom.js (which
+  // never sends this field) behaves exactly as before.
+  const customSystemPrompt = typeof systemPrompt === "string" && systemPrompt.trim()
+    ? systemPrompt.trim().slice(0, MAX_CONTENT_LENGTH)
+    : null;
   // Never forward an arbitrary client-supplied string straight into the
   // upstream request — fall back to the default for anything not on the
   // allow-list instead of rejecting outright, since a stale/unknown value
@@ -71,7 +79,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: upstreamModel,
-        messages: [{ role: "system", content: "你是 EVONCHAT 裡的 AI 助手，用繁體中文回覆，語氣自然親切。" }, ...cleaned],
+        messages: [{ role: "system", content: customSystemPrompt || "你是 EVONCHAT 裡的 AI 助手，用繁體中文回覆，語氣自然親切。" }, ...cleaned],
         stream: false,
       }),
       signal: ctrl.signal,

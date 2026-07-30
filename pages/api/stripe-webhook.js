@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { db } from "../../lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 export const config = {
   api: {
@@ -36,7 +36,17 @@ export default async function handler(req, res) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-    const { userId, userNickname, userAvatar, userColor, userAvatarImage, amount } = session.metadata;
+    const { userId, userNickname, userAvatar, userColor, userAvatarImage, amount, product } = session.metadata;
+
+    if (product === "ai_companion_unlock") {
+      try {
+        await updateDoc(doc(db, "users", userId), { hasAiCompanion: true });
+      } catch (err) {
+        console.error("Firestore write error (hasAiCompanion):", err);
+      }
+      return res.status(200).json({ received: true });
+    }
+
     try {
       await addDoc(collection(db, "donations"), {
         userId,
