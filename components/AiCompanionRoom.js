@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "../lib/toast";
 import { buildCompanionSystemPrompt } from "../lib/aiCompanionPrompt";
+import { isAdminEmail } from "../lib/admin";
 
 const MAX_STORED_MESSAGES = 20; // mirrors chat.js's MAX_MESSAGES — keeps the
 // single aiCompanionChats/{uid} doc from growing past Firestore's 1MiB cap.
@@ -37,7 +38,7 @@ export default function AiCompanionRoom({ user, db, myProfile, onOpenCreator }) 
   // freshest closure instead of a stale one from the first render.
   const handleUserTurnRef = useRef(() => {});
 
-  const hasAiCompanion = !!myProfile?.hasAiCompanion;
+  const hasAiCompanion = !!myProfile?.hasAiCompanion || isAdminEmail(user?.email);
   const hasPersona = !!myProfile?.companionName;
 
   // Load the single saved-session doc once.

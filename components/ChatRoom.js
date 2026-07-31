@@ -28,7 +28,7 @@ import AiChatRoom from "./AiChatRoom";
 import { DocConvertRoomLazy } from "./doc-convert";
 import AiCompanionRoom from "./AiCompanionRoom";
 import AiCompanionCreator from "./AiCompanionCreator";
-import UpgradeMembership from "./UpgradeMembership";
+import UpgradeMembership, { UpgradeHighlights } from "./UpgradeMembership";
 import EmojiStickerPicker from "./EmojiStickerPicker";
 import LoadingState from "./LoadingState";
 import useIsMobile from "../lib/useIsMobile";
@@ -2094,7 +2094,7 @@ export default function ChatApp({ user }) {
               search box per explicit placement request (not where the
               reference mock itself put it). */}
           {!isMobile && (
-            <div style={{ padding: "0 10px 6px" }}>
+            <div style={{ padding: "4px 10px 0" }}>
               <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
                 active={showUpgrade} onClick={() => { resetAllViews(); setShowUpgrade(true); }} />
             </div>
@@ -2882,8 +2882,14 @@ export default function ChatApp({ user }) {
               <button onClick={() => setCalendarOpen(false)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "5px 10px", color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>✕ 關閉</button>
             </div>
           )}
-          {activeSpanishNotes && <PageNotes noteKey={activeSpanishNotes.key} pageTitle={activeSpanishNotes.title} />}
-          <CalendarMemo uid={uid} />
+          {showUpgrade ? (
+            <UpgradeHighlights />
+          ) : (
+            <>
+              {activeSpanishNotes && <PageNotes noteKey={activeSpanishNotes.key} pageTitle={activeSpanishNotes.title} />}
+              <CalendarMemo uid={uid} />
+            </>
+          )}
         </div>
 
         {isMobile && (

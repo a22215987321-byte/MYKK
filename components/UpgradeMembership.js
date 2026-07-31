@@ -72,61 +72,67 @@ function PlanCard({ plan, cycle }) {
   );
 }
 
+// Rendered in the calendar column (see ChatRoom.js — swaps CalendarMemo out
+// for this while 升級會員 is the active view) instead of living inside this
+// component's own layout, so the page doesn't create an extra 4th column
+// alongside the real calendar panel.
+export function UpgradeHighlights() {
+  return (
+    <div style={{ padding: 20, overflowY: "auto", flex: 1, minHeight: 0 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+        ✨ 升級重點
+      </div>
+      {HIGHLIGHTS.map(h => (
+        <div key={h.title} style={{ display: "flex", gap: 10, marginBottom: 14, padding: 12, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12 }}>
+          <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{h.icon}</div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>{h.title}</div>
+            <div style={{ fontSize: 11, color: "var(--text-faint)", lineHeight: 1.5 }}>{h.desc}</div>
+          </div>
+        </div>
+      ))}
+      <button onClick={() => toast("付費升級功能即將推出")}
+        style={{ width: "100%", background: "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 12, padding: "12px 0", color: "var(--accent-text)", fontSize: 14, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
+        👑 立即升級
+      </button>
+      <div style={{ textAlign: "center", fontSize: 11, color: "var(--text-dim)", marginTop: 8 }}>
+        🔒 安全付款・隨時可取消
+      </div>
+    </div>
+  );
+}
+
 export default function UpgradeMembership() {
   const [cycle, setCycle] = useState("month");
 
   return (
-    <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
-      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,var(--accent),var(--accent-2))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>💎</div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 20, color: "var(--text)" }}>升級會員方案</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>選擇最適合你的 AI 使用方式</div>
-            </div>
-          </div>
-          <div style={{ display: "flex", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 999, padding: 3 }}>
-            {[["month", "月付"], ["year", "年付"]].map(([id, label]) => (
-              <button key={id} onClick={() => setCycle(id)}
-                style={{ padding: "6px 16px", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
-                  background: cycle === id ? "var(--panel)" : "none", color: cycle === id ? "var(--text)" : "var(--text-faint)",
-                  boxShadow: cycle === id ? "var(--card-shadow)" : "none" }}>
-                {label}
-              </button>
-            ))}
+    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,var(--accent),var(--accent-2))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>💎</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 20, color: "var(--text)" }}>升級會員方案</div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>選擇最適合你的 AI 使用方式</div>
           </div>
         </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-          {PLANS.map(p => <PlanCard key={p.id} plan={p} cycle={cycle} />)}
-        </div>
-
-        <div style={{ marginTop: 20, textAlign: "center", fontSize: 12, color: "var(--text-dim)" }}>
-          🔒 所有方案皆包含企業級安全性與隱私保護
+        <div style={{ display: "flex", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 999, padding: 3 }}>
+          {[["month", "月付"], ["year", "年付"]].map(([id, label]) => (
+            <button key={id} onClick={() => setCycle(id)}
+              style={{ padding: "6px 16px", borderRadius: 999, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                background: cycle === id ? "var(--panel)" : "none", color: cycle === id ? "var(--text)" : "var(--text-faint)",
+                boxShadow: cycle === id ? "var(--card-shadow)" : "none" }}>
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div style={{ width: 260, flexShrink: 0, borderLeft: "1px solid var(--border)", padding: 20, overflowY: "auto" }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          ✨ 升級重點
-        </div>
-        {HIGHLIGHTS.map(h => (
-          <div key={h.title} style={{ display: "flex", gap: 10, marginBottom: 14, padding: 12, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12 }}>
-            <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{h.icon}</div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>{h.title}</div>
-              <div style={{ fontSize: 11, color: "var(--text-faint)", lineHeight: 1.5 }}>{h.desc}</div>
-            </div>
-          </div>
-        ))}
-        <button onClick={() => toast("付費升級功能即將推出")}
-          style={{ width: "100%", background: "linear-gradient(135deg,var(--accent),var(--accent-2))", border: "none", borderRadius: 12, padding: "12px 0", color: "var(--accent-text)", fontSize: 14, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
-          👑 立即升級
-        </button>
-        <div style={{ textAlign: "center", fontSize: 11, color: "var(--text-dim)", marginTop: 8 }}>
-          🔒 安全付款・隨時可取消
-        </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+        {PLANS.map(p => <PlanCard key={p.id} plan={p} cycle={cycle} />)}
+      </div>
+
+      <div style={{ marginTop: 20, textAlign: "center", fontSize: 12, color: "var(--text-dim)" }}>
+        🔒 所有方案皆包含企業級安全性與隱私保護
       </div>
     </div>
   );
