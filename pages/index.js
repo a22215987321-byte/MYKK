@@ -4,6 +4,7 @@ import ChatRoom from '../components/ChatRoom';
 import LoadingState from '../components/LoadingState';
 import { auth, db, googleProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { saveAccount, consumePendingLoginEmail } from '../lib/accountSwitcher';
 
 const AUTH_TIMEOUT_MS = 12000;
 
@@ -274,7 +275,7 @@ export default function Home() {
 
   // Login / Register form state
   const [tab, setTab] = useState('login');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => consumePendingLoginEmail());
   const [password, setPassword] = useState('');
   const [nickname, setNickname] = useState('');
   const [avatar, setAvatar] = useState('😊');
@@ -294,6 +295,8 @@ export default function Home() {
       try {
         const snap = await getDoc(doc(db, 'users', u.uid));
         if (snap.exists()) {
+          const p = snap.data();
+          saveAccount({ uid: u.uid, email: u.email, nickname: p.nickname, avatar: p.avatar, avatarImage: p.avatarImage, color: p.color });
           // The splash screen is a once-per-session boot animation, not a
           // per-navigation one — every client-side nav back to "/" (the
           // 返回聊天室 link on /profile or /feed, browser back, etc.) remounts

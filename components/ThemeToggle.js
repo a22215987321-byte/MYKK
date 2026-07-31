@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/router";
 import { auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import useIsMobile from "../lib/useIsMobile";
 import { CHAT_WORLDS, getWorldById, getSavedWorldId, getSavedVariantId, applyWorld } from "../lib/chatWorlds";
+import { getSavedAccounts, setPendingLoginEmail } from "../lib/accountSwitcher";
 
 const THEMES = [
   { id: "default", label: "☀️ 淺色預設" },
@@ -139,8 +141,10 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
   const [chatWorldVariant, setChatWorldVariant] = useState(null);
   const [open, setOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [savedAccounts, setSavedAccounts] = useState([]);
   const menuRef = useRef(null);
   const isMobile = useIsMobile();
+  const router = useRouter();
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
@@ -231,6 +235,26 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
     setOpen(false);
   };
 
+  // Refresh the switcher list each time the menu opens, so a nickname/avatar
+  // change made just now (which also re-saves the entry — see pages/index.js)
+  // shows up without needing a full reload.
+  useEffect(() => {
+    if (open) setSavedAccounts(getSavedAccounts());
+  }, [open]);
+
+  // Not a real multi-session switch — signs out and, for a remembered
+  // account, pre-fills its email on the login screen so the user only has
+  // to type the password (see lib/accountSwitcher.js for why: true
+  // simultaneous-session switching needs a much bigger auth rearchitecture).
+  const switchToAccount = async (targetEmail) => {
+    setPendingLoginEmail(targetEmail || "");
+    setOpen(false);
+    await auth.signOut();
+    router.push("/");
+  };
+  const addAccount = () => switchToAccount("");
+  const logout = () => switchToAccount("");
+
   const showPaletteGrid = open && theme === "pastel-pearl";
 
   return (
@@ -290,6 +314,45 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
               👤 個人資料設定
             </button>
           )}
+
+          {loggedIn && savedAccounts.filter(a => a.uid !== auth.currentUser?.uid).length > 0 && (
+            <div style={{ borderBottom: "1px solid var(--border-soft)", padding: "6px 0" }}>
+              <div style={{ padding: "4px 14px", fontSize: 11, color: "var(--text-dim)" }}>切換帳號</div>
+              {savedAccounts.filter(a => a.uid !== auth.currentUser?.uid).map(a => (
+                <button key={a.uid} onClick={() => switchToAccount(a.email)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, width: "100%",
+                    padding: "8px 14px", background: "none", border: "none",
+                    color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "none"}>
+                  {a.avatarImage ? (
+                    <img src={a.avatarImage} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                  ) : (
+                    <span style={{ width: 22, height: 22, borderRadius: "50%", background: a.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0 }}>{a.avatar || "😊"}</span>
+                  )}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.nickname || a.email}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {loggedIn && (
+            <button
+              onClick={addAccount}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "10px 14px", background: "none", border: "none",
+                borderBottom: "1px solid var(--border-soft)", color: "var(--text)",
+                fontSize: 13, textAlign: "left", cursor: "pointer",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+              onMouseLeave={e => e.currentTarget.style.background = "none"}
+            >
+              ➕ 新增帳號
+            </button>
+          )}
           {onChangeMsgFontSize && (
             <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-soft)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
@@ -341,6 +404,22 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
           <WorldGrid selected={chatWorld} onSelect={selectWorld} />
           {chatWorld === "water" && (
             <WorldVariantGrid world={getWorldById("water")} selected={chatWorldVariant} onSelect={selectWorldVariant} />
+          )}
+
+          {loggedIn && (
+            <button
+              onClick={logout}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "10px 14px", background: "none", border: "none",
+                borderTop: "1px solid var(--border-soft)", color: "#ef4444",
+                fontSize: 13, textAlign: "left", cursor: "pointer",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+              onMouseLeave={e => e.currentTarget.style.background = "none"}
+            >
+              🚪 登出
+            </button>
           )}
         </div>
       )}
