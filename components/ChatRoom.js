@@ -29,6 +29,7 @@ import { DocConvertRoomLazy } from "./doc-convert";
 import AiCompanionRoom from "./AiCompanionRoom";
 import AiCompanionCreator from "./AiCompanionCreator";
 import UpgradeMembership, { UpgradeHighlights } from "./UpgradeMembership";
+import NavFolder from "./nav/NavFolder";
 import EmojiStickerPicker from "./EmojiStickerPicker";
 import LoadingState from "./LoadingState";
 import useIsMobile from "../lib/useIsMobile";
@@ -505,10 +506,10 @@ function FriendSearch({ myUid, myProfile, onClose, onSendRequest }) {
   }, [searchText, myUid, myProfile.friends, myProfile.pendingOut]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "10vh", zIndex: 600 }}>
       <div className="cr-modal-full" style={{ background: "var(--panel)", borderRadius: 20, width: 520, maxWidth: "95vw", border: "1px solid var(--border)", padding: 28, boxSizing: "border-box", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 20, fontWeight: 700 }}>搜尋並新增好友</h3>
+          <h3 style={{ color: "var(--text)", margin: 0, fontSize: 20, fontWeight: 700 }}>新增好友</h3>
           <button onClick={onClose} className="cr-close-btn" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 24 }}>✕</button>
         </div>
         <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="輸入暱稱或電郵搜尋..."
@@ -2090,16 +2091,6 @@ export default function ChatApp({ user }) {
             </div>
           )}
 
-          {/* Upgrade membership — layout only for now, right under the
-              search box per explicit placement request (not where the
-              reference mock itself put it). */}
-          {!isMobile && (
-            <div style={{ padding: "4px 10px 0" }}>
-              <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
-                active={showUpgrade} onClick={() => { resetAllViews(); setShowUpgrade(true); }} />
-            </div>
-          )}
-
           {/* Feed link + Hall button — 手機版統一成同一種「聊天列表卡片」樣式 */}
           {isMobile ? (
             <div style={{ padding: "4px 16px 0" }}>
@@ -2155,93 +2146,48 @@ export default function ChatApp({ user }) {
               active={showLeaderboard} onClick={() => { resetAllViews(); setShowLeaderboard(true); }} />
           </div>
 
-          {/* Cinema button */}
-          <div style={{ padding: "0 10px 6px" }}>
+          {/* 功能資料夾 — 把比較不常用的功能收起來，減少側欄長度 */}
+          <NavFolder id="features" icon="🧩" label="更多功能"
+            hasActiveChild={showUpgrade || showCinema || showImageEditor || showAiChat || showDocConvert || showAiCompanion}>
+            <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
+              active={showUpgrade} onClick={() => { resetAllViews(); setShowUpgrade(true); }} />
             <NavItem icon="🎬" iconBg="linear-gradient(135deg,var(--accent-hover),#2563eb)" label="電影院" sublabel="同步觀看影片"
               active={showCinema} onClick={() => { resetAllViews(); setShowCinema(true); }} />
-          </div>
-
-          {/* Image editor button */}
-          <div style={{ padding: "0 10px 6px" }}>
             <NavItem icon="🖼️" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="圖片編輯" sublabel="裁剪・濾鏡・貼圖"
               active={showImageEditor} onClick={() => { resetAllViews(); setShowImageEditor(true); }} />
-          </div>
-
-          {/* AI chat button */}
-          <div style={{ padding: "0 10px 6px" }}>
             <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel="有問題都可以問我"
               active={showAiChat} onClick={() => { resetAllViews(); setShowAiChat(true); }} />
-          </div>
-
-          {/* Doc convert button */}
-          <div style={{ padding: "0 10px 6px" }}>
             <NavItem icon="🔄" iconBg="linear-gradient(135deg,#0d9488,#0891b2)" label="文檔轉換" sublabel="圖片・影音格式互轉"
               active={showDocConvert} onClick={() => { resetAllViews(); setShowDocConvert(true); }} />
-          </div>
-
-          {/* AI 夥伴 button — paid voice companion */}
-          <div style={{ padding: "0 10px 6px" }}>
             <NavItem icon="💞" iconBg="linear-gradient(135deg,#db2777,#9333ea)" label="AI 夥伴" sublabel={myProfile?.hasAiCompanion ? "語音陪伴" : "付費解鎖"}
               active={showAiCompanion} onClick={() => { resetAllViews(); setShowAiCompanion(true); }} />
-          </div>
+          </NavFolder>
 
-          {/* English section label */}
-          <div style={{ padding: "4px 12px 2px" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>🇬🇧 英語學習</span>
-          </div>
-
-          {/* English Pronunciation button */}
-          <div style={{ padding: "0 10px 6px" }}>
+          {/* 英語學習資料夾 */}
+          <NavFolder id="lang-en" icon="🇬🇧" label="英語學習"
+            hasActiveChild={showEnglishPron || showIeltsBand4 || showVocab}>
             <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音"
               active={showEnglishPron} onClick={() => { resetAllViews(); setShowEnglishPron(true); }} />
-          </div>
-
-          {/* IELTS Band 4 button */}
-          <div style={{ padding: "0 10px 2px" }}>
             <NavItem compact icon="🎯" iconBg="linear-gradient(135deg,#1e3a1e,#6366f1)" label="IELTS 4.0 入門" sublabel="詞彙・聽力・口說"
               active={showIeltsBand4} onClick={() => { resetAllViews(); setShowIeltsBand4(true); }} />
-          </div>
-
-          {/* Vocab button */}
-          <div style={{ padding: "0 10px 6px" }}>
             <NavItem icon="📚" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習"
               active={showVocab} onClick={() => { resetAllViews(); setShowVocab(true); }} />
-          </div>
+          </NavFolder>
 
-          {/* Spanish section label */}
-          <div style={{ padding: "4px 12px 2px" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>🇪🇸 西班牙語</span>
-          </div>
-
-          {/* Spanish button */}
-          <div style={{ padding: "0 10px 2px" }}>
+          {/* 西班牙語資料夾 */}
+          <NavFolder id="lang-es" icon="🇪🇸" label="西班牙語"
+            hasActiveChild={showSpanish || showSpanishCourse || showSpanishPron || showSpanishGrammar || showSpanishVerbs}>
             <NavItem icon="🇪🇸" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西班牙語學習" sublabel="CEFR A1/A2"
               active={showSpanish} onClick={() => { resetAllViews(); setShowSpanish(true); }} />
-          </div>
-
-          {/* Spanish Course button */}
-          <div style={{ padding: "0 10px 2px" }}>
             <NavItem compact icon="🗺️" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="西語 A1 路線" sublabel="初學者情境課程"
               active={showSpanishCourse} onClick={() => { resetAllViews(); setShowSpanishCourse(true); }} />
-          </div>
-
-          {/* Spanish Pronunciation button */}
-          <div style={{ padding: "0 10px 2px" }}>
             <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#7c1d1d,#b91c1c)" label="西語發音" sublabel="母音 · 子音 · 重音"
               active={showSpanishPron} onClick={() => { resetAllViews(); setShowSpanishPron(true); }} />
-          </div>
-
-          {/* Spanish Grammar button */}
-          <div style={{ padding: "0 10px 6px" }}>
             <NavItem compact icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="西語文法" sublabel="ser/estar · 代詞 · 動詞"
               active={showSpanishGrammar} onClick={() => { resetAllViews(); setShowSpanishGrammar(true); }} />
-          </div>
-
-          {/* Spanish Verb Conjugator button */}
-          <div style={{ padding: "0 10px 6px" }}>
             <NavItem compact icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢"
               active={showSpanishVerbs} onClick={() => { resetAllViews(); setShowSpanishVerbs(true); }} />
-          </div>
+          </NavFolder>
 
           {/* Custom vocab button */}
           <div style={{ padding: "0 10px 6px" }}>
