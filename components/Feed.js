@@ -189,7 +189,7 @@ function CommentSection({ postId, myProfile }) {
 
 const LONG_POST_THRESHOLD = 260;
 
-function PostCard({ post, myUid, myProfile }) {
+function PostCard({ post, myUid, myProfile, onOpenProfile }) {
   const [showComments, setShowComments] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -250,13 +250,29 @@ function PostCard({ post, myUid, myProfile }) {
     <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", marginBottom: 16, overflow: "hidden" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", position: "relative" }}>
-        <Link href={`/profile/${post.userId}`} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
-          <Avatar avatar={post.userAvatar} avatarImage={post.userAvatarImage} color={post.userColor} size={40} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.userNickname}</div>
-            <div style={{ fontSize: 11, color: "var(--text-muted)" }} title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</div>
-          </div>
-        </Link>
+        {/* onOpenProfile (embedded-in-ChatRoom mode) swaps the Feed pane for
+            an inline profile view instead of navigating to /profile/[uid] —
+            clicking an author used to leave the chat SPA entirely, which
+            read as "jumping to a new page" every time. Standalone /feed page
+            has no onOpenProfile, so it keeps the plain route navigation. */}
+        {onOpenProfile ? (
+          <button type="button" onClick={() => onOpenProfile(post.userId)}
+            style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, textDecoration: "none", color: "inherit", background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", font: "inherit" }}>
+            <Avatar avatar={post.userAvatar} avatarImage={post.userAvatarImage} color={post.userColor} size={40} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.userNickname}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }} title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</div>
+            </div>
+          </button>
+        ) : (
+          <Link href={`/profile/${post.userId}`} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
+            <Avatar avatar={post.userAvatar} avatarImage={post.userAvatarImage} color={post.userColor} size={40} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.userNickname}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }} title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</div>
+            </div>
+          </Link>
+        )}
         {isMine && (
           <div style={{ position: "relative" }}>
             <button onClick={() => setMenuOpen(v => !v)}
@@ -771,7 +787,7 @@ const FEED_INTERACTION_CSS = `
   .feed-tag-chip:active { transform: scale(0.96); }
 `;
 
-export default function FeedApp({ user, embedded = false }) {
+export default function FeedApp({ user, embedded = false, onOpenProfile }) {
   const [myProfile, setMyProfile] = useState(null);
   const [myProfileError, setMyProfileError] = useState('');
   const [posts, setPosts] = useState([]);
@@ -878,7 +894,7 @@ export default function FeedApp({ user, embedded = false }) {
       )}
 
       {filteredPosts.map(post => (
-        <PostCard key={post.id} post={post} myUid={user.uid} myProfile={myProfile} />
+        <PostCard key={post.id} post={post} myUid={user.uid} myProfile={myProfile} onOpenProfile={onOpenProfile} />
       ))}
     </div>
   );

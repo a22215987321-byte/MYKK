@@ -1,0 +1,1524 @@
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import { auth, db } from "../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import MobileTabBarLayout from "./MobileTabBarLayout";
+import MyStickersPanel from "./MyStickersPanel";
+import LoadingState from "./LoadingState";
+import ImageCropModal from "./ImageCropModal";
+import ThemeToggle from "./ThemeToggle";
+import useIsMobile from "../lib/useIsMobile";
+import { uploadToR2 } from "../lib/uploadToR2";
+import { formatDate } from "../lib/format";
+import { toast } from "../lib/toast";
+import { PhotoEditorLazy, VideoEditorLazy } from "./media-editor";
+import { validatePhotoFile, validateVideoFile } from "./media-editor/mediaValidation";
+import { getNotificationVolume, setNotificationVolume, playNotificationSound } from "../lib/notificationSound";
+import {
+  doc, getDoc, onSnapshot, collection, query, where, orderBy, getDocs, addDoc,
+  updateDoc, serverTimestamp, arrayUnion, arrayRemove,
+} from "firebase/firestore";
+
+function getStatus(status) {
+  switch (status) {
+    case "online": return { label: "線上",    color: "#22c55e" };
+    case "away":   return { label: "暫時離開", color: "#eab308" };
+    case "dnd":    return { label: "請勿打擾", color: "#ef4444" };
+    default:       return { label: "離線",    color: "#6b7280" };
+  }
+}
+
+function formatJoinDate(ts) {
+  if (!ts) return "";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString("zh-TW", { year: "numeric", month: "long" });
+}
+
+const VISIBILITY_OPTS = [
+  { id: "public",  label: "公開",     icon: "🌐" },
+  { id: "friends", label: "好友可見", icon: "👥" },
+  { id: "private", label: "僅自己",   icon: "🔒" },
+];
+
+const LANGUAGE_OPTIONS = ["西班牙語", "英語（IELTS）", "法語"];
+
+// Compact profile-header badge for whatever the user is currently learning
+// (reuses the same learningLanguages field already editable in the 關於 tab —
+// no separate schema needed just to show it more prominently up top).
+const LANGUAGE_BADGES = {
+  "西班牙語": { code: "ES", label: "西語入門" },
+  "英語（IELTS）": { code: "EN", label: "英語 IELTS" },
+  "法語": { code: "FR", label: "法語入門" },
+};
+
+// Every badge is computed from data the app already tracks elsewhere
+// (Spanish course progress, Feed hashtags, friend count, join date) —
+// no separate achievements collection to keep in sync.
+const ACHIEVEMENTS = [
+  { id: "streak7",      icon: "🔥", label: "連續打卡7天", tooltip: "西語課程連續學習達 7 天",
+    check: (p) => (p.spanishCourseStreak || 0) >= 7 },
+  { id: "spanishStart", icon: "🇪🇸", label: "西語入門",   tooltip: "完成至少一堂西語課程",
+    check: (p) => (p.spanishCourseCompleted || []).length >= 1 },
+  { id: "ieltsRookie",  icon: "📝", label: "IELTS 新手", tooltip: "在動態消息發布過 IELTS 練習相關貼文",
+    check: (p, posts) => posts.some(post => (post.text || "").includes("#IELTS 練習")) },
+  { id: "social",       icon: "🤝", label: "社交達人",   tooltip: "好友數達到 5 人",
+    check: (p) => (p.friends || []).length >= 5 },
+  { id: "veteran",      icon: "🎖️", label: "元老用戶",   tooltip: "加入 EVONCHAT 超過 90 天",
+    check: (p) => {
+      if (!p.createdAt) return false;
+      const d = p.createdAt.toDate ? p.createdAt.toDate() : new Date(p.createdAt);
+      return (Date.now() - d.getTime()) >= 90 * 86400000;
+    } },
+];
+
+function AchievementsRow({ profile, posts }) {
+  const unlocked = ACHIEVEMENTS.filter(a => a.check(profile, posts));
+  if (unlocked.length === 0) return null;
+  return (
+    <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "2px 2px 10px", marginBottom: 4 }}>
+      {unlocked.map(a => (
+        <div key={a.id} title={a.tooltip}
+          style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, boxShadow: "var(--card-shadow)", padding: "6px 10px" }}>
+          <span style={{ fontSize: 16 }} aria-hidden="true">{a.icon}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{a.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function VisibilityMenu({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const current = VISIBILITY_OPTS.find(o => o.id === value) || VISIBILITY_OPTS[0];
+  return (
+    <div style={{ position: "relative" }}>
+      <button onClick={() => setOpen(v => !v)} type="button"
+        style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>
+        {current.icon} {current.label} <span style={{ fontSize: 10 }}>▾</span>
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+          <div style={{ position: "absolute", bottom: "100%", left: 0, marginBottom: 6, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 61, minWidth: 140, overflow: "hidden" }}>
+            {VISIBILITY_OPTS.map(o => (
+              <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} type="button"
+                style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", textAlign: "left", background: o.id === value ? "var(--panel-hover)" : "none", border: "none", padding: "9px 12px", color: "var(--text)", cursor: "pointer", fontSize: 13 }}>
+                {o.icon} {o.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Auto-grow textarea: ~6 lines of breathing room before scrolling kicks in,
+// capped well short of the viewport so the 發佈 button never gets pushed
+// off-screen by a long draft.
+const TEXTAREA_MIN_HEIGHT = 132;
+const TEXTAREA_MAX_HEIGHT_RATIO = 0.55;
+
+function NewPostForm({ profile, onPosted }) {
+  const [text, setText] = useState("");
+  const [visibility, setVisibility] = useState("public");
+  const [mediaFile, setMediaFile] = useState(null);
+  const [mediaType, setMediaType] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [posting, setPosting] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState(false);
+  const [editingVideo, setEditingVideo] = useState(false);
+  const [previewLightbox, setPreviewLightbox] = useState(false);
+  const fileRef = useRef();
+  const textareaRef = useRef();
+  const manualHeightRef = useRef(0);
+  const pendingCursorRef = useRef(null);
+
+  const attachFile = (file) => {
+    const isVideo = file.type.startsWith("video/");
+    const err = isVideo ? validateVideoFile(file) : validatePhotoFile(file);
+    if (err) { toast(err); return false; }
+    setMediaFile(file);
+    setMediaType(isVideo ? "video" : "image");
+    setPreview(URL.createObjectURL(file));
+    return true;
+  };
+
+  const onFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    attachFile(file);
+  };
+
+  const removeMedia = () => {
+    setMediaFile(null);
+    setMediaType(null);
+    setPreview(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const onTextareaPaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageItem = Array.from(items).find(it => it.type.startsWith("image/"));
+    if (!imageItem) return;
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    if (mediaFile) { toast("已經有附加媒體了，請先移除再貼上新圖片"); return; }
+    const named = new File([file], file.name || `pasted-${Date.now()}.png`, { type: file.type });
+    if (!attachFile(named)) return;
+    toast("圖片已加入", "success");
+
+    const pastedText = e.clipboardData.getData("text/plain");
+    if (pastedText) {
+      const el = e.target;
+      const start = el.selectionStart ?? text.length;
+      const end = el.selectionEnd ?? text.length;
+      pendingCursorRef.current = start + pastedText.length;
+      setText(prev => prev.slice(0, start) + pastedText + prev.slice(end));
+    }
+  };
+
+  useEffect(() => {
+    if (pendingCursorRef.current == null) return;
+    const el = textareaRef.current;
+    const pos = pendingCursorRef.current;
+    pendingCursorRef.current = null;
+    if (el) requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = pos; });
+  }, [text]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const maxH = Math.round(window.innerHeight * TEXTAREA_MAX_HEIGHT_RATIO);
+    const target = Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_HEIGHT, manualHeightRef.current), maxH);
+    el.style.height = `${target}px`;
+  }, [text]);
+
+  const onTextareaMouseUp = () => {
+    const el = textareaRef.current;
+    if (el) manualHeightRef.current = el.offsetHeight;
+  };
+
+  const submit = async () => {
+    if (!text.trim() && !mediaFile) { toast("請輸入內容"); return; }
+    if (!auth.currentUser || !profile?.uid) {
+      console.error("[ProfileView.NewPostForm] submit blocked: no authenticated user", { authCurrentUser: auth.currentUser, profileUid: profile?.uid });
+      toast("請先登入後再發布");
+      return;
+    }
+    if (auth.currentUser.uid !== profile.uid) {
+      console.error("[ProfileView.NewPostForm] submit blocked: viewing another user's profile", { authUid: auth.currentUser.uid, profileUid: profile.uid });
+      toast("發布失敗：沒有發布權限，請檢查登入狀態");
+      return;
+    }
+    setPosting(true);
+    const payload = {
+      userId: profile.uid,
+      userNickname: profile.nickname,
+      userAvatar: profile.avatar || "😊",
+      userAvatarImage: profile.avatarImage || "",
+      userColor: profile.color || "var(--accent)",
+      text: text.trim(),
+      imageUrl: null,
+      videoUrl: null,
+      likes: [],
+      visibility,
+      pinned: false,
+      createdAt: serverTimestamp(),
+    };
+    try {
+      if (mediaFile) {
+        console.log("[ProfileView.NewPostForm] uploading media", { name: mediaFile.name, type: mediaFile.type, size: mediaFile.size });
+        const url = await uploadToR2(mediaFile);
+        if (mediaType === "video") payload.videoUrl = url;
+        else payload.imageUrl = url;
+      }
+      console.log("[ProfileView.NewPostForm] submitting post", {
+        uid: auth.currentUser.uid, hasImage: !!payload.imageUrl, hasVideo: !!payload.videoUrl,
+        textLength: payload.text.length, payload,
+      });
+      const ref = await addDoc(collection(db, "posts"), payload);
+      console.log("[ProfileView.NewPostForm] post created", { id: ref.id });
+      setText("");
+      removeMedia();
+      setVisibility("public");
+      onPosted?.();
+    } catch (err) {
+      console.error("[ProfileView.NewPostForm] publish failed", {
+        code: err?.code, message: err?.message, name: err?.name, stack: err?.stack,
+        uid: auth.currentUser?.uid, payload,
+      });
+      if (err?.code === "permission-denied") {
+        toast("發布失敗：沒有發布權限，請檢查登入狀態");
+      } else if (err?.code === "unavailable" || err?.message?.includes("network")) {
+        toast("網絡錯誤，請稍後再試");
+      } else if (err?.code) {
+        toast(`發布失敗：資料庫寫入失敗 (${err.code})`);
+      } else {
+        toast("發布失敗，請重試");
+      }
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const canPost = (text.trim() || mediaFile) && !posting;
+
+  return (
+    <div style={{ borderBottom: "1px solid var(--panel)", padding: 16 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+        {profile.avatarImage
+          ? <img src={profile.avatarImage} alt="頭像" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+          : <div style={{ width: 40, height: 40, borderRadius: "50%", background: profile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{profile.avatar || "😊"}</div>
+        }
+        <div style={{ flex: 1 }}>
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onPaste={onTextareaPaste}
+            onMouseUp={onTextareaMouseUp}
+            placeholder="有什麼想分享的嗎？（可直接貼上截圖）"
+            aria-label="貼文內容"
+            style={{
+              width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12,
+              padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box", lineHeight: 1.5,
+              minHeight: TEXTAREA_MIN_HEIGHT, maxHeight: `${TEXTAREA_MAX_HEIGHT_RATIO * 100}vh`, overflowY: "auto", resize: "vertical",
+            }}
+          />
+          {preview && (
+            <div
+              onClick={() => setPreviewLightbox(true)}
+              style={{ position: "relative", marginTop: 8, width: 120, height: 120, borderRadius: 10, overflow: "hidden", cursor: "zoom-in", flexShrink: 0 }}
+            >
+              {mediaType === "video"
+                ? <video src={preview} muted style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                : <img src={preview} alt="預覽" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              }
+              {mediaType === "image" && (
+                <button onClick={e => { e.stopPropagation(); setEditingPhoto(true); }} aria-label="編輯圖片"
+                  style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: 13, width: 26, height: 26, color: "#fff", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  ✏️
+                </button>
+              )}
+              {mediaType === "video" && (
+                <button onClick={e => { e.stopPropagation(); setEditingVideo(true); }} aria-label="剪輯影片"
+                  style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: 13, width: 26, height: 26, color: "#fff", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  ✂️
+                </button>
+              )}
+              <button onClick={e => { e.stopPropagation(); removeMedia(); }} aria-label="移除附加媒體"
+                style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: "50%", width: 22, height: 22, color: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                ✕
+              </button>
+            </div>
+          )}
+
+          {previewLightbox && preview && (
+            <div role="dialog" aria-modal="true" aria-label="媒體預覽" onClick={() => setPreviewLightbox(false)}
+              style={{ position: "fixed", inset: 0, zIndex: 1500, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
+              {mediaType === "video"
+                ? <video src={preview} controls autoPlay onClick={e => e.stopPropagation()} style={{ maxWidth: "92vw", maxHeight: "92vh" }} />
+                : <img src={preview} alt="預覽" onClick={e => e.stopPropagation()} style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain" }} />
+              }
+              <button onClick={() => setPreviewLightbox(false)} aria-label="關閉預覽"
+                style={{ position: "absolute", top: 20, right: 20, background: "rgba(30,41,59,0.9)", border: "1px solid var(--border)", color: "#f1f5f9", fontSize: 20, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                ✕
+              </button>
+            </div>
+          )}
+
+          {editingPhoto && mediaFile && (
+            <PhotoEditorLazy
+              file={mediaFile}
+              onCancel={() => setEditingPhoto(false)}
+              onExport={(blob) => {
+                const edited = new File([blob], mediaFile.name.replace(/\.\w+$/, "") + "-edited.jpg", { type: "image/jpeg" });
+                setMediaFile(edited);
+                setPreview(URL.createObjectURL(blob));
+                setEditingPhoto(false);
+              }}
+            />
+          )}
+
+          {editingVideo && mediaFile && (
+            <VideoEditorLazy
+              files={[mediaFile]}
+              onCancel={() => setEditingVideo(false)}
+              onExport={(videoBlob) => {
+                const edited = new File([videoBlob], mediaFile.name.replace(/\.\w+$/, "") + "-edited.mp4", { type: "video/mp4" });
+                setMediaFile(edited);
+                setPreview(URL.createObjectURL(videoBlob));
+                setEditingVideo(false);
+              }}
+            />
+          )}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button onClick={() => fileRef.current?.click()}
+                style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}>
+                📎 加入圖片/影片
+              </button>
+              <VisibilityMenu value={visibility} onChange={setVisibility} />
+            </div>
+            <input ref={fileRef} type="file" accept="image/*,video/*" onChange={onFile} style={{ display: "none" }} />
+            <button onClick={submit} disabled={!canPost}
+              style={{ background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: "8px 20px", color: canPost ? "var(--accent-text)" : "var(--text-dim)", cursor: canPost ? "pointer" : "default", fontSize: 14, fontWeight: 700 }}>
+              {posting ? "發佈中..." : "發佈"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PostItem({ post, profile, isOwner, onTogglePin, onOpenMedia }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const visInfo = VISIBILITY_OPTS.find(o => o.id === (post.visibility || "public"));
+
+  return (
+    <div id={`post-${post.id}`} style={{ borderBottom: "1px solid var(--panel)", background: post.pinned ? "var(--panel-alt)" : "transparent" }}>
+      <div style={{ padding: "16px 16px 12px" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+          {profile.avatarImage
+            ? <img src={profile.avatarImage} alt="頭像" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+            : <div style={{ width: 40, height: 40, borderRadius: "50%", background: profile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{profile.avatar}</div>
+          }
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+              <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{profile.nickname}</span>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>· {formatDate(post.createdAt)}</span>
+              {post.pinned && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", background: "var(--accent-active)", borderRadius: 20, padding: "1px 8px" }}>📌 置頂</span>
+              )}
+              {isOwner && post.visibility && post.visibility !== "public" && (
+                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{visInfo.icon} {visInfo.label}</span>
+              )}
+              {isOwner && (
+                <div style={{ position: "relative", marginLeft: "auto" }}>
+                  <button onClick={() => setMenuOpen(v => !v)} aria-label="貼文選項"
+                    style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4 }}>⋯</button>
+                  {menuOpen && (
+                    <>
+                      <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+                      <div style={{ position: "absolute", top: "100%", right: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 61, minWidth: 120, overflow: "hidden" }}>
+                        <button onClick={() => { onTogglePin(post); setMenuOpen(false); }}
+                          style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "10px 14px", color: "var(--text)", cursor: "pointer", fontSize: 13 }}>
+                          {post.pinned ? "取消置頂" : "📌 置頂"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            {post.text && (
+              <div style={{ fontSize: 15, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: (post.imageUrl || post.videoUrl) ? 10 : 0 }}>
+                {post.text}
+              </div>
+            )}
+            {post.videoUrl && (
+              <div style={{ borderRadius: 16, overflow: "hidden", marginTop: 10 }}>
+                <video src={post.videoUrl} controls style={{ width: "100%", maxHeight: 400, display: "block" }} />
+              </div>
+            )}
+            {post.imageUrl && (
+              <div style={{ borderRadius: 16, overflow: "hidden", marginTop: 10, cursor: "zoom-in" }}
+                onClick={() => onOpenMedia(post)}>
+                <img src={post.imageUrl} alt="貼文圖片" style={{ width: "100%", maxHeight: 400, objectFit: "cover", display: "block", transition: "filter 0.2s" }}
+                  onMouseEnter={e => e.currentTarget.style.filter = "brightness(0.85)"}
+                  onMouseLeave={e => e.currentTarget.style.filter = "brightness(1)"} />
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 20, marginTop: 12 }}>
+              <span style={{ fontSize: 13, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>
+                ❤️ {(post.likes || []).length}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FriendsTab({ friendUids, isMobile, onOpenProfile }) {
+  const [friendProfiles, setFriendProfiles] = useState({});
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const entries = await Promise.all(friendUids.map(async fid => {
+        try {
+          const snap = await getDoc(doc(db, "users", fid));
+          return snap.exists() ? [fid, { uid: fid, ...snap.data() }] : null;
+        } catch { return null; }
+      }));
+      if (!cancelled) {
+        setFriendProfiles(Object.fromEntries(entries.filter(Boolean)));
+        setLoaded(true);
+      }
+    }
+    if (friendUids.length > 0) load(); else setLoaded(true);
+    return () => { cancelled = true; };
+  }, [friendUids.join(",")]);
+
+  if (!loaded) return <LoadingState label="載入好友中..." minHeight="200px" />;
+
+  if (friendUids.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dim)" }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🧑‍🤝‍🧑</div>
+        <div style={{ fontSize: 16 }}>還沒有好友</div>
+      </div>
+    );
+  }
+
+  const CardTag = onOpenProfile ? "button" : Link;
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(4, 1fr)", gap: 12, padding: 16 }}>
+      {friendUids.map(fid => {
+        const f = friendProfiles[fid];
+        if (!f) return null;
+        const extraProps = onOpenProfile
+          ? { onClick: () => onOpenProfile(fid), type: "button" }
+          : { href: `/profile/${fid}` };
+        return (
+          <CardTag key={fid} {...extraProps}
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none", padding: 10, borderRadius: 12, transition: "background 0.15s", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+            onMouseEnter={e => e.currentTarget.style.background = "var(--panel)"}
+            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+            {f.avatarImage
+              ? <img src={f.avatarImage} alt={f.nickname} style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover" }} />
+              : <div style={{ width: 64, height: 64, borderRadius: "50%", background: f.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30 }}>{f.avatar || "😊"}</div>
+            }
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{f.nickname}</span>
+          </CardTag>
+        );
+      })}
+    </div>
+  );
+}
+
+function AboutTab({ profile, isOwner }) {
+  const languages = profile.learningLanguages || [];
+
+  const toggleLanguage = async (lang) => {
+    const has = languages.includes(lang);
+    await updateDoc(doc(db, "users", profile.uid), {
+      learningLanguages: has ? arrayRemove(lang) : arrayUnion(lang),
+    });
+  };
+
+  return (
+    <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
+      <div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>加入時間</div>
+        <div style={{ fontSize: 14, color: "var(--text)" }}>{profile.createdAt ? `📅 加入於 ${formatJoinDate(profile.createdAt)}` : "—"}</div>
+      </div>
+      <div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>學習語言偏好</div>
+        {isOwner ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {LANGUAGE_OPTIONS.map(lang => {
+              const active = languages.includes(lang);
+              return (
+                <button key={lang} onClick={() => toggleLanguage(lang)}
+                  style={{
+                    borderRadius: 20, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    background: active ? "var(--accent)" : "var(--panel)",
+                    color: active ? "#fff" : "var(--text-muted)",
+                    border: active ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  }}>
+                  {lang}
+                </button>
+              );
+            })}
+          </div>
+        ) : languages.length > 0 ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {languages.map(lang => (
+              <span key={lang} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "6px 14px", fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>{lang}</span>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, color: "var(--text-dim)" }}>尚未設定</div>
+        )}
+      </div>
+      <div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>簡介</div>
+        <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{profile.bio || "尚未填寫簡介"}</div>
+      </div>
+    </div>
+  );
+}
+
+// Hover-to-edit overlay shown on the cover/avatar only for the profile owner.
+function EditOverlay({ shape = "rect", label, onClick }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button onClick={onClick} title={label} aria-label={label}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        position: "absolute", inset: 0, border: "none", cursor: "pointer",
+        borderRadius: shape === "circle" ? "50%" : 12,
+        background: hover ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        transition: "background 0.15s", color: "#fff",
+      }}>
+      {hover && <span style={{ fontSize: shape === "circle" ? 24 : 20 }} aria-hidden="true">📷</span>}
+    </button>
+  );
+}
+
+// Rich media viewer — unlike a bare image lightbox, this keeps the source
+// post's author/time/text/like/comment context visible, and lets you step
+// through the same user's other media (mediaList) without closing/reopening.
+function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobile, onClose, onIndexChange, onViewOriginal }) {
+  const post = mediaList[index];
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState("");
+  const [sendingComment, setSendingComment] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
+
+  useEffect(() => {
+    if (!post) return;
+    return onSnapshot(query(collection(db, "posts", post.id, "comments"), orderBy("createdAt")), snap => {
+      setComments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => console.error("[ProfileView.MediaLightbox] comments listener failed", e));
+  }, [post?.id]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "ArrowLeft" && index > 0) onIndexChange(index - 1);
+      else if (e.key === "ArrowRight" && index < mediaList.length - 1) onIndexChange(index + 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, mediaList.length, onIndexChange]);
+
+  if (!post) {
+    return (
+      <div role="dialog" aria-modal="true" aria-label="貼文檢視" onClick={onClose}
+        style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+        <div onClick={e => e.stopPropagation()}
+          style={{ background: "var(--panel)", borderRadius: 16, padding: 32, textAlign: "center", color: "var(--text-muted)" }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>🚫</div>
+          這則貼文已無法顯示
+          <div style={{ marginTop: 16 }}>
+            <button onClick={onClose} style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 18px", color: "var(--accent-text)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>關閉</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const liked = viewerUid ? (post.likes || []).includes(viewerUid) : false;
+
+  const toggleLike = async () => {
+    if (!viewerUid) { toast("請先登入後再按讚"); return; }
+    if (likeBusy) return;
+    setLikeBusy(true);
+    try {
+      await updateDoc(doc(db, "posts", post.id), { likes: liked ? arrayRemove(viewerUid) : arrayUnion(viewerUid) });
+    } catch (e) {
+      console.error("[ProfileView.MediaLightbox] toggleLike failed", e);
+      toast("操作失敗，請重試");
+    } finally {
+      setLikeBusy(false);
+    }
+  };
+
+  const submitComment = async () => {
+    if (!viewerUid || !myProfile) { toast("請先登入後再留言"); return; }
+    if (!commentText.trim() || sendingComment) return;
+    setSendingComment(true);
+    try {
+      await addDoc(collection(db, "posts", post.id, "comments"), {
+        userId: myProfile.uid,
+        userNickname: myProfile.nickname,
+        userAvatar: myProfile.avatar,
+        userAvatarImage: myProfile.avatarImage || "",
+        userColor: myProfile.color,
+        text: commentText.trim(),
+        createdAt: serverTimestamp(),
+      });
+      setCommentText("");
+    } catch (e) {
+      console.error("[ProfileView.MediaLightbox] submitComment failed", e);
+      toast("留言失敗，請重試");
+    } finally {
+      setSendingComment(false);
+    }
+  };
+
+  const share = async () => {
+    const url = `${window.location.origin}/profile/${profile.uid}?post=${post.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${profile.nickname} 的貼文`, text: post.text?.slice(0, 80) || "", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast("連結已複製", "success");
+      }
+    } catch { /* 使用者取消分享 */ }
+  };
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="貼文檢視" onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{
+          display: "flex", flexDirection: isMobile ? "column" : "row",
+          width: "100%", maxWidth: isMobile ? "none" : 1100,
+          height: isMobile ? "100dvh" : "90vh", maxHeight: isMobile ? "100dvh" : "90vh",
+          background: "#000", borderRadius: isMobile ? 0 : 12, overflow: "hidden",
+        }}>
+
+        {/* Media + prev/next — fixed proportion of the modal's own height
+            (not the info column's content height), so a solid black media
+            area never depends on how much text happens to be below it. */}
+        <div style={{ position: "relative", flex: isMobile ? "0 0 62%" : "1 1 auto", height: isMobile ? undefined : "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          {post.videoUrl
+            ? <video src={post.videoUrl} controls style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+            : <img src={post.imageUrl} alt="貼文圖片" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+          }
+          {index > 0 && (
+            <button onClick={() => onIndexChange(index - 1)} aria-label="上一張"
+              style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", color: "#fff", width: 36, height: 36, borderRadius: "50%", cursor: "pointer", fontSize: 18 }}>
+              ‹
+            </button>
+          )}
+          {index < mediaList.length - 1 && (
+            <button onClick={() => onIndexChange(index + 1)} aria-label="下一張"
+              style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", color: "#fff", width: 36, height: 36, borderRadius: "50%", cursor: "pointer", fontSize: 18 }}>
+              ›
+            </button>
+          )}
+        </div>
+
+        {/* Post info + interactions — on desktop this shares the row's fixed
+            height with the media column; on mobile it's just "whatever's left"
+            after the media area's fixed 62%, with its own internal scroll. */}
+        <div style={{ width: isMobile ? "100%" : 360, flex: isMobile ? "1 1 0%" : "0 0 360px", height: isMobile ? undefined : "100%", minHeight: 0, background: "var(--panel)", display: "flex", flexDirection: "column" }}>
+          {/* Fixed header — just the author row, always visible regardless of
+              how long the post text below turns out to be. */}
+          <div style={{ padding: 16, borderBottom: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
+            {profile.avatarImage
+              ? <img src={profile.avatarImage} alt="頭像" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+              : <div style={{ width: 36, height: 36, borderRadius: "50%", background: profile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{profile.avatar}</div>
+            }
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{profile.nickname}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{formatDate(post.createdAt)}</div>
+            </div>
+          </div>
+
+          {/* Scrollable body — post text (can be arbitrarily long, e.g. an AI
+              prompt) + actions + comments all share this one scroll region,
+              so nothing here can ever push past the modal's fixed height. */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
+            {post.text && (
+              <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                {post.text}
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 12 }}>
+              <button onClick={toggleLike} disabled={likeBusy}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: liked ? "#ef4444" : "var(--text-faint)", fontSize: 13, fontWeight: 600, padding: 0 }}>
+                <span style={{ fontSize: 17 }}>{liked ? "❤️" : "🤍"}</span> {(post.likes || []).length}
+              </button>
+              <span style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--text-faint)", fontSize: 13, fontWeight: 600 }}>
+                <span style={{ fontSize: 17 }}>💬</span> {comments.length}
+              </span>
+              <button onClick={share}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 13, fontWeight: 600, padding: 0 }}>
+                <span style={{ fontSize: 17 }}>↗</span>
+              </button>
+            </div>
+            <button onClick={() => onViewOriginal(post.id)}
+              style={{ marginTop: 12, marginBottom: 16, width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 0", color: "var(--text)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+              查看原貼文
+            </button>
+
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+            {comments.map(c => (
+              <div key={c.id} style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-start" }}>
+                {c.userAvatarImage
+                  ? <img src={c.userAvatarImage} alt="頭像" style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                  : <div style={{ width: 26, height: 26, borderRadius: "50%", background: c.userColor || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{c.userAvatar}</div>
+                }
+                <div style={{ background: "var(--panel-alt)", borderRadius: 10, padding: "6px 10px", flex: 1, minWidth: 0 }}>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: "var(--text-muted)", marginRight: 6 }}>{c.userNickname}</span>
+                  <span style={{ fontSize: 13, color: "var(--text)" }}>{c.text}</span>
+                </div>
+              </div>
+            ))}
+            {comments.length === 0 && (
+              <div style={{ fontSize: 13, color: "var(--text-dim)", textAlign: "center", padding: "20px 0" }}>還沒有留言</div>
+            )}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 6, padding: 12, borderTop: "1px solid var(--border)", flexShrink: 0 }}>
+            <input
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && submitComment()}
+              placeholder="留言..."
+              style={{ flex: 1, minWidth: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 12px", color: "var(--text)", fontSize: 13, outline: "none" }}
+            />
+            <button onClick={submitComment} disabled={!commentText.trim() || sendingComment}
+              style={{ background: commentText.trim() ? "var(--accent)" : "var(--panel-alt)", border: "none", borderRadius: 20, padding: "7px 16px", color: commentText.trim() ? "var(--accent-text)" : "var(--text-dim)", cursor: commentText.trim() ? "pointer" : "default", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
+              送出
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button onClick={onClose} aria-label="關閉貼文檢視"
+        style={{ position: "absolute", top: 16, right: 16, background: "rgba(30,41,59,0.9)", border: "1px solid var(--border)", color: "#f1f5f9", fontSize: 20, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
+// Shared full profile UI — used both by pages/profile/[uid].js (standalone
+// page, direct/shareable link) and embedded inline inside ChatRoom's Feed
+// pane (see ChatRoom.js's viewProfileUid state) so clicking a post author
+// never leaves the chat SPA. `embedded`/`onClose` only affect page chrome
+// (header back-vs-close button, root sizing, global CSS resets, bottom tab
+// bar) — every Firebase query/write below is identical either way.
+export default function ProfileView({ uid, embedded = false, onClose, onOpenProfile }) {
+  const router = useRouter();
+  const [viewerUid, setViewerUid] = useState(undefined); // undefined = auth not resolved yet, null = guest
+  const [viewerProfile, setViewerProfile] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [tab, setTab] = useState("posts");
+  const [avatarZoomImg, setAvatarZoomImg] = useState(null);
+  const [mediaLightboxIndex, setMediaLightboxIndex] = useState(null);
+  const [scrollToPostId, setScrollToPostId] = useState(null);
+  const [avatarHover, setAvatarHover] = useState(false);
+  const [hoveredMedia, setHoveredMedia] = useState(null);
+  const [stickersPanelOpen, setStickersPanelOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [cropTarget, setCropTarget] = useState(null); // "avatar" | "cover" | null
+  const [pendingFile, setPendingFile] = useState(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  // Starts at the same default the getter falls back to, then corrected from
+  // localStorage client-side only — reading localStorage during the initial
+  // render would mismatch what the statically-generated HTML shipped with.
+  const [notifVolume, setNotifVolumeState] = useState(70);
+  useEffect(() => { setNotifVolumeState(getNotificationVolume()); }, []);
+  const changeNotifVolume = (v) => { setNotifVolumeState(v); setNotificationVolume(v); };
+  const avatarFileRef = useRef();
+  const coverFileRef = useRef();
+  const isMobile = useIsMobile();
+
+  const isOwner = viewerUid != null && viewerUid === uid;
+
+  useEffect(() => onAuthStateChanged(auth, u => setViewerUid(u ? u.uid : null)), []);
+
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    const unsub = onSnapshot(doc(db, "users", uid), snap => {
+      if (!cancelled && snap.exists()) setProfile({ uid: snap.id, ...snap.data() });
+      if (!cancelled) setLoading(false);
+    }, (e) => {
+      console.error("[ProfileView] failed to load profile", e);
+      if (!cancelled) { setLoadError(true); setLoading(false); }
+    });
+    return () => { cancelled = true; unsub(); };
+  }, [uid]);
+
+  // Only need a separate subscription to my own doc when I'm viewing someone
+  // else's page (friend-status button etc.) — on my own page `profile` already
+  // *is* my doc, no need to fetch it twice.
+  useEffect(() => {
+    if (!viewerUid || viewerUid === uid) { setViewerProfile(null); return; }
+    return onSnapshot(doc(db, "users", viewerUid), snap => {
+      if (snap.exists()) setViewerProfile({ uid: snap.id, ...snap.data() });
+    });
+  }, [viewerUid, uid]);
+
+  const myProfile = isOwner ? profile : viewerProfile;
+
+  const reloadPosts = useCallback(async () => {
+    if (!uid) return;
+    try {
+      const postsSnap = await getDocs(query(collection(db, "posts"), where("userId", "==", uid)));
+      const sorted = postsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+          const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+          const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+          return tb - ta;
+        });
+      setPosts(sorted);
+    } catch (e) { console.error("[ProfileView] failed to load posts", e); }
+  }, [uid]);
+
+  useEffect(() => { if (uid) reloadPosts(); }, [uid, reloadPosts]);
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") { setAvatarZoomImg(null); setMediaLightboxIndex(null); } }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // 「查看原貼文」／分享連結（?post=<id>）都指到貼文 tab 裡對應那則貼文的位置。
+  // 只在獨立頁面（非 embedded）才看 URL query，避免嵌入模式誤讀聊天室自己的網址參數。
+  useEffect(() => {
+    if (embedded || tab !== "posts" || !scrollToPostId) return;
+    const id = scrollToPostId;
+    const t = setTimeout(() => {
+      document.getElementById(`post-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setScrollToPostId(null);
+    }, 50);
+    return () => clearTimeout(t);
+  }, [embedded, tab, scrollToPostId, posts]);
+
+  useEffect(() => {
+    if (embedded || !router.isReady) return;
+    const postId = router.query.post;
+    if (typeof postId === "string" && postId && posts.some(p => p.id === postId)) {
+      setTab("posts");
+      setScrollToPostId(postId);
+    }
+  }, [embedded, router.isReady, router.query.post, posts]);
+
+  const viewOriginalPost = useCallback((postId) => {
+    setMediaLightboxIndex(null);
+    setTab("posts");
+    setScrollToPostId(postId);
+  }, []);
+
+  const togglePin = useCallback(async (post) => {
+    try {
+      await updateDoc(doc(db, "posts", post.id), { pinned: !post.pinned });
+      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, pinned: !p.pinned } : p));
+    } catch (e) {
+      console.error("[ProfileView] togglePin failed", e);
+      toast("操作失敗，請重試");
+    }
+  }, []);
+
+  // ---- Friend / message / block / report (visitor actions) ----
+  const friendState = useMemo(() => {
+    if (isOwner || !profile) return null;
+    if (!viewerUid) return "guest";
+    if ((viewerProfile?.blocked || []).includes(profile.uid)) return "blocked";
+    if ((profile.friends || []).includes(viewerUid)) return "friends";
+    if ((profile.pendingIn || []).includes(viewerUid)) return "requestSent"; // I'm in their pendingIn = I sent them a request
+    if ((viewerProfile?.pendingIn || []).includes(profile.uid)) return "requestReceived"; // they sent me one
+    return "none";
+  }, [isOwner, profile, viewerProfile, viewerUid]);
+
+  const sendFriendRequest = async () => {
+    if (!viewerUid || !profile) return;
+    try {
+      await updateDoc(doc(db, "users", viewerUid), { pendingOut: arrayUnion(profile.uid) });
+      await updateDoc(doc(db, "users", profile.uid), { pendingIn: arrayUnion(viewerUid) });
+      toast("已送出好友邀請", "success");
+    } catch (e) {
+      console.error("[ProfileView] sendFriendRequest failed", e);
+      toast("送出失敗，請重試");
+    }
+  };
+
+  const acceptFriendRequest = async () => {
+    if (!viewerUid || !profile) return;
+    try {
+      await updateDoc(doc(db, "users", viewerUid), { friends: arrayUnion(profile.uid), pendingIn: arrayRemove(profile.uid) });
+      await updateDoc(doc(db, "users", profile.uid), { friends: arrayUnion(viewerUid), pendingOut: arrayRemove(viewerUid) });
+      toast("已成為好友", "success");
+    } catch (e) {
+      console.error("[ProfileView] acceptFriendRequest failed", e);
+      toast("操作失敗，請重試");
+    }
+  };
+
+  const reportUser = async () => {
+    if (!viewerUid || !profile) return;
+    try {
+      await addDoc(collection(db, "reports"), { reporterUid: viewerUid, targetUid: profile.uid, createdAt: serverTimestamp() });
+      toast("已送出檢舉，我們會盡快處理", "success");
+    } catch (e) {
+      console.error("[ProfileView] reportUser failed", e);
+      toast("送出失敗，請重試");
+    }
+    setMoreMenuOpen(false);
+  };
+
+  const blockUser = async () => {
+    if (!viewerUid || !profile) return;
+    try {
+      await updateDoc(doc(db, "users", viewerUid), { blocked: arrayUnion(profile.uid) });
+      toast("已封鎖此用戶", "success");
+    } catch (e) {
+      console.error("[ProfileView] blockUser failed", e);
+      toast("操作失敗，請重試");
+    }
+    setMoreMenuOpen(false);
+  };
+
+  const unblockUser = async () => {
+    if (!viewerUid || !profile) return;
+    try {
+      await updateDoc(doc(db, "users", viewerUid), { blocked: arrayRemove(profile.uid) });
+      toast("已解除封鎖", "success");
+    } catch (e) {
+      console.error("[ProfileView] unblockUser failed", e);
+      toast("操作失敗，請重試");
+    }
+  };
+
+  // ---- Cover / avatar crop upload ----
+  const openCrop = (target) => (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingFile(file);
+    setCropTarget(target);
+  };
+
+  const confirmCrop = async (blob) => {
+    if (!profile) return;
+    const file = new File([blob], `${cropTarget}.jpg`, { type: "image/jpeg" });
+    try {
+      const url = await uploadToR2(file);
+      if (cropTarget === "avatar") {
+        await updateDoc(doc(db, "users", profile.uid), { avatarImage: url });
+      } else {
+        await updateDoc(doc(db, "users", profile.uid), { profileBg: url, profileBgType: "image" });
+      }
+      toast("已更新圖片", "success");
+    } catch (e) {
+      console.error("[ProfileView] confirmCrop upload failed", e);
+      toast("上傳失敗，請重試");
+    } finally {
+      setCropTarget(null);
+      setPendingFile(null);
+      if (avatarFileRef.current) avatarFileRef.current.value = "";
+      if (coverFileRef.current) coverFileRef.current.value = "";
+    }
+  };
+
+  if (loading) {
+    return <LoadingState label="載入中..." minHeight={embedded ? "100%" : undefined} />;
+  }
+
+  if (loadError && !profile) {
+    return (
+      <LoadingState
+        error="無法載入此用戶，請檢查網路連線"
+        onRetry={() => window.location.reload()}
+        minHeight={embedded ? "100%" : undefined}
+      />
+    );
+  }
+
+  if (!profile) {
+    return (
+      <main style={{ minHeight: embedded ? "100%" : "100vh", background: "var(--panel-alt)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+        <div aria-hidden="true" style={{ fontSize: 48 }}>😶</div>
+        <div style={{ color: "var(--text-muted)", fontSize: 18 }}>找不到此用戶</div>
+        {embedded
+          ? <button onClick={onClose} style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>← 返回動態消息</button>
+          : <Link href="/" style={{ color: "var(--accent)", textDecoration: "none", fontSize: 14 }}>← 返回聊天室</Link>
+        }
+      </main>
+    );
+  }
+
+  const st = getStatus(profile.status);
+  const bannerStyle = profile.profileBgType === "image"
+    ? { backgroundImage: `url(${profile.profileBg})`, backgroundSize: "cover", backgroundPosition: "center" }
+    : { background: profile.profileBg || "linear-gradient(135deg,#1e3a5f,#2d1f6e)" };
+
+  const visiblePosts = posts.filter(p => {
+    if (isOwner) return true;
+    const vis = p.visibility || "public";
+    if (vis === "private") return false;
+    if (vis === "friends") return (profile.friends || []).includes(viewerUid);
+    return true;
+  });
+  const pinnedPosts = visiblePosts.filter(p => p.pinned);
+  const restPosts = visiblePosts.filter(p => !p.pinned);
+  const orderedPosts = [...pinnedPosts, ...restPosts];
+  const mediaPosts = visiblePosts.filter(p => p.imageUrl || p.videoUrl);
+  const totalLikes = visiblePosts.reduce((sum, p) => sum + (p.likes || []).length, 0);
+  const friendUids = profile.friends || [];
+
+  const openMediaFor = (post) => {
+    const idx = mediaPosts.findIndex(p => p.id === post.id);
+    if (idx >= 0) setMediaLightboxIndex(idx);
+  };
+
+  return (
+    <>
+      {embedded ? (
+        // Scoped to .pv-embedded only — this component can be mounted
+        // alongside ChatRoom's own shell, so unlike the standalone page it
+        // must never touch bare `*`/`body`/`input` selectors globally.
+        <style>{`
+          .pv-embedded, .pv-embedded *, .pv-embedded *::before, .pv-embedded *::after { box-sizing: border-box; }
+          .pv-embedded ::-webkit-scrollbar { width: 4px; }
+          .pv-embedded ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+          .pv-embedded .pp-stat-clickable { cursor: pointer; }
+          .pv-embedded .pp-stat-clickable:hover { background: var(--panel-hover); }
+          @media (max-width: 767px) {
+            .pv-embedded input, .pv-embedded textarea, .pv-embedded select { font-size: 16px !important; }
+            .pv-embedded .pp-banner { height: 140px !important; }
+            .pv-embedded .pp-avatar { width: 84px !important; height: 84px !important; }
+            .pv-embedded .pp-avatar-row { margin-top: -42px !important; }
+          }
+        `}</style>
+      ) : (
+        <style>{`
+          *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+          body { background: var(--panel-alt); }
+          ::-webkit-scrollbar { width: 4px; }
+          ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+          .pp-stat-clickable { cursor: pointer; }
+          .pp-stat-clickable:hover { background: var(--panel-hover); }
+
+          @media (max-width: 767px) {
+            /* Prevent iOS Safari auto-zoom on input focus (needs >=16px) */
+            input, textarea, select { font-size: 16px !important; }
+
+            .pp-banner { height: 140px !important; }
+            .pp-avatar { width: 84px !important; height: 84px !important; }
+            .pp-avatar-row { margin-top: -42px !important; }
+            .pp-root { padding-bottom: calc(var(--mobile-tabbar-h) + env(safe-area-inset-bottom)); }
+          }
+        `}</style>
+      )}
+
+      {/* Avatar zoom (no post context — just the profile picture itself) */}
+      {avatarZoomImg && (
+        <div role="dialog" aria-modal="true" aria-label="圖片檢視" onClick={() => setAvatarZoomImg(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
+          <img src={avatarZoomImg} alt="放大檢視的圖片" onClick={e => e.stopPropagation()}
+            style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 8, objectFit: "contain", cursor: "default", boxShadow: "0 8px 40px rgba(0,0,0,0.6)" }} />
+          <button onClick={() => setAvatarZoomImg(null)} aria-label="關閉圖片檢視"
+            style={{ position: "absolute", top: 20, right: 20, background: "rgba(30,41,59,0.9)", border: "1px solid var(--border)", color: "#f1f5f9", fontSize: 20, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Media lightbox — keeps the source post's author/text/likes/comments visible */}
+      {mediaLightboxIndex != null && (
+        <MediaLightbox
+          mediaList={mediaPosts}
+          index={mediaLightboxIndex}
+          profile={profile}
+          viewerUid={viewerUid}
+          myProfile={myProfile}
+          isMobile={isMobile}
+          onClose={() => setMediaLightboxIndex(null)}
+          onIndexChange={setMediaLightboxIndex}
+          onViewOriginal={viewOriginalPost}
+        />
+      )}
+
+      {/* 我的貼圖包 */}
+      {stickersPanelOpen && isOwner && (
+        <div role="dialog" aria-modal="true" aria-label="我的貼圖包" onClick={() => setStickersPanelOpen(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: "var(--panel)", borderRadius: 16, padding: 20, width: 420, maxWidth: "100%", maxHeight: "80vh", overflowY: "auto", boxSizing: "border-box" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>🖼️ 我的貼圖包</div>
+              <button onClick={() => setStickersPanelOpen(false)} aria-label="關閉" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 20 }}>✕</button>
+            </div>
+            <MyStickersPanel uid={uid} isMobile={isMobile} />
+          </div>
+        </div>
+      )}
+
+      {/* Crop modal */}
+      {cropTarget && pendingFile && (
+        <ImageCropModal
+          file={pendingFile}
+          aspect={cropTarget === "avatar" ? 1 : 3}
+          outputWidth={cropTarget === "avatar" ? 512 : 1200}
+          title={cropTarget === "avatar" ? "調整頭像" : "調整封面"}
+          onCancel={() => { setCropTarget(null); setPendingFile(null); }}
+          onConfirm={confirmCrop}
+        />
+      )}
+
+      <div className={embedded ? "pp-root pv-embedded" : "pp-root"} style={{ minHeight: embedded ? "100%" : "100vh", background: "var(--panel-alt)", color: "var(--text)", fontFamily: "var(--font-body)", boxSizing: "border-box" }}>
+
+        {/* Sticky top bar — 左邊是返回鍵，embedded 時右上角另外放一顆明確的
+            關閉按鈕（✕），兩顆都會回到動態消息，不會真的離開這個 SPA。 */}
+        <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,23,42,0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 16, padding: "0 16px", height: 52 }}>
+          {embedded ? (
+            <button onClick={onClose} aria-label="返回動態消息" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", color: "var(--text)", border: "none", background: "transparent", cursor: "pointer", fontSize: 18, transition: "background 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--panel)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              ←
+            </button>
+          ) : (
+            <Link href="/" aria-label="返回聊天室" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", color: "var(--text)", textDecoration: "none", fontSize: 18, background: "transparent", transition: "background 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--panel)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              ←
+            </Link>
+          )}
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{profile.nickname}</div>
+            <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{visiblePosts.length} 則貼文</div>
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          {embedded && (
+            <button onClick={onClose} aria-label="關閉個人頁面"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", color: "#f1f5f9", cursor: "pointer", fontSize: 15, flexShrink: 0 }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.16)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}>
+              ✕
+            </button>
+          )}
+
+          {/* Quick account menu — this is the logged-in viewer's own
+              settings (e.g. notification sound volume), not something about
+              whichever profile happens to be open, so it uses myProfile and
+              shows regardless of isOwner. */}
+          {myProfile && (
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setAccountMenuOpen(v => !v)} aria-label="帳號選項" aria-expanded={accountMenuOpen}
+                style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 20 }}>
+                {myProfile.avatarImage
+                  ? <img src={myProfile.avatarImage} alt="我的頭像" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
+                  : <div style={{ width: 28, height: 28, borderRadius: "50%", background: myProfile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{myProfile.avatar || "😊"}</div>
+                }
+                <span style={{ color: "#f1f5f9", fontSize: 10 }}>▾</span>
+              </button>
+              {accountMenuOpen && (
+                <>
+                  <div onClick={() => setAccountMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 91, minWidth: 220, padding: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 10 }}>快速設定</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text)", marginBottom: 6 }}>
+                      <span>🔊 新訊息音量</span>
+                      <span style={{ color: "var(--text-faint)" }}>{notifVolume}%</span>
+                    </div>
+                    <input type="range" min={0} max={100} value={notifVolume}
+                      onChange={e => changeNotifVolume(Number(e.target.value))}
+                      style={{ width: "100%" }} aria-label="新訊息通知音量" />
+                    <button onClick={() => playNotificationSound()}
+                      style={{ marginTop: 10, width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 0", color: "var(--text)", fontSize: 12, cursor: "pointer" }}>
+                      🔔 測試音效
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </header>
+
+        <main>
+        {/* Banner */}
+        <div className="pp-banner" style={{ height: 200, position: "relative", overflow: "hidden", ...bannerStyle }}>
+          {/* Star-field texture — only over the default/custom-color gradient;
+              a real cover photo shouldn't get a scattering of fake stars
+              drawn on top of it. */}
+          {profile.profileBgType !== "image" && (
+            <div aria-hidden="true" style={{
+              position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.6,
+              backgroundImage: [
+                "radial-gradient(1.5px 1.5px at 8% 22%, #fff, transparent)",
+                "radial-gradient(1px 1px at 22% 65%, #fff, transparent)",
+                "radial-gradient(2px 2px at 38% 12%, #fff, transparent)",
+                "radial-gradient(1px 1px at 52% 48%, #fff, transparent)",
+                "radial-gradient(1.5px 1.5px at 64% 75%, #fff, transparent)",
+                "radial-gradient(1px 1px at 76% 20%, #fff, transparent)",
+                "radial-gradient(2px 2px at 90% 55%, #fff, transparent)",
+                "radial-gradient(1px 1px at 14% 85%, #fff, transparent)",
+                "radial-gradient(1.5px 1.5px at 46% 88%, #fff, transparent)",
+                "radial-gradient(1px 1px at 82% 8%, #fff, transparent)",
+                "radial-gradient(1px 1px at 96% 80%, #fff, transparent)",
+                "radial-gradient(1.5px 1.5px at 30% 35%, #fff, transparent)",
+              ].join(","),
+              backgroundSize: "100% 100%",
+            }} />
+          )}
+          {isOwner && (
+            <>
+              <EditOverlay label="更換封面" onClick={() => coverFileRef.current?.click()} />
+              <input ref={coverFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={openCrop("cover")} />
+            </>
+          )}
+        </div>
+
+        {/* Avatar + actions row */}
+        <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px" }}>
+          <div className="pp-avatar-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: -52, marginBottom: 12 }}>
+            <div className="pp-avatar" style={{ flexShrink: 0, position: "relative", cursor: (!isOwner && profile.avatarImage) ? "pointer" : "default", width: 104, height: 104 }}
+              onClick={() => !isOwner && profile.avatarImage && setAvatarZoomImg(profile.avatarImage)}
+              onMouseEnter={() => setAvatarHover(true)}
+              onMouseLeave={() => setAvatarHover(false)}>
+              {profile.avatarImage
+                ? <img src={profile.avatarImage} alt="頭像" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "4px solid var(--panel-alt)", display: "block", transition: "filter 0.2s", filter: (!isOwner && avatarHover) ? "brightness(0.75)" : "brightness(1)" }} />
+                : <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: profile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, border: "4px solid var(--panel-alt)" }}>{profile.avatar || "😊"}</div>
+              }
+              {!isOwner && profile.avatarImage && avatarHover && (
+                <div style={{ position: "absolute", inset: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                  <span style={{ fontSize: 28 }}>🔍</span>
+                </div>
+              )}
+              {/* Online status dot */}
+              <span title={st.label} style={{ position: "absolute", bottom: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: st.color, border: "3px solid var(--panel-alt)" }} />
+              {isOwner && (
+                <>
+                  <EditOverlay shape="circle" label="更換頭像" onClick={() => avatarFileRef.current?.click()} />
+                  <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={openCrop("avatar")} />
+                </>
+              )}
+            </div>
+
+            {isOwner ? (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+                <Link href="/?view=editProfile" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 16px", color: "var(--text)", textDecoration: "none", fontSize: 14, fontWeight: 700, display: "inline-block" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
+                  👤 編輯個人資料
+                </Link>
+                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 10px", display: "flex", alignItems: "center" }}>
+                  <ThemeToggle mode="inline" openUp />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginLeft: 2 }}>設定</span>
+                </div>
+                <button onClick={() => setStickersPanelOpen(true)}
+                  style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 16px", color: "var(--text)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
+                  🖼️ 我的貼圖包
+                </button>
+              </div>
+            ) : friendState === "blocked" ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: "var(--text-faint)" }}>已封鎖</span>
+                <button onClick={unblockUser}
+                  style={{ background: "none", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 14px", color: "var(--text-muted)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+                  解除封鎖
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, position: "relative" }}>
+                {friendState === "none" && (
+                  <button onClick={sendFriendRequest}
+                    style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "8px 16px", color: "var(--text)", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
+                    ➕ 加好友
+                  </button>
+                )}
+                {friendState === "requestSent" && (
+                  <button disabled
+                    style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "8px 16px", color: "var(--text-dim)", cursor: "default", fontSize: 14, fontWeight: 700 }}>
+                    ⏳ 已送出邀請
+                  </button>
+                )}
+                {friendState === "requestReceived" && (
+                  <button onClick={acceptFriendRequest}
+                    style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 16px", color: "var(--accent-text)", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
+                    ✅ 接受好友邀請
+                  </button>
+                )}
+                <Link href={`/?chat=${uid}`} style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 18px", color: "var(--accent-text)", textDecoration: "none", fontSize: 14, fontWeight: 700, transition: "background 0.15s", display: "inline-block" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#2563eb"}
+                  onMouseLeave={e => e.currentTarget.style.background = "var(--accent)"}>
+                  💬 傳訊息
+                </Link>
+                <div style={{ position: "relative" }}>
+                  <button onClick={() => setMoreMenuOpen(v => !v)} aria-label="更多選項"
+                    style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "50%", width: 36, height: 36, color: "var(--text-faint)", cursor: "pointer", fontSize: 18 }}>
+                    ⋯
+                  </button>
+                  {moreMenuOpen && (
+                    <>
+                      <div onClick={() => setMoreMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+                      <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 6, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 61, minWidth: 120, overflow: "hidden" }}>
+                        <button onClick={reportUser}
+                          style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "10px 14px", color: "var(--text)", cursor: "pointer", fontSize: 13 }}>
+                          🚩 檢舉
+                        </button>
+                        <button onClick={blockUser}
+                          style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "10px 14px", color: "#ef4444", cursor: "pointer", fontSize: 13 }}>
+                          🚫 封鎖
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Name + status */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", lineHeight: 1.2 }}>{profile.nickname}</h1>
+              {profile.status === "offline" ? (
+                <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 600 }}>
+                  {profile.lastActiveAt ? `最後上線於 ${formatDate(profile.lastActiveAt)}` : "離線"}
+                </span>
+              ) : (
+                <span style={{ background: `${st.color}22`, border: `1px solid ${st.color}55`, color: st.color, borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
+                  ● {st.label}
+                </span>
+              )}
+            </div>
+            {profile.signature && (
+              <div style={{ fontSize: 13, color: "var(--text-faint)", marginTop: 2, fontStyle: "italic" }}>「{profile.signature}」</div>
+            )}
+          </div>
+
+          {(profile.learningLanguages || []).some(l => LANGUAGE_BADGES[l]) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+              {(profile.learningLanguages || []).map(lang => {
+                const badge = LANGUAGE_BADGES[lang];
+                if (!badge) return null;
+                return (
+                  <span key={lang} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--accent-active)", border: "1px solid var(--accent-border, var(--border))", borderRadius: 20, padding: "4px 12px 4px 4px", fontSize: 12, fontWeight: 700, color: "var(--text)" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "var(--accent)", color: "var(--accent-text)", fontSize: 9, fontWeight: 800 }}>{badge.code}</span>
+                    {badge.label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          <AchievementsRow profile={profile} posts={posts} />
+
+          {profile.bio && (
+            <div style={{ fontSize: 15, color: "var(--text-subtle)", marginBottom: 12, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{profile.bio}</div>
+          )}
+
+          {profile.statusText && (
+            <div style={{ marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>💬 {profile.statusText}</span>
+            </div>
+          )}
+
+          {/* Stat card — joined-date + friend/post/like counts share one row
+              instead of a plain text line, matching the rest of the app's
+              bordered-card visual language (var(--card-shadow) etc). */}
+          <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "var(--panel)", boxShadow: "var(--card-shadow)", marginBottom: 16, overflow: "hidden" }}>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">📅</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>加入於</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{profile.createdAt ? formatJoinDate(profile.createdAt) : "—"}</div>
+              </div>
+            </div>
+            <div className="pp-stat-clickable" onClick={() => setTab("friends")} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">👥</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{friendUids.length}</div>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>好友</div>
+              </div>
+            </div>
+            <div className="pp-stat-clickable" onClick={() => setTab("posts")} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">📄</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{visiblePosts.length}</div>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>貼文</div>
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">♡</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{totalLikes}</div>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>獲讚總數</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: "flex", borderBottom: "1px solid var(--panel)" }}>
+            {[
+              ["posts", "貼文"],
+              ["media", `媒體${mediaPosts.length > 0 ? ` (${mediaPosts.length})` : ""}`],
+              ["friends", "好友"],
+              ["about", "關於"],
+            ].map(([key, label]) => (
+              <button key={key} onClick={() => setTab(key)}
+                style={{ flex: 1, padding: "14px 0", background: "none", border: "none", borderBottom: tab === key ? "2px solid var(--accent)" : "2px solid transparent", color: tab === key ? "var(--text)" : "var(--text-faint)", fontSize: 14, fontWeight: tab === key ? 700 : 500, cursor: "pointer", transition: "color 0.15s" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab content */}
+        <div style={{ maxWidth: 600, margin: "0 auto" }}>
+          {tab === "posts" && (
+            <>
+              {isOwner && (
+                <NewPostForm profile={profile} onPosted={reloadPosts} />
+              )}
+
+              {orderedPosts.length === 0 && (
+                <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dim)" }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
+                  <div style={{ fontSize: 16 }}>{isOwner ? "還沒有貼文，發第一篇吧！" : "還沒有任何貼文"}</div>
+                </div>
+              )}
+              {orderedPosts.filter(p => p.text || p.imageUrl || p.videoUrl).map(post => (
+                <PostItem key={post.id} post={post} profile={profile} isOwner={isOwner} onTogglePin={togglePin} onOpenMedia={openMediaFor} />
+              ))}
+            </>
+          )}
+          {tab === "media" && (
+            <>
+              {mediaPosts.length === 0 && (
+                <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dim)" }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🖼️</div>
+                  <div style={{ fontSize: 16 }}>還沒有媒體貼文</div>
+                </div>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, padding: "2px" }}>
+                {mediaPosts.map(post => (
+                  <div key={post.id}
+                    onClick={() => openMediaFor(post)}
+                    onMouseEnter={() => setHoveredMedia(post.id)}
+                    onMouseLeave={() => setHoveredMedia(null)}
+                    style={{ aspectRatio: "1", overflow: "hidden", background: "var(--panel)", cursor: "zoom-in", position: "relative" }}>
+                    {post.videoUrl
+                      ? <video src={post.videoUrl} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      : <img src={post.imageUrl} alt="媒體" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.2s", transform: hoveredMedia === post.id ? "scale(1.06)" : "scale(1)" }} />
+                    }
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {tab === "friends" && (
+            <FriendsTab friendUids={friendUids} isMobile={isMobile} onOpenProfile={embedded ? onOpenProfile : undefined} />
+          )}
+          {tab === "about" && (
+            <AboutTab profile={profile} isOwner={isOwner} />
+          )}
+        </div>
+        </main>
+      </div>
+      {!embedded && <MobileTabBarLayout activeTab={isOwner ? "me" : undefined} />}
+    </>
+  );
+}

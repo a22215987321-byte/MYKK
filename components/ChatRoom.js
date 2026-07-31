@@ -18,6 +18,7 @@ import SpanishCourseRoom from "./SpanishCourseRoom";
 import CustomVocabRoom from "./CustomVocabRoom";
 import DictionaryRoom from "./DictionaryRoom";
 import FeedApp from "./Feed";
+import ProfileView from "./ProfileView";
 import SpanishPronunciation from "./SpanishPronunciation";
 import SpanishGrammar from "./SpanishGrammar";
 import SpanishVerbConjugator from "./SpanishVerbConjugator";
@@ -794,6 +795,10 @@ export default function ChatApp({ user }) {
   const [showEnglishPron,    setShowEnglishPron]    = useState(false);
   const [showIeltsBand4,     setShowIeltsBand4]     = useState(false);
   const [showFeed,           setShowFeed]           = useState(false);
+  // 動態消息裡點擊貼文作者頭像/名字要看的個人頁面 uid（null = 沒有開啟）——
+  // 用這個狀態把 ProfileView 換進 Feed 的位置，而不是像以前那樣用
+  // <Link href="/profile/[uid]"> 整個離開聊天室 SPA。
+  const [viewProfileUid,     setViewProfileUid]     = useState(null);
   const [showImageEditor,    setShowImageEditor]    = useState(false);
   const [showAiChat,         setShowAiChat]         = useState(false);
   const [showDocConvert,     setShowDocConvert]     = useState(false);
@@ -907,7 +912,7 @@ export default function ChatApp({ user }) {
     setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false);
     setShowEnglishPron(false); setShowIeltsBand4(false);
     setShowFeed(false); setShowImageEditor(false); setShowAiChat(false); setShowDocConvert(false);
-    setShowAiCompanion(false); setShowUpgrade(false);
+    setShowAiCompanion(false); setShowUpgrade(false); setViewProfileUid(null);
   }, []);
 
   // Cinema states
@@ -2350,10 +2355,19 @@ export default function ChatApp({ user }) {
             background: "var(--force-shell-bg, var(--chat-world-transparent, var(--bg)))",
           }}>
 
-          {/* Feed view — embedded so switching here never leaves this SPA */}
+          {/* Feed view — embedded so switching here never leaves this SPA.
+              Clicking a post author swaps this pane's content for an inline
+              ProfileView instead of navigating to /profile/[uid], so that
+              never leaves the SPA either. */}
           {showFeed && !activeFriendId && !activeGroupId && (
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-              <FeedApp user={user} embedded />
+              {viewProfileUid ? (
+                <ProfileView uid={viewProfileUid} embedded
+                  onClose={() => setViewProfileUid(null)}
+                  onOpenProfile={setViewProfileUid} />
+              ) : (
+                <FeedApp user={user} embedded onOpenProfile={setViewProfileUid} />
+              )}
             </div>
           )}
 
