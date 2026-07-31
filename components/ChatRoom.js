@@ -1645,7 +1645,13 @@ export default function ChatApp({ user }) {
           cursor: pointer; text-align: left; transition: background 0.15s; margin-bottom: 2px;
         }
         .cr-fb-icon {
-          width: 36px; height: 36px; border-radius: 50%;
+          /* Group icons only (friends use the separate circular AvatarImg
+             component) — Discord-style "squircle": a square with soft
+             rounded corners instead of a full circle. 30% scales with the
+             icon's own size so the 48px mobile variant below stays the
+             same shape, not just a fixed px radius that would look
+             proportionally sharper at the smaller desktop size. */
+          width: 36px; height: 36px; border-radius: 30%;
           background: linear-gradient(135deg,var(--text-dim),var(--border));
           display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
         }
