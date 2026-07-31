@@ -2139,54 +2139,6 @@ export default function ChatApp({ user }) {
             </div>
           )}
 
-          {/* Discord 風格群組直排 icon 欄：緊接在新增好友那排下面，改成直的一排方塊，
-              用原生 title 做 hover 顯示群組名稱的 tooltip，不用另外寫 tooltip 元件。
-              alignSelf:"flex-start" 讓這個欄位的寬度縮到剛好夠塞一個方塊圖示（不像
-              .cr-sidebar 底下其他區塊那樣被撐開到整個側欄寬），手機版沒有空間放這排，
-              群組維持在側欄裡的文字列表（見下面 isMobile 那段）。 */}
-          {!isMobile && (
-            <div style={{
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-              alignSelf: "flex-start", padding: "0 10px 10px",
-            }}>
-              <button onClick={() => setShowCreateGroup(true)} title="新增群組" aria-label="新增群組"
-                style={{
-                  width: 40, height: 40, borderRadius: "30%", flexShrink: 0,
-                  border: "1.5px dashed var(--text-dim)", background: "transparent",
-                  color: "var(--text-dim)", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "background 0.15s, border-color 0.15s, color 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--text-dim)"; e.currentTarget.style.color = "var(--text-dim)"; }}>
-                <Plus size={18} />
-              </button>
-
-              {myGroups.map(group => {
-                const isActive = activeGroupId === group.id;
-                return (
-                  <button key={group.id} title={group.name} aria-label={group.name}
-                    onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
-                    style={{
-                      width: 40, height: 40, borderRadius: "30%", flexShrink: 0,
-                      border: isActive ? "2px solid var(--accent)" : "1px solid transparent",
-                      background: isActive ? "var(--accent-active)" : "var(--panel)",
-                      boxShadow: isActive ? "var(--glow-shadow)" : "none",
-                      color: "var(--text)", cursor: "pointer", fontSize: 16, fontWeight: 700,
-                      display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
-                      transition: "background 0.15s, border-color 0.15s",
-                    }}
-                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--panel-hover)"; }}
-                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "var(--panel)"; }}>
-                    {isGroupAvatarImage(group.avatar)
-                      ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
-                      : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
           {/* Feed link + Hall button — 手機版統一成同一種「聊天列表卡片」樣式 */}
           {isMobile ? (
             <div style={{ padding: "4px 16px 0" }}>
@@ -2429,6 +2381,56 @@ export default function ChatApp({ user }) {
             }}>
             {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
+        )}
+
+        {/* Discord 風格群組直排 icon 欄：獨立的一個直排方塊面板，卡在側欄跟主聊天區
+            中間，用原生 title 做 hover 顯示群組名稱的 tooltip。寬度剛好夠塞一個方塊
+            圖示，自己的 margin 讓它跟兩側之間永遠留一點間距，不依賴各主題各自的
+            --panel-gap（很多主題預設是 0）。手機版沒有空間放這條獨立欄，群組維持在
+            側欄裡的文字列表（見上面 isMobile 那段）。 */}
+        {!isMobile && (
+          <div style={{
+            width: 64, flexShrink: 0, display: "flex", flexDirection: "column",
+            alignItems: "center", gap: 8, padding: "10px 0", margin: "8px 4px",
+            overflowY: "auto", borderRadius: "var(--radius-md)",
+            background: "var(--panel)", border: "1px solid var(--border)",
+          }}>
+            <button onClick={() => setShowCreateGroup(true)} title="新增群組" aria-label="新增群組"
+              style={{
+                width: 40, height: 40, borderRadius: "30%", flexShrink: 0,
+                border: "1.5px dashed var(--text-dim)", background: "transparent",
+                color: "var(--text-dim)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "background 0.15s, border-color 0.15s, color 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--text-dim)"; e.currentTarget.style.color = "var(--text-dim)"; }}>
+              <Plus size={18} />
+            </button>
+
+            {myGroups.map(group => {
+              const isActive = activeGroupId === group.id;
+              return (
+                <button key={group.id} title={group.name} aria-label={group.name}
+                  onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
+                  style={{
+                    width: 40, height: 40, borderRadius: "30%", flexShrink: 0,
+                    border: isActive ? "2px solid var(--accent)" : "1px solid transparent",
+                    background: isActive ? "var(--accent-active)" : "var(--panel-alt)",
+                    boxShadow: isActive ? "var(--glow-shadow)" : "none",
+                    color: "var(--text)", cursor: "pointer", fontSize: 16, fontWeight: 700,
+                    display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
+                    transition: "background 0.15s, border-color 0.15s",
+                  }}
+                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--panel-hover)"; }}
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "var(--panel-alt)"; }}>
+                  {isGroupAvatarImage(group.avatar)
+                    ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
+                    : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
+                </button>
+              );
+            })}
+          </div>
         )}
 
         {/* 主要區域：一般文件流佈局；手機版拖曳抽屜時用 ref 直接位移（applyDrawerTransform），
