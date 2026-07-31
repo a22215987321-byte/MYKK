@@ -2225,18 +2225,22 @@ export default function ChatApp({ user }) {
           </>
           )}
 
-          {/* Groups section */}
+          {/* Groups section — desktop 版群組改用 .cr-sidebar 外面那條 Discord 風格
+              直排 icon 欄（見 .cr-shell 內、cr-main 前面），這裡的文字列表只在
+              手機版保留（沒有空間再放一條獨立的 icon 欄）。 */}
+          {isMobile && (
+            <>
           <div className="cr-nav-hdr">
             <span className="cr-nav-hdr-label">群組 {myGroups.length}</span>
             <button onClick={() => setShowCreateGroup(true)} title="建立群組" className="cr-nav-icon-btn">
-              {isMobile ? <Plus size={16} /> : "+"}
+              <Plus size={16} />
             </button>
           </div>
-          <div style={{ padding: isMobile ? "0 16px 4px" : "0 8px 6px" }}>
+          <div style={{ padding: "0 16px 4px" }}>
             {myGroups.map(group => {
               const isActive = activeGroupId === group.id;
               return (
-                <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); if (isMobile) settleDrawer(false); }}
+                <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); settleDrawer(false); }}
                   className={`fb ${isActive ? "act" : ""}`}>
                   <div className="cr-fb-icon">
                     {group.avatar || "👥"}
@@ -2249,6 +2253,8 @@ export default function ChatApp({ user }) {
               );
             })}
           </div>
+            </>
+          )}
 
           {/* Friends header */}
           <div className="cr-nav-hdr">
@@ -2350,6 +2356,52 @@ export default function ChatApp({ user }) {
             }}>
             {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
+        )}
+
+        {/* Discord 風格群組直排 icon 欄：貼在側欄跟主聊天區之間（左側區塊最右邊），
+            只顯示方塊圖示，用原生 title 做 hover 顯示群組名稱的 tooltip，不用另外
+            寫 tooltip 元件。手機版沒有空間再放一條獨立欄，群組維持在側欄裡的文字
+            列表（見上面 isMobile 那段）。 */}
+        {!isMobile && (
+          <div style={{
+            width: 64, flexShrink: 0, display: "flex", flexDirection: "column",
+            alignItems: "center", gap: 10, padding: "12px 0", overflowY: "auto",
+            background: "var(--panel-alt)", borderRight: "1px solid var(--border)",
+          }}>
+            <button onClick={() => setShowCreateGroup(true)} title="新增群組" aria-label="新增群組"
+              style={{
+                width: 44, height: 44, borderRadius: "30%", flexShrink: 0,
+                border: "1.5px dashed var(--text-dim)", background: "transparent",
+                color: "var(--text-dim)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "background 0.15s, border-color 0.15s, color 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--text-dim)"; e.currentTarget.style.color = "var(--text-dim)"; }}>
+              <Plus size={20} />
+            </button>
+
+            {myGroups.map(group => {
+              const isActive = activeGroupId === group.id;
+              return (
+                <button key={group.id} title={group.name} aria-label={group.name}
+                  onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
+                  style={{
+                    width: 44, height: 44, borderRadius: "30%", flexShrink: 0,
+                    border: isActive ? "2px solid var(--accent)" : "1px solid transparent",
+                    background: isActive ? "var(--accent-active)" : "var(--panel)",
+                    boxShadow: isActive ? "var(--glow-shadow)" : "none",
+                    color: "var(--text)", cursor: "pointer", fontSize: 18, fontWeight: 700,
+                    display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
+                    transition: "background 0.15s, border-color 0.15s",
+                  }}
+                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--panel-hover)"; }}
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "var(--panel)"; }}>
+                  {group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥")}
+                </button>
+              );
+            })}
+          </div>
         )}
 
         {/* 主要區域：一般文件流佈局；手機版拖曳抽屜時用 ref 直接位移（applyDrawerTransform），
