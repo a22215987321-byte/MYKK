@@ -68,6 +68,7 @@
   --col-shadow: none;
   --col-blur: none;
   --col-margin: 0px;
+  --resize-handle-display: block;
   --panel-gradient-img: none;
   /* --force-panel-bg / --force-panel-blur are deliberately left undefined
      here (not even set to "none") — an undefined custom property makes
@@ -135,6 +136,12 @@ html[data-theme="shadow-window"] {
   --panel-gap: 12px;
   --sidebar-w-override: 360px;
   --cal-w-override: 260px;
+
+  /* side/cal 寬度拖曳把手整個關閉：這個主題的三個面板改成固定寬度
+     （--sidebar-w-override / --cal-w-override），面板間距一律交給
+     .cr-shell 的 gap（--panel-gap）決定，不再需要、也不應該讓使用者
+     用把手把中間跟兩側的間距拖到跟 gap 不一致。 */
+  --resize-handle-display: none;
 
   --col-border: 1px solid rgba(255, 255, 255, 0.14);
   --col-border-right: 1px solid rgba(255, 255, 255, 0.14);

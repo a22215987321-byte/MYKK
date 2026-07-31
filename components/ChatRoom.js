@@ -2305,6 +2305,10 @@ export default function ChatApp({ user }) {
             onDoubleClick={() => resetPanelWidth("sidebar")}
             title="拖曳調整寬度（雙擊復原預設）"
             style={{
+              // shadow-window 取消寬度拖曳：--resize-handle-display 設為 none
+              // 讓這個把手整個退出 flex 排列，改由 .cr-shell 的 gap（--panel-gap）
+              // 單獨決定側欄與主內容之間的間距，不再是「gap + 把手」疊加。
+              display: "var(--resize-handle-display, block)",
               width: 6, flexShrink: 0, cursor: "col-resize",
               background: resizingPanel === "sidebar" ? "var(--accent)" : "transparent",
               marginLeft: -3, marginRight: -3, zIndex: 30, position: "relative",
@@ -2819,6 +2823,7 @@ export default function ChatApp({ user }) {
             onDoubleClick={() => resetPanelWidth("cal")}
             title="拖曳調整寬度（雙擊復原預設）"
             style={{
+              display: "var(--resize-handle-display, block)",
               width: 6, flexShrink: 0, cursor: "col-resize",
               background: resizingPanel === "cal" ? "var(--accent)" : "transparent",
               marginLeft: -3, marginRight: -3, zIndex: 30, position: "relative",
