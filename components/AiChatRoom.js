@@ -6,8 +6,8 @@ import {
 import { toast } from "../lib/toast";
 
 const MODELS = [
-  { id: "deepseek-v4-flash", label: "deepseek-v4-flash" },
-  { id: "deepseek-v4-pro", label: "deepseek-v4-pro" },
+  { id: "deepseek-v4-flash", label: "Evon 1.0 Flash" },
+  { id: "deepseek-v4-pro", label: "Evon 1.0 Pro" },
   { id: "claude-sonnet", label: "Claude Sonnet 4.6" },
   { id: "claude-haiku", label: "Claude Haiku 4.5" },
   { id: "gpt-5", label: "GPT-5.2" },
@@ -326,7 +326,7 @@ export default function AiChatRoom({ user, db }) {
               background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--modelpicker-radius, 999px)",
               padding: "0 14px", color: "var(--text)", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
             }}>
-            {model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
+            {MODELS.find(m => m.id === model)?.label || model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
           </button>
 
           {modelMenuOpen && (
