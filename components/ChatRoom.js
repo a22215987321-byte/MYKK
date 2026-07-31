@@ -1945,7 +1945,7 @@ export default function ChatApp({ user }) {
         style={{
         display: "flex",
         position: "relative",
-        height: "calc(100vh - var(--shell-margin) * 2 - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+        height: "calc(var(--viewport-h, 100vh) - var(--shell-margin) * 2 - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
         marginTop: "calc(var(--shell-margin) + env(safe-area-inset-top))",
         marginBottom: "calc(var(--shell-margin) + env(safe-area-inset-bottom))",
         marginLeft: "calc(var(--shell-margin) + env(safe-area-inset-left))",

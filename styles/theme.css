@@ -144,11 +144,18 @@ html[data-theme="shadow-window"] {
   --col-blur: blur(18px);
   --col-margin: 0px;
 
-  --navcard-bg: rgba(255, 255, 255, 0.045);
+  --navcard-bg: rgba(255, 255, 255, 0.04);
   --navcard-border: rgba(255, 255, 255, 0.08);
   --navcard-radius: 14px;
   --navcard-height: 58px;
-  --navcard-active-glow: 0 0 0 1px rgba(139, 92, 246, 0.25), 0 0 16px rgba(139, 92, 246, 0.18);
+  --navcard-hover-bg: rgba(255, 255, 255, 0.09);
+  --navcard-icon-size: 40px;
+  --navcard-icon-radius: 10px;
+  --navcard-indicator-w: 3px;
+  /* No blur spread — that used to bleed out past the selected nav item's
+     own edge and read as a glowing line running along the sidebar's
+     border, not a highlighted card. */
+  --navcard-active-glow: 0 0 0 1px rgba(139, 92, 246, 0.35);
 
   --search-radius: 14px;
   --search-height: 42px;
@@ -400,7 +407,7 @@ html[data-theme="shadow-window"] {
      translucent too). Only AiChatRoom.js's assistant-side bubble reads
      this one. */
   --bubble-assistant-bg: rgba(8, 10, 16, 0.82);
-  --border: rgba(255, 255, 255, 0.14);
+  --border: rgba(255, 255, 255, 0.08);
   --border-soft: rgba(255, 255, 255, 0.08);
   --panel-gradient: linear-gradient(145deg, rgba(31, 36, 44, 0.92), rgba(17, 21, 27, 0.96));
   --panel-gradient-img: var(--panel-gradient);
@@ -412,8 +419,8 @@ html[data-theme="shadow-window"] {
      this theme's own frosted-glass panels. Placed first in each
      background-color/-image fallback chain (see ChatRoom.js's <style>
      block) so it wins regardless of whether a world is active. */
-  --force-panel-bg: rgba(20, 26, 34, 0.72);
-  --force-panel-blur: blur(18px);
+  --force-panel-bg: rgba(14, 22, 40, 0.62);
+  --force-panel-blur: blur(24px) saturate(150%);
   /* .cr-shell/.cr-main (the "gap" layers behind the floating panels) —
      forced to a plain opaque background regardless of whether a chat
      "世界" is selected, so the gap between panels reads as solid
@@ -421,15 +428,15 @@ html[data-theme="shadow-window"] {
      photo compounding through two stacked pass-through layers. */
   --force-shell-bg: var(--bg);
 
-  --text: rgba(255, 255, 255, 0.95);
-  --text-muted: rgba(255, 255, 255, 0.55);
-  --text-faint: rgba(255, 255, 255, 0.55);
+  --text: rgba(255, 255, 255, 0.92);
+  --text-muted: rgba(255, 255, 255, 0.48);
+  --text-faint: rgba(255, 255, 255, 0.48);
   --text-dim: rgba(255, 255, 255, 0.35);
   --text-subtle: rgba(255, 255, 255, 0.75);
 
-  --accent: #6366f1;
+  --accent: #7C5CFF;
   --accent-2: #8b5cf6;
-  --accent-active: rgba(91, 83, 255, 0.22);
+  --accent-active: rgba(124, 92, 255, 0.18);
   --accent-active-border: rgba(135, 125, 255, 0.45);
   --accent-hover: rgba(255, 255, 255, 0.06);
 
@@ -445,7 +452,11 @@ html[data-theme="shadow-window"] {
      longer needs to be one big card. */
   --shell-bg: transparent;
   --shell-blur: none;
-  --shell-margin: 14px;
+  /* dvh accounts for mobile browser chrome (address bar show/hide) that
+     100vh doesn't — the mismatch was what read as extra background
+     showing along the bottom edge specifically, not all four sides. */
+  --viewport-h: 100dvh;
+  --shell-margin: 12px;
   --shell-radius: 0px;
   --shell-shadow: none;
 }
@@ -485,7 +496,13 @@ html[data-theme="shadow-window"] body::before {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  filter: brightness(0.65) saturate(0.75);
+  /* Blurred, not just dimmed — a sharp photo behind semi-transparent glass
+     panels fights with foreground text; blur keeps only color/light and
+     lets the panels' own content stay legible. scale(1.05) covers the
+     transparent edge fringe blur() would otherwise leave visible at the
+     viewport's border. */
+  filter: brightness(0.75) saturate(0.75) blur(6px);
+  transform: scale(1.05);
 }
 html[data-theme="shadow-window"] body::after {
   content: "";
@@ -494,6 +511,16 @@ html[data-theme="shadow-window"] body::after {
   z-index: -1;
   background: rgba(0, 0, 0, 0.5);
   pointer-events: none;
+}
+
+/* Browsers without backdrop-filter support can't render the glass effect
+   at all — --force-panel-bg's low alpha would just look like a barely-
+   there smear over whatever's behind it instead of a frosted panel, so
+   raise it to near-opaque as a substitute for the blur. */
+@supports not (backdrop-filter: blur(1px)) {
+  html[data-theme="shadow-window"] {
+    --force-panel-bg: rgba(14, 22, 40, 0.94);
+  }
 }
 
 /* Prevent oversized media/tables from forcing horizontal overflow on narrow screens */
