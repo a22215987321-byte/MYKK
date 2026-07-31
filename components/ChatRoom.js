@@ -643,12 +643,19 @@ const RANK_PALETTE = [
 ].map(r => {
   const n = parseInt(r.hex.slice(1), 16);
   const rgb = `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
-  return { ...r, card: `rgba(${rgb},0.14)`, border: `rgba(${rgb},0.55)`, glow: `rgba(${rgb},0.28)`, amount: r.hex };
+  return {
+    ...r,
+    rowBg: `linear-gradient(90deg, rgba(${rgb},0.55) 0%, rgba(${rgb},0.22) 55%, rgba(251,249,245,0.4) 100%)`,
+    ring: `rgba(${rgb},0.9)`,
+    border: `rgba(${rgb},0.35)`,
+    amount: "#2C2C2C",
+  };
 });
 const RANK_PALETTE_FALLBACK = {
-  badge: "linear-gradient(135deg,var(--border),var(--text-dim))", badgeText: "#fff", badgeTextMuted: "rgba(255,255,255,0.75)",
-  card: "rgba(51,65,85,0.15)", border: "rgba(71,85,105,0.35)", glow: "transparent", amount: "var(--text-muted)",
+  badge: "#E5E1D8", badgeText: "#444444", badgeTextMuted: "rgba(68,68,68,0.7)",
+  rowBg: "rgba(229,225,216,0.4)", ring: "rgba(68,68,68,0.3)", border: "rgba(68,68,68,0.15)", amount: "#2C2C2C",
 };
+const RANK_TITLES = ["CHAMPION", "RUNNER-UP", "TOP SUPPORTER", "GREAT SUPPORTER", "KIND SUPPORTER", "VALUE SUPPORTER", "LOYAL SUPPORTER", "FRIENDLY SUPPORTER", "NEW SUPPORTER"];
 
 function RankBadge({ rank, size = 32 }) {
   const bg =
@@ -2346,66 +2353,72 @@ export default function ChatApp({ user }) {
             </div>
           )}
 
-          {/* Leaderboard view */}
+          {/* Leaderboard view — warm-ivory "luxury magazine" pastel design,
+              per an exact reference mock (see RANK_PALETTE above for the
+              9 rank colors this pulls from). */}
           {showLeaderboard && !activeFriendId && !activeGroupId && !showFeed && (
             <>
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "linear-gradient(180deg,#08091a 0%,#0d0a28 60%,var(--bg) 100%)", padding: "36px 28px 24px" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "#FBF9F5", padding: "36px 28px 24px" }}>
                 {/* Title */}
                 <div style={{ textAlign: "center", marginBottom: 36 }}>
-                  <div style={{ fontSize: 30, fontWeight: 900, color: "#f8c94f", letterSpacing: 3, textShadow: "0 0 30px rgba(248,201,79,0.6), 0 0 60px rgba(248,201,79,0.3)" }}>
-                    🏆 打賞排行榜
-                  </div>
-                  <div style={{ fontSize: 11, color: "#4a5580", letterSpacing: 8, marginTop: 8, fontWeight: 700 }}>
-                    TIPPING LEADERBOARD
+                  <div style={{ fontSize: 34, marginBottom: 6 }}>🏆</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
+                    <span style={{ flex: 1, maxWidth: 120, height: 1, background: "linear-gradient(90deg, transparent, #C9A24B)" }} />
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "#B8892E", letterSpacing: 6, whiteSpace: "nowrap" }}>
+                      TIPPING LEADERBOARD
+                    </div>
+                    <span style={{ flex: 1, maxWidth: 120, height: 1, background: "linear-gradient(90deg, #C9A24B, transparent)" }} />
                   </div>
                 </div>
 
                 {leaderboard.length === 0 && (
-                  <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-dim)" }}>
+                  <div style={{ textAlign: "center", padding: "60px 0", color: "#8a8478" }}>
                     <div style={{ fontSize: 52, marginBottom: 14 }}>🏆</div>
-                    <div style={{ fontSize: 16, color: "var(--text-faint)" }}>還沒有人打賞</div>
-                    <div style={{ fontSize: 13, marginTop: 6, color: "var(--text-dim)" }}>快來成為第一位吧！</div>
+                    <div style={{ fontSize: 16, color: "#5a564c" }}>還沒有人打賞</div>
+                    <div style={{ fontSize: 13, marginTop: 6, color: "#8a8478" }}>快來成為第一位吧！</div>
                   </div>
                 )}
 
                 {/* All entries */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 700, margin: "0 auto" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 760, margin: "0 auto" }}>
                   {leaderboard.map((entry, i) => {
                     const rank = i + 1;
                     const suffix = rank === 1 ? "ST" : rank === 2 ? "ND" : rank === 3 ? "RD" : "TH";
-                    const title = rank === 1 ? "CHAMPION" : rank === 2 ? "RUNNER-UP" : rank === 3 ? "THIRD" : `${rank}TH PLACE`;
+                    const title = RANK_TITLES[i] || `${rank}TH SUPPORTER`;
                     const p = RANK_PALETTE[i] || RANK_PALETTE_FALLBACK;
                     return (
                       <div key={entry.userId} style={{
                         display: "flex", alignItems: "center", gap: 16,
-                        padding: "14px 22px 14px 16px",
+                        padding: "14px 26px 14px 16px",
                         borderRadius: 60,
-                        background: p.card,
+                        background: p.rowBg,
                         border: `1px solid ${p.border}`,
-                        boxShadow: `0 0 24px ${p.glow}, inset 0 0 24px ${p.card}`,
+                        boxShadow: "0 1px 0 rgba(255,255,255,0.6) inset, 0 -6px 12px rgba(0,0,0,0.03) inset, 0 4px 14px rgba(120,100,60,0.08)",
                       }}>
                         {/* Rank badge */}
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: 58, height: 58, borderRadius: "var(--radius-lg)", background: p.badge, flexShrink: 0, boxShadow: `0 4px 12px ${p.glow}` }}>
-                          <span style={{ fontSize: 22, fontWeight: 900, color: p.badgeText, lineHeight: 1.1 }}>{rank}</span>
-                          <span style={{ fontSize: 8, fontWeight: 800, color: p.badgeTextMuted, letterSpacing: 1 }}>{suffix}</span>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: 52, height: 52, borderRadius: "50%", background: p.badge, flexShrink: 0, boxShadow: "0 2px 6px rgba(0,0,0,0.1)" }}>
+                          <span style={{ fontSize: 19, fontWeight: 800, color: p.badgeText, lineHeight: 1.1 }}>{rank}</span>
+                          <span style={{ fontSize: 8, fontWeight: 700, color: p.badgeTextMuted, letterSpacing: 1 }}>{suffix}</span>
                         </div>
                         {/* Avatar */}
-                        <AvatarImg avatarImage={entry.userAvatarImage} avatar={entry.userAvatar} color={entry.userColor} size={52} />
+                        <div style={{ borderRadius: "50%", boxShadow: `0 0 0 2px #FBF9F5, 0 0 0 4px ${p.ring}`, flexShrink: 0 }}>
+                          <AvatarImg avatarImage={entry.userAvatarImage} avatar={entry.userAvatar} color={entry.userColor} size={48} />
+                        </div>
                         {/* Name + title */}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 800, fontSize: 17, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.userNickname}</div>
-                          <div style={{ fontSize: 9, color: p.amount, letterSpacing: 3, fontWeight: 700, marginTop: 3 }}>{title}</div>
+                          <div style={{ fontWeight: 700, fontSize: 17, color: "#2C2C2C", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.userNickname}</div>
+                          <div style={{ fontSize: 10, color: "#8a7550", letterSpacing: 2, fontWeight: 700, marginTop: 3 }}>{title}</div>
                         </div>
                         {/* Amount */}
-                        <div style={{ fontWeight: 900, fontSize: 18, color: p.amount, flexShrink: 0, letterSpacing: 0.5 }}>HK${entry.total.toLocaleString()}</div>
+                        <div style={{ fontWeight: 800, fontSize: 19, color: "#2C2C2C", flexShrink: 0, letterSpacing: 0.3 }}>HK${entry.total.toLocaleString()}</div>
                       </div>
                     );
                   })}
                 </div>
               </div>
-              <div style={{ padding: "14px 20px", background: "#08091a", borderTop: "1px solid #1a1a3a", flexShrink: 0 }}>
+              <div style={{ padding: "14px 20px", background: "#FBF9F5", borderTop: "1px solid rgba(201,162,75,0.25)", flexShrink: 0 }}>
                 <button onClick={() => setShowDonateModal(true)}
-                  style={{ width: "100%", background: "linear-gradient(135deg,#f59e0b,#d97706)", border: "none", borderRadius: "var(--radius-lg)", padding: "13px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 20px rgba(245,158,11,0.35)", letterSpacing: 1 }}>
+                  style={{ width: "100%", background: "linear-gradient(135deg,#F4BF45,#D9A73B)", border: "none", borderRadius: 999, padding: "13px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 16px rgba(212,168,45,0.35)", letterSpacing: 1 }}>
                   🎁 立即打賞
                 </button>
               </div>
