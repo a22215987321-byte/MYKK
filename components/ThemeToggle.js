@@ -183,6 +183,18 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
+  // Refresh the switcher list each time the menu opens, so a nickname/avatar
+  // change made just now (which also re-saves the entry — see pages/index.js)
+  // shows up without needing a full reload.
+  // MUST stay above the "floating + loggedIn" early return below — every
+  // hook has to run unconditionally on every render (Rules of Hooks); this
+  // one used to sit after that return and only ran when it *didn't* fire,
+  // which crashed the whole app the moment loggedIn flipped true on any
+  // page using mode="floating" ("Rendered fewer hooks than expected").
+  useEffect(() => {
+    if (open) setSavedAccounts(getSavedAccounts());
+  }, [open]);
+
   // Once logged in, the sidebar's own settings button takes over — avoid two settings buttons on screen.
   if (mode === "floating" && loggedIn) return null;
 
@@ -234,13 +246,6 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
     else window.dispatchEvent(new CustomEvent("evon:open-profile"));
     setOpen(false);
   };
-
-  // Refresh the switcher list each time the menu opens, so a nickname/avatar
-  // change made just now (which also re-saves the entry — see pages/index.js)
-  // shows up without needing a full reload.
-  useEffect(() => {
-    if (open) setSavedAccounts(getSavedAccounts());
-  }, [open]);
 
   // Not a real multi-session switch — signs out and, for a remembered
   // account, pre-fills its email on the login screen so the user only has
