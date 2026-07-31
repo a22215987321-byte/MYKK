@@ -126,6 +126,12 @@ function AvatarImg({ avatarImage, avatar, color, size = 36 }) {
   );
 }
 
+// 群組頭像跟 avatar emoji 共用同一個欄位（預設 "👥"，上傳後變成 R2 圖片網址）——
+// 用這個判斷目前存的是要當文字顯示的 emoji，還是要當 <img src> 顯示的圖片網址。
+function isGroupAvatarImage(avatar) {
+  return typeof avatar === "string" && avatar.startsWith("http");
+}
+
 // MessageBubble
 
 function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFontSize = 14 }) {
@@ -939,6 +945,7 @@ export default function ChatApp({ user }) {
   const groupEmojiBtnRef = useRef(null);
   const privateFileRef = useRef(null);
   const groupFileRef = useRef(null);
+  const groupAvatarFileRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnectionsRef = useRef({});
@@ -1254,6 +1261,22 @@ export default function ChatApp({ user }) {
       setGroupUploading(false);
     }
   }, [activeGroupId, myProfile, uid]);
+
+  // 群組頭像：跟 avatar emoji 共用同一個欄位，上傳成功後存成 R2 圖片網址；
+  // 顯示端用 isGroupAvatarImage() 判斷欄位裡存的是 emoji 字串還是圖片網址。
+  const [groupAvatarUploading, setGroupAvatarUploading] = useState(false);
+  const changeGroupAvatar = useCallback(async (file) => {
+    if (!activeGroupId) return;
+    setGroupAvatarUploading(true);
+    try {
+      const url = await uploadToR2(file);
+      await updateDoc(doc(db, 'groups', activeGroupId), { avatar: url });
+    } catch {
+      toast("上傳失敗，請重試");
+    } finally {
+      setGroupAvatarUploading(false);
+    }
+  }, [activeGroupId]);
 
   // 表情/手勢貼圖：item 來自 EmojiStickerPicker 的 onSendItem（手勢分類或真的貼圖會直接發送，
   // 不像一般 emoji 插入輸入框）。第一版全部 type:"emoji"，之後換成 PNG 貼圖只要 item.type
@@ -2116,6 +2139,53 @@ export default function ChatApp({ user }) {
             </div>
           )}
 
+          {/* Discord 風格群組橫排 icon 欄：緊接在新增好友那排下面，一排方塊圖示，
+              用原生 title 做 hover 顯示群組名稱的 tooltip，不用另外寫 tooltip 元件。
+              手機版沒有橫向空間放這排，群組維持在側欄裡的文字列表（見下面 isMobile
+              那段）。 */}
+          {!isMobile && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+              padding: "0 10px 10px",
+            }}>
+              <button onClick={() => setShowCreateGroup(true)} title="新增群組" aria-label="新增群組"
+                style={{
+                  width: 40, height: 40, borderRadius: "30%", flexShrink: 0,
+                  border: "1.5px dashed var(--text-dim)", background: "transparent",
+                  color: "var(--text-dim)", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "background 0.15s, border-color 0.15s, color 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--text-dim)"; e.currentTarget.style.color = "var(--text-dim)"; }}>
+                <Plus size={18} />
+              </button>
+
+              {myGroups.map(group => {
+                const isActive = activeGroupId === group.id;
+                return (
+                  <button key={group.id} title={group.name} aria-label={group.name}
+                    onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
+                    style={{
+                      width: 40, height: 40, borderRadius: "30%", flexShrink: 0,
+                      border: isActive ? "2px solid var(--accent)" : "1px solid transparent",
+                      background: isActive ? "var(--accent-active)" : "var(--panel)",
+                      boxShadow: isActive ? "var(--glow-shadow)" : "none",
+                      color: "var(--text)", cursor: "pointer", fontSize: 16, fontWeight: 700,
+                      display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
+                      transition: "background 0.15s, border-color 0.15s",
+                    }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--panel-hover)"; }}
+                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "var(--panel)"; }}>
+                    {isGroupAvatarImage(group.avatar)
+                      ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
+                      : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Feed link + Hall button — 手機版統一成同一種「聊天列表卡片」樣式 */}
           {isMobile ? (
             <div style={{ padding: "4px 16px 0" }}>
@@ -2243,7 +2313,9 @@ export default function ChatApp({ user }) {
                 <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); settleDrawer(false); }}
                   className={`fb ${isActive ? "act" : ""}`}>
                   <div className="cr-fb-icon">
-                    {group.avatar || "👥"}
+                    {isGroupAvatarImage(group.avatar)
+                      ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
+                      : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="cr-fb-name">{group.name}</div>
@@ -2356,52 +2428,6 @@ export default function ChatApp({ user }) {
             }}>
             {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
-        )}
-
-        {/* Discord 風格群組直排 icon 欄：貼在側欄跟主聊天區之間（左側區塊最右邊），
-            只顯示方塊圖示，用原生 title 做 hover 顯示群組名稱的 tooltip，不用另外
-            寫 tooltip 元件。手機版沒有空間再放一條獨立欄，群組維持在側欄裡的文字
-            列表（見上面 isMobile 那段）。 */}
-        {!isMobile && (
-          <div style={{
-            width: 64, flexShrink: 0, display: "flex", flexDirection: "column",
-            alignItems: "center", gap: 10, padding: "12px 0", overflowY: "auto",
-            background: "var(--panel-alt)", borderRight: "1px solid var(--border)",
-          }}>
-            <button onClick={() => setShowCreateGroup(true)} title="新增群組" aria-label="新增群組"
-              style={{
-                width: 44, height: 44, borderRadius: "30%", flexShrink: 0,
-                border: "1.5px dashed var(--text-dim)", background: "transparent",
-                color: "var(--text-dim)", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "background 0.15s, border-color 0.15s, color 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--text-dim)"; e.currentTarget.style.color = "var(--text-dim)"; }}>
-              <Plus size={20} />
-            </button>
-
-            {myGroups.map(group => {
-              const isActive = activeGroupId === group.id;
-              return (
-                <button key={group.id} title={group.name} aria-label={group.name}
-                  onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
-                  style={{
-                    width: 44, height: 44, borderRadius: "30%", flexShrink: 0,
-                    border: isActive ? "2px solid var(--accent)" : "1px solid transparent",
-                    background: isActive ? "var(--accent-active)" : "var(--panel)",
-                    boxShadow: isActive ? "var(--glow-shadow)" : "none",
-                    color: "var(--text)", cursor: "pointer", fontSize: 18, fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
-                    transition: "background 0.15s, border-color 0.15s",
-                  }}
-                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--panel-hover)"; }}
-                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "var(--panel)"; }}>
-                  {group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥")}
-                </button>
-              );
-            })}
-          </div>
         )}
 
         {/* 主要區域：一般文件流佈局；手機版拖曳抽屜時用 ref 直接位移（applyDrawerTransform），
@@ -2826,9 +2852,21 @@ export default function ChatApp({ user }) {
           {activeGroupId && activeGroup && (
             <>
               <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
-                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,var(--text-dim),var(--border))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-                  {activeGroup.avatar || "👥"}
-                </div>
+                <input ref={groupAvatarFileRef} type="file" accept="image/*" style={{ display: "none" }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) changeGroupAvatar(f); e.target.value = ""; }} />
+                <button onClick={() => groupAvatarFileRef.current?.click()} disabled={groupAvatarUploading}
+                  title="更換群組頭像" aria-label="更換群組頭像"
+                  style={{
+                    width: 34, height: 34, borderRadius: "50%", flexShrink: 0, padding: 0,
+                    border: "none", cursor: groupAvatarUploading ? "default" : "pointer",
+                    background: "linear-gradient(135deg,var(--text-dim),var(--border))",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+                    overflow: "hidden", opacity: groupAvatarUploading ? 0.6 : 1,
+                  }}>
+                  {isGroupAvatarImage(activeGroup.avatar)
+                    ? <img src={activeGroup.avatar} alt={activeGroup.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    : (activeGroup.avatar || (activeGroup.name ? activeGroup.name.slice(0, 1).toUpperCase() : "👥"))}
+                </button>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{activeGroup.name}</div>
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(activeGroup.members || []).length} 位成員</div>
