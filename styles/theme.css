@@ -414,6 +414,12 @@ html[data-theme="shadow-window"] {
      block) so it wins regardless of whether a world is active. */
   --force-panel-bg: rgba(20, 26, 34, 0.72);
   --force-panel-blur: blur(18px);
+  /* .cr-shell/.cr-main (the "gap" layers behind the floating panels) —
+     forced to a plain opaque background regardless of whether a chat
+     "世界" is selected, so the gap between panels reads as solid
+     background like the reference, not a second dimmer copy of the world
+     photo compounding through two stacked pass-through layers. */
+  --force-shell-bg: var(--bg);
 
   --text: rgba(255, 255, 255, 0.95);
   --text-muted: rgba(255, 255, 255, 0.55);

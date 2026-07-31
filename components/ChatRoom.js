@@ -1948,7 +1948,14 @@ export default function ChatApp({ user }) {
         // paints the one shared copy of the photo) and every panel below,
         // so it has to get out of the way for any of them to show it.
         // Otherwise it's exactly the same opaque var(--shell-bg) as before.
-        background: "var(--chat-world-transparent, var(--shell-bg))",
+        // --force-shell-bg overrides that for 幽影深窗: the gap between the
+        // floating panels is meant to read as plain solid background (see
+        // the reference mock), not a second, fainter copy of the world
+        // photo bleeding through — which was compounding with .cr-main's
+        // own identical pass-through below and reading as "no gap at all"
+        // once the (dimmed) photo happened to be close in tone to the
+        // panels' own glass color.
+        background: "var(--force-shell-bg, var(--chat-world-transparent, var(--shell-bg)))",
         color: "var(--text)", fontFamily: "var(--font-body)", overflow: "hidden",
         borderRadius: "var(--shell-radius)", boxShadow: "var(--shell-shadow)",
         backdropFilter: "var(--shell-blur)", WebkitBackdropFilter: "var(--shell-blur)",
@@ -2328,8 +2335,8 @@ export default function ChatApp({ user }) {
         <main ref={mainElRef} className="cr-main"
           style={{
             flex: 1, display: (isMobile && mobileView === 'more') ? "none" : "flex", flexDirection: "column", minWidth: 0, minHeight: 0,
-            // Same reasoning as .cr-shell above.
-            background: "var(--chat-world-transparent, var(--bg))",
+            // Same reasoning as .cr-shell above, including --force-shell-bg.
+            background: "var(--force-shell-bg, var(--chat-world-transparent, var(--bg)))",
           }}>
 
           {/* Feed view — embedded so switching here never leaves this SPA */}
