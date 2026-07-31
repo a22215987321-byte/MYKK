@@ -2139,14 +2139,15 @@ export default function ChatApp({ user }) {
             </div>
           )}
 
-          {/* Discord 風格群組橫排 icon 欄：緊接在新增好友那排下面，一排方塊圖示，
+          {/* Discord 風格群組直排 icon 欄：緊接在新增好友那排下面，改成直的一排方塊，
               用原生 title 做 hover 顯示群組名稱的 tooltip，不用另外寫 tooltip 元件。
-              手機版沒有橫向空間放這排，群組維持在側欄裡的文字列表（見下面 isMobile
-              那段）。 */}
+              alignSelf:"flex-start" 讓這個欄位的寬度縮到剛好夠塞一個方塊圖示（不像
+              .cr-sidebar 底下其他區塊那樣被撐開到整個側欄寬），手機版沒有空間放這排，
+              群組維持在側欄裡的文字列表（見下面 isMobile 那段）。 */}
           {!isMobile && (
             <div style={{
-              display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
-              padding: "0 10px 10px",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+              alignSelf: "flex-start", padding: "0 10px 10px",
             }}>
               <button onClick={() => setShowCreateGroup(true)} title="新增群組" aria-label="新增群組"
                 style={{
