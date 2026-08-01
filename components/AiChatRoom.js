@@ -6,8 +6,8 @@ import {
 import { toast } from "../lib/toast";
 
 const MODELS = [
-  { id: "deepseek-v4-flash", label: "Evon 1.0 Flash" },
-  { id: "deepseek-v4-pro", label: "Evon 1.0 Pro" },
+  { id: "deepseek-v4-flash", label: "DeepSeek-V4-Flash 正式版" },
+  { id: "deepseek-v4-pro", label: "DeepSeek-V4-Pro" },
   { id: "claude-sonnet", label: "Claude Sonnet 4.6" },
   { id: "claude-haiku", label: "Claude Haiku 4.5" },
   { id: "gpt-5", label: "GPT-5.2" },
