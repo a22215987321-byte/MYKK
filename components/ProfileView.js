@@ -804,7 +804,7 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
 // never leaves the chat SPA. `embedded`/`onClose` only affect page chrome
 // (header back-vs-close button, root sizing, global CSS resets, bottom tab
 // bar) — every Firebase query/write below is identical either way.
-export default function ProfileView({ uid, embedded = false, onClose, onOpenProfile }) {
+export default function ProfileView({ uid, embedded = false, onClose, onOpenProfile, initialTab = "posts" }) {
   const router = useRouter();
   const [viewerUid, setViewerUid] = useState(undefined); // undefined = auth not resolved yet, null = guest
   const [viewerProfile, setViewerProfile] = useState(null);
@@ -812,7 +812,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [tab, setTab] = useState("posts");
+  const [tab, setTab] = useState(initialTab);
   const [avatarZoomImg, setAvatarZoomImg] = useState(null);
   const [mediaLightboxIndex, setMediaLightboxIndex] = useState(null);
   // 從「影片」分頁打開時，prev/next 只在影片之間切換（不會混到圖片貼文）；
