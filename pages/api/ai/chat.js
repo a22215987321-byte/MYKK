@@ -28,8 +28,8 @@ const PROVIDERS = {
 const MODELS = {
   "deepseek-v4-flash": { provider: "deepseek", model: "deepseek-v4-flash" },
   "deepseek-v4-pro": { provider: "deepseek", model: "deepseek-v4-pro" },
-  "claude-sonnet": { provider: "openrouter", model: "anthropic/claude-sonnet-4.6" },
-  "gpt-5": { provider: "openrouter", model: "openai/gpt-5.2" },
+  "claude-sonnet": { provider: "openrouter", model: "anthropic/claude-sonnet-5" },
+  "gpt-5": { provider: "openrouter", model: "openai/gpt-5.5" },
   "claude-haiku": { provider: "openrouter", model: "anthropic/claude-haiku-4.5" },
   "gpt-5-mini": { provider: "openrouter", model: "openai/gpt-5.2-mini" },
   "gemini-pro": { provider: "openrouter", model: "google/gemini-3-pro" },

@@ -6,13 +6,13 @@ import {
 import { toast } from "../lib/toast";
 
 const MODELS = [
-  { id: "deepseek-v4-flash", label: "DeepSeek-V4-Flash 正式版" },
-  { id: "deepseek-v4-pro", label: "DeepSeek-V4-Pro" },
-  { id: "claude-sonnet", label: "Claude Sonnet 4.6" },
+  { id: "claude-sonnet", label: "Claude Sonnet 5" },
   { id: "claude-haiku", label: "Claude Haiku 4.5" },
-  { id: "gpt-5", label: "GPT-5.2" },
+  { id: "gpt-5", label: "GPT-5.5" },
   { id: "gpt-5-mini", label: "GPT-5.2 Mini" },
   { id: "gemini-pro", label: "Gemini 3 Pro" },
+  { id: "deepseek-v4-flash", label: "DeepSeek-V4-Flash 正式版" },
+  { id: "deepseek-v4-pro", label: "DeepSeek-V4-Pro" },
 ];
 
 function titleFromMessages(messages) {
@@ -46,7 +46,9 @@ export default function AiChatRoom({ user, db }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [model, setModel] = useState(MODELS[0].id);
+  // 預設模型固定用 DeepSeek（跟後端 chat.js 的 DEFAULT_MODEL_ID 一致），
+  // 不要因為上面 MODELS 陣列的排序（OpenRouter 排前面方便選）跟著變動。
+  const [model, setModel] = useState("deepseek-v4-flash");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const endRef = useRef(null);
