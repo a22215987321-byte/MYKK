@@ -31,7 +31,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: MODEL,
         messages: [{ role: "user", content: cleanedPrompt }],
-        modalities: ["image", "text"],
+        modalities: ["image"],
       }),
       signal: ctrl.signal,
     });
