@@ -30,7 +30,6 @@ import { DocConvertRoomLazy } from "./doc-convert";
 import AiCompanionRoom from "./AiCompanionRoom";
 import AiCompanionCreator from "./AiCompanionCreator";
 import UpgradeMembership, { UpgradeHighlights } from "./UpgradeMembership";
-import NavFolder from "./nav/NavFolder";
 import EmojiStickerPicker from "./EmojiStickerPicker";
 import LoadingState from "./LoadingState";
 import useIsMobile from "../lib/useIsMobile";
@@ -126,13 +125,18 @@ function AvatarImg({ avatarImage, avatar, color, size = 36 }) {
   );
 }
 
-// 側欄功能方塊「長按（超過 1 秒）拖曳調整順序」——每個區塊（頂層項目、
-// 更多功能資料夾、英語學習資料夾、西班牙語資料夾）各自獨立記住自己的順序
-// （storageKey 分開存），defaultOrder 之外/之內多出來或少掉的 key 都會自動
-// 補齊/濾掉，避免以後增刪功能時順序資料變成無效值。
+// 側欄功能方塊「按住 0.5 秒拖曳調整順序」：按住超過 0.5 秒後方塊會整個浮起來
+// 跟著滑鼠自由移動（不侷限在原本那條直線上），拖曳中的方塊只要中心點掃過另一個
+// 方塊，就會跟那個方塊互換位置（即時生效）；放開滑鼠後浮起的方塊本身消失，回到
+// 正常排版裡（也就是這次拖曳過程中換到的最終位置），不會維持浮在原地。
+// defaultOrder 之外/之內多出來或少掉的 key 都會自動補齊/濾掉，避免以後增刪
+// 功能時，存在 localStorage 的順序資料變成無效值。
 function useReorder(storageKey, defaultOrder) {
   const [order, setOrder] = useState(defaultOrder);
-  const [draggingKey, setDraggingKey] = useState(null);
+  // dragState 非 null 時代表目前正在拖曳中：{ key, x, y, w, h }（x/y 是浮起的
+  // 方塊左上角在畫面上的位置，跟著滑鼠即時更新）。
+  const [dragState, setDragState] = useState(null);
+  const itemRefs = useRef(new Map());
   const justDraggedRef = useRef(null);
 
   useEffect(() => {
@@ -148,33 +152,55 @@ function useReorder(storageKey, defaultOrder) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
+  const registerRef = useCallback((key) => (el) => {
+    if (el) itemRefs.current.set(key, el);
+    else itemRefs.current.delete(key);
+  }, []);
+
   const startDrag = useCallback((key) => (e) => {
     if (e.button !== 0) return;
-    e.stopPropagation(); // 不讓 mousedown 冒泡到外層（例如資料夾本身）的拖曳判斷
-    const startY = e.clientY;
-    const itemHeight = e.currentTarget.offsetHeight + 6; // 6px ≈ 項目之間的間距
-    let dragging = false, moved = false;
-    let timer = setTimeout(() => { dragging = true; setDraggingKey(key); }, 1000);
+    e.stopPropagation(); // 不讓 mousedown 冒泡到外層元素
+    let armed = false, moved = false;
+    let swapTarget = key;
+    const timer = setTimeout(() => {
+      const el = itemRefs.current.get(key);
+      if (!el) return;
+      armed = true;
+      const rect = el.getBoundingClientRect();
+      setDragState({ key, x: rect.left, y: rect.top, w: rect.width, h: rect.height, grabX: e.clientX - rect.left, grabY: e.clientY - rect.top });
+    }, 500);
     const onMove = (ev) => {
-      if (!dragging) return;
+      if (!armed) return;
       moved = true;
-      const slots = Math.round((ev.clientY - startY) / itemHeight);
-      setOrder(prev => {
-        const from = prev.indexOf(key);
-        const to = Math.min(prev.length - 1, Math.max(0, from + slots));
-        if (from === to || from < 0) return prev;
-        const next = prev.slice();
-        next.splice(from, 1);
-        next.splice(to, 0, key);
-        return next;
-      });
+      ev.preventDefault();
+      setDragState(prev => prev ? { ...prev, x: ev.clientX - prev.grabX, y: ev.clientY - prev.grabY } : prev);
+      // 拖曳中的方塊「中心點」掃過哪個方塊，就跟那個方塊互換——用中心點而不是
+      // 滑鼠原始座標，這樣浮起的方塊視覺上真的疊到哪裡，判定就是那裡。
+      const cx = ev.clientX, cy = ev.clientY;
+      for (const [k, el] of itemRefs.current) {
+        if (k === key) continue;
+        const r = el.getBoundingClientRect();
+        if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
+          if (swapTarget !== k) {
+            swapTarget = k;
+            setOrder(prev => {
+              const a = prev.indexOf(key), b = prev.indexOf(k);
+              if (a < 0 || b < 0) return prev;
+              const next = prev.slice();
+              [next[a], next[b]] = [next[b], next[a]];
+              return next;
+            });
+          }
+          break;
+        }
+      }
     };
     const onUp = () => {
       clearTimeout(timer);
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
-      setDraggingKey(null);
-      if (dragging && moved) {
+      setDragState(null);
+      if (armed && moved) {
         justDraggedRef.current = key;
         setOrder(cur => {
           try { localStorage.setItem(storageKey, JSON.stringify(cur)); } catch {}
@@ -191,19 +217,39 @@ function useReorder(storageKey, defaultOrder) {
     return false;
   }, []);
 
-  return { order, draggingKey, startDrag, wasJustDragged };
+  return { order, dragState, startDrag, wasJustDragged, registerRef };
 }
 
 // 包住每個可拖曳項目：onMouseDown 開始長按計時、onClickCapture 在剛拖曳完
-// 之後把緊接著那次 click 吃掉，不會一放開就誤觸該項目原本的 onClick（切換頁面
-// 或資料夾展開/收合）。
+// 之後把緊接著那次 click 吃掉，不會一放開就誤觸該項目原本的 onClick（切換頁面）。
+// 拖曳中（dragState.key === 這一個）時原地那份直接隱藏，改由外層另外渲染一份
+// 浮起來跟著滑鼠跑的版本（見下面 DragGhost）。
 function DragReorderWrap({ dragKey, controller, style, children }) {
-  const { draggingKey, startDrag, wasJustDragged } = controller;
+  const { dragState, startDrag, wasJustDragged, registerRef } = controller;
+  const isDragging = dragState?.key === dragKey;
   return (
     <div
+      ref={registerRef(dragKey)}
       onMouseDown={startDrag(dragKey)}
       onClickCapture={e => { if (wasJustDragged(dragKey)) { e.stopPropagation(); e.preventDefault(); } }}
-      style={{ ...style, opacity: draggingKey === dragKey ? 0.45 : 1, cursor: draggingKey === dragKey ? "grabbing" : undefined }}>
+      style={{ ...style, visibility: isDragging ? "hidden" : "visible", cursor: "grab" }}>
+      {children}
+    </div>
+  );
+}
+
+// 拖曳中浮在最上層、跟著滑鼠跑的那份方塊複本，position:fixed 所以不受側欄
+// scroll/排版影響，pointerEvents:none 避免擋到底下的 hit-test。
+function DragGhost({ controller, children }) {
+  const { dragState } = controller;
+  if (!dragState) return null;
+  return (
+    <div style={{
+      position: "fixed", left: dragState.x, top: dragState.y,
+      width: dragState.w, height: dragState.h, zIndex: 1000,
+      pointerEvents: "none", opacity: 0.92, transform: "scale(1.02)",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.45)", borderRadius: "var(--radius-md)", overflow: "hidden",
+    }}>
       {children}
     </div>
   );
@@ -906,12 +952,16 @@ export default function ChatApp({ user }) {
   // 桌面版導覽欄收合狀態（跟手機版的抽屜 sidebarOpen 是兩套機制，互不影響）。
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // 側欄功能方塊長按拖曳調整順序——桌面版限定（手機版側欄是完全不同的簡化排法）。
-  // 動態消息／公共大廳固定在最上面當錨點，其餘從排行榜開始都可以拖。
-  const topNavReorder = useReorder("cr-order-top", ["leaderboard", "calendar", "features", "lang-en", "lang-es", "customVocab", "dict"]);
-  const featuresReorder = useReorder("cr-order-features", ["upgrade", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion"]);
-  const langEnReorder = useReorder("cr-order-lang-en", ["englishPron", "ieltsBand4", "vocab"]);
-  const langEsReorder = useReorder("cr-order-lang-es", ["spanish", "spanishCourse", "spanishPron", "spanishGrammar", "spanishVerbs"]);
+  // 側欄功能方塊按住拖曳調整順序——桌面版限定（手機版側欄是完全不同的簡化排法）。
+  // 動態消息／公共大廳固定在最上面當錨點，其餘全部（原本分在三個資料夾裡的
+  // 項目也拆出來攤平）都在同一份順序清單裡，彼此都可以互相拖曳交換位置。
+  const topNavReorder = useReorder("cr-order-top-v2", [
+    "leaderboard", "calendar",
+    "upgrade", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion",
+    "englishPron", "ieltsBand4", "vocab",
+    "spanish", "spanishCourse", "spanishPron", "spanishGrammar", "spanishVerbs",
+    "customVocab", "dict",
+  ]);
 
   useEffect(() => {
     try {
@@ -2281,9 +2331,18 @@ export default function ChatApp({ user }) {
           )}
 
           {!isMobile && (() => {
-            // 每一區塊各自的項目（key → JSX），實際渲染順序交給對應的
-            // useReorder().order 決定，長按（超過 1 秒）拖曳就能調整。
-            const featuresItems = {
+            // 原本分在「更多功能／英語學習／西班牙語」三個資料夾裡的項目全部
+            // 攤平出來，跟排行榜/行事曆/自定詞彙/字典一起放進同一份可拖曳排序
+            // 清單（key → JSX），實際渲染順序交給 topNavReorder.order 決定。
+            const topItems = {
+              leaderboard: (
+                <NavItem icon="🏆" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
+                  active={showLeaderboard} onClick={() => { resetAllViews(); setShowLeaderboard(true); }} />
+              ),
+              calendar: (
+                <NavItem icon="📅" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="行事曆" sublabel="日曆備忘錄"
+                  active={showCalendar} onClick={() => { resetAllViews(); setShowCalendar(true); }} />
+              ),
               upgrade: (
                 <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
                   active={showUpgrade} onClick={() => { resetAllViews(); setShowUpgrade(true); }} />
@@ -2308,8 +2367,6 @@ export default function ChatApp({ user }) {
                 <NavItem icon="💞" iconBg="linear-gradient(135deg,#db2777,#9333ea)" label="AI 夥伴" sublabel={myProfile?.hasAiCompanion ? "語音陪伴" : "付費解鎖"}
                   active={showAiCompanion} onClick={() => { resetAllViews(); setShowAiCompanion(true); }} />
               ),
-            };
-            const langEnItems = {
               englishPron: (
                 <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音"
                   active={showEnglishPron} onClick={() => { resetAllViews(); setShowEnglishPron(true); }} />
@@ -2322,8 +2379,6 @@ export default function ChatApp({ user }) {
                 <NavItem icon="📚" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習"
                   active={showVocab} onClick={() => { resetAllViews(); setShowVocab(true); }} />
               ),
-            };
-            const langEsItems = {
               spanish: (
                 <NavItem icon="🇪🇸" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西班牙語學習" sublabel="CEFR A1/A2"
                   active={showSpanish} onClick={() => { resetAllViews(); setShowSpanish(true); }} />
@@ -2344,40 +2399,6 @@ export default function ChatApp({ user }) {
                 <NavItem compact icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢"
                   active={showSpanishVerbs} onClick={() => { resetAllViews(); setShowSpanishVerbs(true); }} />
               ),
-            };
-            const topItems = {
-              leaderboard: (
-                <NavItem icon="🏆" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
-                  active={showLeaderboard} onClick={() => { resetAllViews(); setShowLeaderboard(true); }} />
-              ),
-              calendar: (
-                <NavItem icon="📅" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="行事曆" sublabel="日曆備忘錄"
-                  active={showCalendar} onClick={() => { resetAllViews(); setShowCalendar(true); }} />
-              ),
-              features: (
-                <NavFolder id="features" icon="🧩" label="更多功能"
-                  hasActiveChild={showUpgrade || showCinema || showImageEditor || showAiChat || showDocConvert || showAiCompanion}>
-                  {featuresReorder.order.map(key => (
-                    <DragReorderWrap key={key} dragKey={key} controller={featuresReorder}>{featuresItems[key]}</DragReorderWrap>
-                  ))}
-                </NavFolder>
-              ),
-              "lang-en": (
-                <NavFolder id="lang-en" icon="🇬🇧" label="英語學習"
-                  hasActiveChild={showEnglishPron || showIeltsBand4 || showVocab}>
-                  {langEnReorder.order.map(key => (
-                    <DragReorderWrap key={key} dragKey={key} controller={langEnReorder}>{langEnItems[key]}</DragReorderWrap>
-                  ))}
-                </NavFolder>
-              ),
-              "lang-es": (
-                <NavFolder id="lang-es" icon="🇪🇸" label="西班牙語"
-                  hasActiveChild={showSpanish || showSpanishCourse || showSpanishPron || showSpanishGrammar || showSpanishVerbs}>
-                  {langEsReorder.order.map(key => (
-                    <DragReorderWrap key={key} dragKey={key} controller={langEsReorder}>{langEsItems[key]}</DragReorderWrap>
-                  ))}
-                </NavFolder>
-              ),
               customVocab: (
                 <NavItem icon="✏️" iconBg="linear-gradient(135deg,var(--accent-hover),#7c3aed)" label="自定詞彙" sublabel="建立個人單字本"
                   active={showCustomVocab} onClick={() => { resetAllViews(); setShowCustomVocab(true); }} />
@@ -2387,19 +2408,17 @@ export default function ChatApp({ user }) {
                   active={showDict} onClick={() => { resetAllViews(); setShowDict(true); }} />
               ),
             };
-            const topPadding = {
-              leaderboard: { padding: "4px 10px 6px" },
-              calendar: { padding: "0 10px 6px" },
-              customVocab: { padding: "0 10px 6px" },
-              dict: { padding: "0 10px 6px" },
-            };
+            const itemPadding = { padding: "0 10px 6px" };
             return (
               <>
                 {topNavReorder.order.map(key => (
-                  <DragReorderWrap key={key} dragKey={key} controller={topNavReorder} style={topPadding[key]}>
+                  <DragReorderWrap key={key} dragKey={key} controller={topNavReorder} style={itemPadding}>
                     {topItems[key]}
                   </DragReorderWrap>
                 ))}
+                <DragGhost controller={topNavReorder}>
+                  {topNavReorder.dragState && topItems[topNavReorder.dragState.key]}
+                </DragGhost>
               </>
             );
           })()}
