@@ -8,9 +8,8 @@ import { toast } from "../lib/toast";
 const MODELS = [
   { id: "claude-sonnet", label: "Claude Sonnet 5" },
   { id: "claude-haiku", label: "Claude Haiku 4.5" },
-  { id: "gpt-5", label: "GPT-5.5" },
+  { id: "gpt-5", label: "GPT-5" },
   { id: "gpt-5-mini", label: "GPT-5.2 Mini" },
-  { id: "gemini-pro", label: "Gemini 3 Pro" },
   { id: "deepseek-v4-flash", label: "DeepSeek-V4-Flash 正式版" },
   { id: "deepseek-v4-pro", label: "DeepSeek-V4-Pro" },
 ];
