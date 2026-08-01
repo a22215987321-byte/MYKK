@@ -1,3 +1,15 @@
+@font-face {
+  font-family: "MoyuBrushTC";
+  src: url("/fonts/MoyuBrushTC.ttf") format("truetype");
+  font-display: swap;
+}
+
+/* 使用者打字輸入的地方（訊息輸入框、貼文框、搜尋框等）一律用這個字體，
+   不影響其他一般文字內容。 */
+input, textarea {
+  font-family: "MoyuBrushTC", var(--font-body, sans-serif);
+}
+
 :root {
   /* Style 1 — light, soft, pastel */
   --bg: #f4f3f9;
@@ -280,13 +292,80 @@ html[data-theme="glass"] {
   --panel-blur: blur(16px);
   --shell-bg: rgba(255, 255, 255, 0.28);
   --shell-blur: blur(24px);
-  /* Previously 30px/32px/a drop shadow — a floating card with a visible gap
-     around it, which made the whole app read as noticeably smaller than
-     every other theme (all of which fill the viewport edge-to-edge). Keeps
-     the frosted-glass look (shell-bg/shell-blur) without the shrink. */
-  --shell-margin: 0px;
+  --viewport-h: 100dvh;
+  /* 版面改成跟幽影深窗一樣的「桌布 + 浮動玻璃視窗」結構：外框留白拉開、
+     三個面板變成各自獨立的圓角毛玻璃卡片、中間留出看得到桌布的縫隙——
+     顏色/模糊感還是玻璃質感自己原本那套（暖色調、--panel/--shell-bg 等），
+     只是把 shadow-window 已經在用的排版 token 套用過來，不是重新設計一套。 */
+  --shell-margin: 12px;
   --shell-radius: 0px;
   --shell-shadow: none;
+  --panel-gap: 12px;
+
+  --col-border: 1px solid var(--border);
+  --col-border-right: 1px solid var(--border);
+  --col-border-left: 1px solid var(--border);
+  --col-radius: 18px;
+  --col-shadow: var(--card-shadow);
+  --col-blur: var(--panel-blur);
+  --col-margin: 0px;
+
+  --force-panel-bg: var(--panel);
+  --force-panel-blur: var(--panel-blur) saturate(150%);
+  --force-shell-bg: var(--bg);
+
+  --navcard-bg: rgba(255, 255, 255, 0.3);
+  --navcard-border: rgba(255, 255, 255, 0.5);
+  --navcard-radius: 14px;
+  --navcard-height: 58px;
+  --navcard-hover-bg: rgba(255, 255, 255, 0.6);
+  --navcard-icon-size: 40px;
+  --navcard-icon-radius: 10px;
+  --navcard-indicator-w: 3px;
+  --navcard-active-glow: 0 0 0 1px rgba(217, 119, 6, 0.35);
+
+  --search-radius: 14px;
+  --search-height: 42px;
+  --search-padding: 0 14px 0 40px;
+  --search-icon-left: 24px;
+  --search-icon-display: block;
+  --inputfield-bg: rgba(255, 255, 255, 0.5);
+
+  --toolbar-panel-margin: 0px;
+  --toolbar-panel-radius: 18px;
+  --toolbar-height: 72px;
+  --toolbar-inner-divider: none;
+  --toolbar-btn-bg: rgba(255, 255, 255, 0.35);
+  --toolbar-btn-radius: 14px;
+  --toolbar-btn-height: 42px;
+
+  --chatpanel-margin: 0px;
+  --chatpanel-radius: 18px;
+  --chatpanel-glow: none;
+  --empty-title-color: var(--text);
+  --empty-sub-color: var(--text-muted);
+  --empty-icon-bg: rgba(255, 255, 255, 0.3);
+  --empty-icon-border: 1px solid rgba(255, 255, 255, 0.5);
+  --empty-line-w: 28px;
+
+  --inputbar-panel-margin: 0px;
+  --inputbar-panel-radius: 18px;
+  --inputbar-height: 78px;
+  --inputbar-field-h: 48px;
+  --plusbtn-display: flex;
+  --plusbtn-size: 44px;
+  --modelpicker-w: 150px;
+  --modelpicker-justify: center;
+  --modelpicker-radius: 14px;
+  --sendbtn-width: 88px;
+  --sendbtn-height: 48px;
+  --sendbtn-bg: linear-gradient(135deg, var(--accent), var(--accent-2));
+
+  --calpanel-margin: 0px;
+  --calpanel-radius: 18px;
+  --calday-size: 26px;
+  --calday-radius: 999px;
+  --calday-selected-bg: rgba(217, 119, 6, 0.35);
 }
 
 html[data-theme="glass"] body {
