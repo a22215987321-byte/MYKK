@@ -8,6 +8,7 @@ import MyStickersPanel from "./MyStickersPanel";
 import LoadingState from "./LoadingState";
 import ImageCropModal from "./ImageCropModal";
 import ThemeToggle from "./ThemeToggle";
+import VideoPlayer from "./VideoPlayer";
 import useIsMobile from "../lib/useIsMobile";
 import { uploadToR2 } from "../lib/uploadToR2";
 import { formatDate } from "../lib/format";
@@ -16,7 +17,7 @@ import { PhotoEditorLazy, VideoEditorLazy } from "./media-editor";
 import { validatePhotoFile, validateVideoFile } from "./media-editor/mediaValidation";
 import { getNotificationVolume, setNotificationVolume, playNotificationSound } from "../lib/notificationSound";
 import {
-  doc, getDoc, onSnapshot, collection, query, where, orderBy, getDocs, addDoc,
+  doc, onSnapshot, collection, query, where, orderBy, getDocs, addDoc,
   updateDoc, serverTimestamp, arrayUnion, arrayRemove,
 } from "firebase/firestore";
 
@@ -447,62 +448,67 @@ function PostItem({ post, profile, isOwner, onTogglePin, onOpenMedia }) {
   );
 }
 
-function FriendsTab({ friendUids, isMobile, onOpenProfile }) {
-  const [friendProfiles, setFriendProfiles] = useState({});
-  const [loaded, setLoaded] = useState(false);
+function formatDuration(sec) {
+  if (!isFinite(sec) || sec <= 0) return "";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      const entries = await Promise.all(friendUids.map(async fid => {
-        try {
-          const snap = await getDoc(doc(db, "users", fid));
-          return snap.exists() ? [fid, { uid: fid, ...snap.data() }] : null;
-        } catch { return null; }
-      }));
-      if (!cancelled) {
-        setFriendProfiles(Object.fromEntries(entries.filter(Boolean)));
-        setLoaded(true);
-      }
-    }
-    if (friendUids.length > 0) load(); else setLoaded(true);
-    return () => { cancelled = true; };
-  }, [friendUids.join(",")]);
+// YouTube 頻道頁那種影片縮圖卡：縮圖是影片本身的畫面（載入 metadata 後把
+// currentTime 撥到 0.1 秒，逼瀏覽器畫出一張真的畫面當封面，而不是黑畫面），
+// 右下角疊字幕長度，滑鼠移過去顯示標題跟讚數/時間。
+function VideoThumb({ post, onOpen }) {
+  const videoRef = useRef(null);
+  const [duration, setDuration] = useState(0);
 
-  if (!loaded) return <LoadingState label="載入好友中..." minHeight="200px" />;
+  const onLoadedMetadata = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    setDuration(v.duration || 0);
+    try { v.currentTime = Math.min(0.1, (v.duration || 1) / 2); } catch {}
+  };
 
-  if (friendUids.length === 0) {
+  return (
+    <button onClick={onOpen} type="button"
+      style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", background: "#000", borderRadius: 10, overflow: "hidden" }}>
+        <video ref={videoRef} src={post.videoUrl} muted playsInline preload="metadata"
+          onLoadedMetadata={onLoadedMetadata}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }} />
+        {duration > 0 && (
+          <span style={{ position: "absolute", right: 6, bottom: 6, background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 5px", borderRadius: 4 }}>
+            {formatDuration(duration)}
+          </span>
+        )}
+      </div>
+      <div style={{ padding: "8px 2px 0" }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.35, minHeight: "2.7em" }}>
+          {post.text?.trim() || "（無標題）"}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 3 }}>
+          ❤️ {(post.likes || []).length} · {formatDate(post.createdAt)}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function VideosTab({ videoPosts, isMobile, onOpen }) {
+  if (videoPosts.length === 0) {
     return (
       <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dim)" }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>🧑‍🤝‍🧑</div>
-        <div style={{ fontSize: 16 }}>還沒有好友</div>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🎬</div>
+        <div style={{ fontSize: 16 }}>還沒有影片</div>
       </div>
     );
   }
 
-  const CardTag = onOpenProfile ? "button" : Link;
-
   return (
-    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(4, 1fr)", gap: 12, padding: 16 }}>
-      {friendUids.map(fid => {
-        const f = friendProfiles[fid];
-        if (!f) return null;
-        const extraProps = onOpenProfile
-          ? { onClick: () => onOpenProfile(fid), type: "button" }
-          : { href: `/profile/${fid}` };
-        return (
-          <CardTag key={fid} {...extraProps}
-            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none", padding: 10, borderRadius: 12, transition: "background 0.15s", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
-            onMouseEnter={e => e.currentTarget.style.background = "var(--panel)"}
-            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-            {f.avatarImage
-              ? <img src={f.avatarImage} alt={f.nickname} style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover" }} />
-              : <div style={{ width: 64, height: 64, borderRadius: "50%", background: f.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30 }}>{f.avatar || "😊"}</div>
-            }
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{f.nickname}</span>
-          </CardTag>
-        );
-      })}
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 20, padding: 16 }}>
+      {videoPosts.map(post => (
+        <VideoThumb key={post.id} post={post} onOpen={() => onOpen(post)} />
+      ))}
     </div>
   );
 }
@@ -688,7 +694,7 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
             area never depends on how much text happens to be below it. */}
         <div style={{ position: "relative", flex: isMobile ? "0 0 62%" : "1 1 auto", height: isMobile ? undefined : "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           {post.videoUrl
-            ? <video src={post.videoUrl} controls style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+            ? <VideoPlayer src={post.videoUrl} autoPlay />
             : <img src={post.imageUrl} alt="貼文圖片" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
           }
           {index > 0 && (
@@ -809,6 +815,9 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
   const [tab, setTab] = useState("posts");
   const [avatarZoomImg, setAvatarZoomImg] = useState(null);
   const [mediaLightboxIndex, setMediaLightboxIndex] = useState(null);
+  // 從「影片」分頁打開時，prev/next 只在影片之間切換（不會混到圖片貼文）；
+  // 從「媒體」分頁打開時維持原本圖片+影片混在一起切換。
+  const [lightboxList, setLightboxList] = useState(null);
   const [scrollToPostId, setScrollToPostId] = useState(null);
   const [avatarHover, setAvatarHover] = useState(false);
   const [hoveredMedia, setHoveredMedia] = useState(null);
@@ -939,6 +948,21 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
     }
   };
 
+  // 訂閱：跟「好友」是兩件事——好友是雙向、用來聊天，訂閱是單向、只是想追蹤這個人
+  // 之後發的貼文/影片，YouTube 頻道那種訂閱概念，所以獨立存在 users/{uid}.subscribers。
+  const isSubscribed = !!(viewerUid && (profile?.subscribers || []).includes(viewerUid));
+  const toggleSubscribe = async () => {
+    if (!viewerUid || !profile) { toast("請先登入後再訂閱"); return; }
+    try {
+      await updateDoc(doc(db, "users", profile.uid), {
+        subscribers: isSubscribed ? arrayRemove(viewerUid) : arrayUnion(viewerUid),
+      });
+    } catch (e) {
+      console.error("[ProfileView] toggleSubscribe failed", e);
+      toast("操作失敗，請重試");
+    }
+  };
+
   const acceptFriendRequest = async () => {
     if (!viewerUid || !profile) return;
     try {
@@ -1059,12 +1083,12 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
   const restPosts = visiblePosts.filter(p => !p.pinned);
   const orderedPosts = [...pinnedPosts, ...restPosts];
   const mediaPosts = visiblePosts.filter(p => p.imageUrl || p.videoUrl);
+  const videoPosts = visiblePosts.filter(p => p.videoUrl);
   const totalLikes = visiblePosts.reduce((sum, p) => sum + (p.likes || []).length, 0);
-  const friendUids = profile.friends || [];
 
-  const openMediaFor = (post) => {
-    const idx = mediaPosts.findIndex(p => p.id === post.id);
-    if (idx >= 0) setMediaLightboxIndex(idx);
+  const openMediaFor = (post, list = mediaPosts) => {
+    const idx = list.findIndex(p => p.id === post.id);
+    if (idx >= 0) { setLightboxList(list); setMediaLightboxIndex(idx); }
   };
 
   return (
@@ -1124,7 +1148,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
       {/* Media lightbox — keeps the source post's author/text/likes/comments visible */}
       {mediaLightboxIndex != null && (
         <MediaLightbox
-          mediaList={mediaPosts}
+          mediaList={lightboxList || mediaPosts}
           index={mediaLightboxIndex}
           profile={profile}
           viewerUid={viewerUid}
@@ -1340,6 +1364,23 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
                     ✅ 接受好友邀請
                   </button>
                 )}
+                <button onClick={toggleSubscribe}
+                  style={{
+                    background: isSubscribed ? "var(--panel)" : "var(--accent)",
+                    border: isSubscribed ? "1px solid var(--border)" : "none",
+                    borderRadius: 20, padding: "8px 16px",
+                    color: isSubscribed ? "var(--text-muted)" : "var(--accent-text)",
+                    cursor: "pointer", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                  {isSubscribed ? "🔔 已訂閱" : "🔔 訂閱"}
+                  {(profile.subscribers || []).length > 0 && (
+                    <span style={{ opacity: 0.75, fontWeight: 600 }}>{(profile.subscribers || []).length}</span>
+                  )}
+                </button>
+                <button onClick={() => toast("社群功能即將推出")}
+                  style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "8px 16px", color: "var(--text)", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
+                  🤝 加入社群
+                </button>
                 <Link href={`/?chat=${uid}`} style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 18px", color: "var(--accent-text)", textDecoration: "none", fontSize: 14, fontWeight: 700, transition: "background 0.15s", display: "inline-block" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#2563eb"}
                   onMouseLeave={e => e.currentTarget.style.background = "var(--accent)"}>
@@ -1427,11 +1468,11 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{profile.createdAt ? formatJoinDate(profile.createdAt) : "—"}</div>
               </div>
             </div>
-            <div className="pp-stat-clickable" onClick={() => setTab("friends")} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">👥</span>
+            <div className="pp-stat-clickable" onClick={() => setTab("videos")} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">🎬</span>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{friendUids.length}</div>
-                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>好友</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{videoPosts.length}</div>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>影片</div>
               </div>
             </div>
             <div className="pp-stat-clickable" onClick={() => setTab("posts")} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
@@ -1455,7 +1496,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
             {[
               ["posts", "貼文"],
               ["media", `媒體${mediaPosts.length > 0 ? ` (${mediaPosts.length})` : ""}`],
-              ["friends", "好友"],
+              ["videos", `影片${videoPosts.length > 0 ? ` (${videoPosts.length})` : ""}`],
               ["about", "關於"],
             ].map(([key, label]) => (
               <button key={key} onClick={() => setTab(key)}
@@ -1509,8 +1550,8 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
               </div>
             </>
           )}
-          {tab === "friends" && (
-            <FriendsTab friendUids={friendUids} isMobile={isMobile} onOpenProfile={embedded ? onOpenProfile : undefined} />
+          {tab === "videos" && (
+            <VideosTab videoPosts={videoPosts} isMobile={isMobile} onOpen={post => openMediaFor(post, videoPosts)} />
           )}
           {tab === "about" && (
             <AboutTab profile={profile} isOwner={isOwner} />
