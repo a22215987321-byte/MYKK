@@ -811,6 +811,9 @@ export default function ChatApp({ user }) {
   const [showAiCompanion,    setShowAiCompanion]    = useState(false);
   const [showCompanionCreator, setShowCompanionCreator] = useState(false);
   const [showUpgrade,        setShowUpgrade]        = useState(false);
+  // 日曆現在是左側的一個獨立功能（跟排行榜等其他功能同一種切換方式），
+  // 不再是右欄永遠顯示的東西——右欄改放群組跟好友（見 .cr-cal 那段）。
+  const [showCalendar,       setShowCalendar]       = useState(false);
 
   // Mobile / sidebar states
   const isMobile = useIsMobile();
@@ -919,6 +922,7 @@ export default function ChatApp({ user }) {
     setShowEnglishPron(false); setShowIeltsBand4(false);
     setShowFeed(false); setShowImageEditor(false); setShowAiChat(false); setShowDocConvert(false);
     setShowAiCompanion(false); setShowUpgrade(false); setViewProfileUid(null);
+    setShowCalendar(false);
   }, []);
 
   // Cinema states
@@ -946,64 +950,6 @@ export default function ChatApp({ user }) {
   const privateFileRef = useRef(null);
   const groupFileRef = useRef(null);
   const groupAvatarFileRef = useRef(null);
-
-  // 群組直排欄可以長按拖曳到畫面任意位置（浮動），放開後記住位置；
-  // groupRailPos 是 null 時維持在側欄旁邊的預設位置（正常 flex 排列）。
-  const [groupRailPos, setGroupRailPos] = useState(null);
-  const groupRailDragRef = useRef({ pressing: false, dragging: false });
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("cr-group-rail-pos");
-      if (raw) {
-        const pos = JSON.parse(raw);
-        if (pos && typeof pos.x === "number" && typeof pos.y === "number") setGroupRailPos(pos);
-      }
-    } catch {}
-  }, []);
-
-  const startGroupRailDrag = useCallback((e) => {
-    // 只在按到面板本身的空白處（不是按到裡面的方塊按鈕）才觸發長按拖曳，
-    // 避免點群組圖示切換群組時被誤判成想拖曳整個面板。
-    if (e.target !== e.currentTarget || e.button !== 0) return;
-    const st = groupRailDragRef.current;
-    st.pressing = true;
-    st.dragging = false;
-    const timer = setTimeout(() => {
-      if (!st.pressing) return;
-      st.dragging = true;
-      document.body.style.userSelect = "none";
-    }, 450);
-    const onMove = (ev) => {
-      if (!st.dragging) return;
-      ev.preventDefault();
-      const x = Math.max(4, Math.min(window.innerWidth - 68, ev.clientX - 32));
-      const y = Math.max(4, Math.min(window.innerHeight - 68, ev.clientY - 32));
-      setGroupRailPos({ x, y });
-    };
-    const onUp = () => {
-      clearTimeout(timer);
-      st.pressing = false;
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      document.body.style.userSelect = "";
-      if (st.dragging) {
-        st.dragging = false;
-        setGroupRailPos(pos => {
-          try { localStorage.setItem("cr-group-rail-pos", JSON.stringify(pos)); } catch {}
-          return pos;
-        });
-      }
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  }, []);
-
-  const resetGroupRailPos = useCallback((e) => {
-    if (e.target !== e.currentTarget) return;
-    setGroupRailPos(null);
-    try { localStorage.removeItem("cr-group-rail-pos"); } catch {}
-  }, []);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnectionsRef = useRef({});
@@ -2211,7 +2157,7 @@ export default function ChatApp({ user }) {
                 </div>
               </button>
               {(() => {
-                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade;
+                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar;
                 return (
                   <button onClick={() => { resetAllViews(); if (isMobile) settleDrawer(false); }}
                     style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: hallActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
@@ -2238,7 +2184,7 @@ export default function ChatApp({ user }) {
               {/* Hall button */}
               <div style={{ padding: "4px 10px 0" }}>
                 <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧"
-                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade}
+                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar}
                   onClick={() => { resetAllViews(); }} />
               </div>
             </>
@@ -2250,6 +2196,13 @@ export default function ChatApp({ user }) {
           <div style={{ padding: "4px 10px 6px" }}>
             <NavItem icon="🏆" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
               active={showLeaderboard} onClick={() => { resetAllViews(); setShowLeaderboard(true); }} />
+          </div>
+
+          {/* Calendar button — 桌面版限定，日曆從右欄改成左側可切換的功能；
+              手機版沒有這顆按鈕，維持原本從頂部列圖示開啟日曆疊層的方式。 */}
+          <div style={{ padding: "0 10px 6px" }}>
+            <NavItem icon="📅" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="行事曆" sublabel="日曆備忘錄"
+              active={showCalendar} onClick={() => { resetAllViews(); setShowCalendar(true); }} />
           </div>
 
           {/* 功能資料夾 — 把比較不常用的功能收起來，減少側欄長度 */}
@@ -2339,23 +2292,26 @@ export default function ChatApp({ user }) {
             </>
           )}
 
-          {/* Friends header */}
+          {/* Friends header + list — 桌面版好友移到右欄（.cr-cal，跟群組放一起），
+              這裡只在手機版保留（手機沒有右欄的概念）。 */}
+          {isMobile && (
+            <>
           <div className="cr-nav-hdr">
             <span className="cr-nav-hdr-label">好友 {myFriends.length}</span>
-            <div style={{ display: "flex", gap: isMobile ? 8 : 4, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {pendingInCount > 0 && (
                 <button onClick={() => setShowFriendReqs(true)} title="好友請求" style={{ background: "#ef4444", border: "none", borderRadius: 20, padding: "2px 8px", color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
                   🔔 {pendingInCount}
                 </button>
               )}
               <button onClick={() => setShowFriendSearch(true)} title="加好友" className="cr-nav-icon-btn">
-                {isMobile ? <Plus size={16} /> : "+"}
+                <Plus size={16} />
               </button>
             </div>
           </div>
 
           {/* Friend list */}
-          <div style={{ padding: isMobile ? "0 16px 8px" : "0 8px 8px" }}>
+          <div style={{ padding: "0 16px 8px" }}>
             {myFriends.length === 0 && !searchQuery && (
               <div style={{ textAlign: "center", padding: "20px 12px", color: "var(--text-dim)", fontSize: 13 }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>👋</div>
@@ -2366,7 +2322,7 @@ export default function ChatApp({ user }) {
             {myFriends.map(friend => {
               const isActive = activeFriendId === friend.uid;
               return (
-                <button key={friend.uid} onClick={() => { if (longPressFiredRef.current) { longPressFiredRef.current = false; return; } resetAllViews(); setActiveFriendId(friend.uid); if (isMobile) settleDrawer(false); }}
+                <button key={friend.uid} onClick={() => { if (longPressFiredRef.current) { longPressFiredRef.current = false; return; } resetAllViews(); setActiveFriendId(friend.uid); settleDrawer(false); }}
                   onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, friend }); }}
                   onTouchStart={e => {
                     longPressFiredRef.current = false;
@@ -2382,8 +2338,8 @@ export default function ChatApp({ user }) {
                   className={`fb ${isActive ? "act" : ""}`}
                   style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}>
                   <div style={{ position: "relative", flexShrink: 0 }}>
-                    <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={isMobile ? 48 : 36} />
-                    <span style={{ position: "absolute", bottom: 1, right: 1, width: isMobile ? 12 : 10, height: isMobile ? 12 : 10, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
+                    <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={48} />
+                    <span style={{ position: "absolute", bottom: 1, right: 1, width: 12, height: 12, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="cr-fb-name">{friend.nickname}</div>
@@ -2395,6 +2351,8 @@ export default function ChatApp({ user }) {
               );
             })}
           </div>
+            </>
+          )}
           </div>
         </nav>
 
@@ -2441,66 +2399,6 @@ export default function ChatApp({ user }) {
           </button>
         )}
 
-        {/* Discord 風格群組直排 icon 欄：獨立的一個直排方塊面板，預設卡在側欄跟主聊天區
-            中間，用原生 title 做 hover 顯示群組名稱的 tooltip。寬度剛好夠塞一個方塊
-            圖示，自己的 margin 讓它跟兩側之間永遠留一點間距，不依賴各主題各自的
-            --panel-gap（很多主題預設是 0）。長按面板空白處（不是按到裡面的方塊）可以
-            拖曳到畫面任意位置，放開後記住位置、下次進來還在那裡；雙擊空白處重設回預設
-            位置。手機版沒有空間放這條獨立欄，群組維持在側欄裡的文字列表（見上面
-            isMobile 那段）。 */}
-        {!isMobile && (
-          <div
-            onMouseDown={startGroupRailDrag}
-            onDoubleClick={resetGroupRailPos}
-            title="長按空白處可拖曳移動位置（雙擊重設）"
-            style={{
-              width: 64, flexShrink: 0, display: "flex", flexDirection: "column",
-              alignItems: "center", gap: 8, padding: "10px 0", margin: "8px 4px",
-              overflowY: "auto", borderRadius: "var(--radius-md)",
-              background: "var(--panel)", border: "1px solid var(--border)",
-              cursor: "grab", boxSizing: "border-box",
-              ...(groupRailPos
-                ? { position: "fixed", left: groupRailPos.x, top: groupRailPos.y, margin: 0, zIndex: 500, maxHeight: "70vh", boxShadow: "var(--card-shadow)" }
-                : {}),
-            }}>
-            <button onClick={() => setShowCreateGroup(true)} title="新增群組" aria-label="新增群組"
-              style={{
-                width: 40, height: 40, borderRadius: "30%", flexShrink: 0,
-                border: "1.5px dashed var(--text-dim)", background: "transparent",
-                color: "var(--text-dim)", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "background 0.15s, border-color 0.15s, color 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--text-dim)"; e.currentTarget.style.color = "var(--text-dim)"; }}>
-              <Plus size={18} />
-            </button>
-
-            {myGroups.map(group => {
-              const isActive = activeGroupId === group.id;
-              return (
-                <button key={group.id} title={group.name} aria-label={group.name}
-                  onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
-                  style={{
-                    width: 40, height: 40, borderRadius: "30%", flexShrink: 0,
-                    border: isActive ? "2px solid var(--accent)" : "1px solid transparent",
-                    background: isActive ? "var(--accent-active)" : "var(--panel-alt)",
-                    boxShadow: isActive ? "var(--glow-shadow)" : "none",
-                    color: "var(--text)", cursor: "pointer", fontSize: 16, fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
-                    transition: "background 0.15s, border-color 0.15s",
-                  }}
-                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--panel-hover)"; }}
-                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "var(--panel-alt)"; }}>
-                  {isGroupAvatarImage(group.avatar)
-                    ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
-                    : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         {/* 主要區域：一般文件流佈局；手機版拖曳抽屜時用 ref 直接位移（applyDrawerTransform），
             跟 sidebar 同步、零延遲；抽屜關閉時固定在 translateX(0)。 */}
         <main ref={mainElRef} className="cr-main"
@@ -2514,7 +2412,7 @@ export default function ChatApp({ user }) {
               Clicking a post author swaps this pane's content for an inline
               ProfileView instead of navigating to /profile/[uid], so that
               never leaves the SPA either. */}
-          {showFeed && !activeFriendId && !activeGroupId && (
+          {showFeed && !activeFriendId && !activeGroupId && !showCalendar && (
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
               {viewProfileUid ? (
                 <ProfileView uid={viewProfileUid} embedded
@@ -2526,10 +2424,21 @@ export default function ChatApp({ user }) {
             </div>
           )}
 
+          {/* Calendar view — 原本是右欄永遠顯示的東西，現在改成左側可切換的
+              一般功能，跟排行榜等其他頁面同一套 showX 模式；右欄（.cr-cal）
+              改放群組跟好友。 */}
+          {showCalendar && !activeFriendId && !activeGroupId && !showFeed && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+              <div style={{ maxWidth: 480, margin: "0 auto", width: "100%" }}>
+                <CalendarMemo uid={uid} />
+              </div>
+            </div>
+          )}
+
           {/* Leaderboard view — warm-ivory "luxury magazine" pastel design,
               per an exact reference mock (see RANK_PALETTE above for the
               9 rank colors this pulls from). */}
-          {showLeaderboard && !activeFriendId && !activeGroupId && !showFeed && (
+          {showLeaderboard && !activeFriendId && !activeGroupId && !showFeed && !showCalendar && (
             <>
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "#FBF9F5", padding: "36px 28px 24px" }}>
                 {/* Title */}
@@ -2599,7 +2508,7 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Cinema view */}
-          {showCinema && !activeFriendId && !activeGroupId && !showLeaderboard && !showFeed && (
+          {showCinema && !activeFriendId && !activeGroupId && !showLeaderboard && !showFeed && !showCalendar && (
             <>
               {cinemaView === 'list' && (
                 <>
@@ -2727,82 +2636,82 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Image editor view */}
-          {showImageEditor && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showImageEditor && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <ImageEditorRoom />
           )}
 
           {/* AI chat view */}
-          {showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <AiChatRoom user={user} db={db} />
           )}
 
           {/* Doc convert view */}
-          {showDocConvert && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showAiCompanion && !showUpgrade && (
+          {showDocConvert && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showAiCompanion && !showUpgrade && !showCalendar && (
             <DocConvertRoomLazy />
           )}
 
           {/* AI 夥伴 view */}
-          {showAiCompanion && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showUpgrade && (
+          {showAiCompanion && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showUpgrade && !showCalendar && (
             <AiCompanionRoom user={user} db={db} myProfile={myProfile} onOpenCreator={() => setShowCompanionCreator(true)} />
           )}
 
           {/* Upgrade membership view — layout only, no real Stripe wiring yet */}
-          {showUpgrade && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && (
+          {showUpgrade && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showCalendar && (
             <UpgradeMembership />
           )}
 
           {/* Vocab view */}
-          {showVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <VocabRoom user={user} db={db} />
           )}
 
           {/* Spanish view */}
-          {showSpanish && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showSpanish && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <SpanishRoom user={user} db={db} />
           )}
 
           {/* Spanish Course view */}
-          {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showSpanishCourse && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <SpanishCourseRoom user={user} db={db} onContextChange={setSpanishCourseNoteContext} />
           )}
 
           {/* Spanish Pronunciation view */}
-          {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showSpanishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishPronunciation onNav={() => { setShowSpanishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Grammar view */}
-          {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showSpanishGrammar && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishGrammar onNav={() => { setShowSpanishGrammar(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Spanish Verb Conjugator view */}
-          {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showSpanishVerbs && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><SpanishVerbConjugator onNav={() => { setShowSpanishVerbs(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* English Pronunciation view */}
-          {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishPronunciation user={user} db={db} onNav={() => { setShowEnglishPron(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
           {/* Custom vocab view */}
-          {showCustomVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showCustomVocab && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <CustomVocabRoom user={myProfile || user} db={db} />
           )}
 
           {/* Dictionary view */}
-          {showDict && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showDict && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <DictionaryRoom />
           )}
 
           {/* Public hall */}
           {/* IELTS Band 4 view */}
-          {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><IeltsBand4 onNav={() => { setShowIeltsBand4(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
-          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && (
+          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && (
             <>
               <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
                 <span style={{ fontSize: 20 }}>💬</span>
@@ -3036,11 +2945,84 @@ export default function ChatApp({ user }) {
           )}
           {showUpgrade ? (
             <UpgradeHighlights />
-          ) : (
+          ) : isMobile ? (
             <>
               {activeSpanishNotes && <PageNotes noteKey={activeSpanishNotes.key} pageTitle={activeSpanishNotes.title} />}
               <CalendarMemo uid={uid} />
             </>
+          ) : (
+            // 桌面版右欄改放群組 + 好友（日曆改成左側 showCalendar 那個可切換
+            // 的一般功能，見上面 .cr-main 裡的 Calendar view）。
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+              {/* Groups */}
+              <div className="cr-nav-hdr">
+                <span className="cr-nav-hdr-label">群組 {myGroups.length}</span>
+                <button onClick={() => setShowCreateGroup(true)} title="建立群組" className="cr-nav-icon-btn">+</button>
+              </div>
+              <div style={{ padding: "0 8px 6px" }}>
+                {myGroups.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "16px 12px", color: "var(--text-dim)", fontSize: 13 }}>
+                    還沒有群組
+                  </div>
+                )}
+                {myGroups.map(group => {
+                  const isActive = activeGroupId === group.id;
+                  return (
+                    <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
+                      className={`fb ${isActive ? "act" : ""}`}>
+                      <div className="cr-fb-icon">
+                        {isGroupAvatarImage(group.avatar)
+                          ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
+                          : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="cr-fb-name">{group.name}</div>
+                        <div className="cr-fb-sub">{(group.members || []).length} 人</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Friends */}
+              <div className="cr-nav-hdr">
+                <span className="cr-nav-hdr-label">好友 {myFriends.length}</span>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  {pendingInCount > 0 && (
+                    <button onClick={() => setShowFriendReqs(true)} title="好友請求" style={{ background: "#ef4444", border: "none", borderRadius: 20, padding: "2px 8px", color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                      🔔 {pendingInCount}
+                    </button>
+                  )}
+                  <button onClick={() => setShowFriendSearch(true)} title="加好友" className="cr-nav-icon-btn">+</button>
+                </div>
+              </div>
+              <div style={{ padding: "0 8px 8px" }}>
+                {myFriends.length === 0 && !searchQuery && (
+                  <div style={{ textAlign: "center", padding: "20px 12px", color: "var(--text-dim)", fontSize: 13 }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>👋</div>
+                    還沒有好友<br />
+                    <button onClick={() => setShowFriendSearch(true)} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, marginTop: 6 }}>點擊搜尋好友</button>
+                  </div>
+                )}
+                {myFriends.map(friend => {
+                  const isActive = activeFriendId === friend.uid;
+                  return (
+                    <button key={friend.uid} onClick={() => { if (longPressFiredRef.current) { longPressFiredRef.current = false; return; } resetAllViews(); setActiveFriendId(friend.uid); }}
+                      onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, friend }); }}
+                      className={`fb ${isActive ? "act" : ""}`}>
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={36} />
+                        <span style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="cr-fb-name">{friend.nickname}</div>
+                        <div className="cr-fb-sub">{friend.statusText || getStatus(friend.status).label}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
 
