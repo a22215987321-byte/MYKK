@@ -126,6 +126,89 @@ function AvatarImg({ avatarImage, avatar, color, size = 36 }) {
   );
 }
 
+// 側欄功能方塊「長按（超過 1 秒）拖曳調整順序」——每個區塊（頂層項目、
+// 更多功能資料夾、英語學習資料夾、西班牙語資料夾）各自獨立記住自己的順序
+// （storageKey 分開存），defaultOrder 之外/之內多出來或少掉的 key 都會自動
+// 補齊/濾掉，避免以後增刪功能時順序資料變成無效值。
+function useReorder(storageKey, defaultOrder) {
+  const [order, setOrder] = useState(defaultOrder);
+  const [draggingKey, setDraggingKey] = useState(null);
+  const justDraggedRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!Array.isArray(saved)) return;
+      const cleaned = saved.filter(k => defaultOrder.includes(k));
+      const missing = defaultOrder.filter(k => !cleaned.includes(k));
+      setOrder([...cleaned, ...missing]);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  const startDrag = useCallback((key) => (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation(); // 不讓 mousedown 冒泡到外層（例如資料夾本身）的拖曳判斷
+    const startY = e.clientY;
+    const itemHeight = e.currentTarget.offsetHeight + 6; // 6px ≈ 項目之間的間距
+    let dragging = false, moved = false;
+    let timer = setTimeout(() => { dragging = true; setDraggingKey(key); }, 1000);
+    const onMove = (ev) => {
+      if (!dragging) return;
+      moved = true;
+      const slots = Math.round((ev.clientY - startY) / itemHeight);
+      setOrder(prev => {
+        const from = prev.indexOf(key);
+        const to = Math.min(prev.length - 1, Math.max(0, from + slots));
+        if (from === to || from < 0) return prev;
+        const next = prev.slice();
+        next.splice(from, 1);
+        next.splice(to, 0, key);
+        return next;
+      });
+    };
+    const onUp = () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      setDraggingKey(null);
+      if (dragging && moved) {
+        justDraggedRef.current = key;
+        setOrder(cur => {
+          try { localStorage.setItem(storageKey, JSON.stringify(cur)); } catch {}
+          return cur;
+        });
+      }
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [storageKey]);
+
+  const wasJustDragged = useCallback((key) => {
+    if (justDraggedRef.current === key) { justDraggedRef.current = null; return true; }
+    return false;
+  }, []);
+
+  return { order, draggingKey, startDrag, wasJustDragged };
+}
+
+// 包住每個可拖曳項目：onMouseDown 開始長按計時、onClickCapture 在剛拖曳完
+// 之後把緊接著那次 click 吃掉，不會一放開就誤觸該項目原本的 onClick（切換頁面
+// 或資料夾展開/收合）。
+function DragReorderWrap({ dragKey, controller, style, children }) {
+  const { draggingKey, startDrag, wasJustDragged } = controller;
+  return (
+    <div
+      onMouseDown={startDrag(dragKey)}
+      onClickCapture={e => { if (wasJustDragged(dragKey)) { e.stopPropagation(); e.preventDefault(); } }}
+      style={{ ...style, opacity: draggingKey === dragKey ? 0.45 : 1, cursor: draggingKey === dragKey ? "grabbing" : undefined }}>
+      {children}
+    </div>
+  );
+}
+
 // 群組頭像跟 avatar emoji 共用同一個欄位（預設 "👥"，上傳後變成 R2 圖片網址）——
 // 用這個判斷目前存的是要當文字顯示的 emoji，還是要當 <img src> 顯示的圖片網址。
 function isGroupAvatarImage(avatar) {
@@ -822,6 +905,13 @@ export default function ChatApp({ user }) {
   const [sidebarOpen,    setSidebarOpen]    = useState(false); // 手機版側邊抽屜的「已定案」開關狀態（拖曳中的即時位置不經過這個 state，見 dragStateRef）
   // 桌面版導覽欄收合狀態（跟手機版的抽屜 sidebarOpen 是兩套機制，互不影響）。
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // 側欄功能方塊長按拖曳調整順序——桌面版限定（手機版側欄是完全不同的簡化排法）。
+  // 動態消息／公共大廳固定在最上面當錨點，其餘從排行榜開始都可以拖。
+  const topNavReorder = useReorder("cr-order-top", ["leaderboard", "calendar", "features", "lang-en", "lang-es", "customVocab", "dict"]);
+  const featuresReorder = useReorder("cr-order-features", ["upgrade", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion"]);
+  const langEnReorder = useReorder("cr-order-lang-en", ["englishPron", "ieltsBand4", "vocab"]);
+  const langEsReorder = useReorder("cr-order-lang-es", ["spanish", "spanishCourse", "spanishPron", "spanishGrammar", "spanishVerbs"]);
 
   useEffect(() => {
     try {
@@ -2190,73 +2280,124 @@ export default function ChatApp({ user }) {
             </>
           )}
 
-          {!isMobile && (
-          <>
-          {/* Leaderboard button */}
-          <div style={{ padding: "4px 10px 6px" }}>
-            <NavItem icon="🏆" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
-              active={showLeaderboard} onClick={() => { resetAllViews(); setShowLeaderboard(true); }} />
-          </div>
-
-          {/* Calendar button — 桌面版限定，日曆從右欄改成左側可切換的功能；
-              手機版沒有這顆按鈕，維持原本從頂部列圖示開啟日曆疊層的方式。 */}
-          <div style={{ padding: "0 10px 6px" }}>
-            <NavItem icon="📅" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="行事曆" sublabel="日曆備忘錄"
-              active={showCalendar} onClick={() => { resetAllViews(); setShowCalendar(true); }} />
-          </div>
-
-          {/* 功能資料夾 — 把比較不常用的功能收起來，減少側欄長度 */}
-          <NavFolder id="features" icon="🧩" label="更多功能"
-            hasActiveChild={showUpgrade || showCinema || showImageEditor || showAiChat || showDocConvert || showAiCompanion}>
-            <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
-              active={showUpgrade} onClick={() => { resetAllViews(); setShowUpgrade(true); }} />
-            <NavItem icon="🎬" iconBg="linear-gradient(135deg,var(--accent-hover),#2563eb)" label="電影院" sublabel="同步觀看影片"
-              active={showCinema} onClick={() => { resetAllViews(); setShowCinema(true); }} />
-            <NavItem icon="🖼️" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="圖片編輯" sublabel="裁剪・濾鏡・貼圖"
-              active={showImageEditor} onClick={() => { resetAllViews(); setShowImageEditor(true); }} />
-            <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel="有問題都可以問我"
-              active={showAiChat} onClick={() => { resetAllViews(); setShowAiChat(true); }} />
-            <NavItem icon="🔄" iconBg="linear-gradient(135deg,#0d9488,#0891b2)" label="文檔轉換" sublabel="圖片・影音格式互轉"
-              active={showDocConvert} onClick={() => { resetAllViews(); setShowDocConvert(true); }} />
-            <NavItem icon="💞" iconBg="linear-gradient(135deg,#db2777,#9333ea)" label="AI 夥伴" sublabel={myProfile?.hasAiCompanion ? "語音陪伴" : "付費解鎖"}
-              active={showAiCompanion} onClick={() => { resetAllViews(); setShowAiCompanion(true); }} />
-          </NavFolder>
-
-          {/* 英語學習資料夾 */}
-          <NavFolder id="lang-en" icon="🇬🇧" label="英語學習"
-            hasActiveChild={showEnglishPron || showIeltsBand4 || showVocab}>
-            <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音"
-              active={showEnglishPron} onClick={() => { resetAllViews(); setShowEnglishPron(true); }} />
-            <NavItem compact icon="🎯" iconBg="linear-gradient(135deg,#1e3a1e,#6366f1)" label="IELTS 4.0 入門" sublabel="詞彙・聽力・口說"
-              active={showIeltsBand4} onClick={() => { resetAllViews(); setShowIeltsBand4(true); }} />
-            <NavItem icon="📚" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習"
-              active={showVocab} onClick={() => { resetAllViews(); setShowVocab(true); }} />
-          </NavFolder>
-
-          {/* 西班牙語資料夾 */}
-          <NavFolder id="lang-es" icon="🇪🇸" label="西班牙語"
-            hasActiveChild={showSpanish || showSpanishCourse || showSpanishPron || showSpanishGrammar || showSpanishVerbs}>
-            <NavItem icon="🇪🇸" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西班牙語學習" sublabel="CEFR A1/A2"
-              active={showSpanish} onClick={() => { resetAllViews(); setShowSpanish(true); }} />
-            <NavItem compact icon="🗺️" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="西語 A1 路線" sublabel="初學者情境課程"
-              active={showSpanishCourse} onClick={() => { resetAllViews(); setShowSpanishCourse(true); }} />
-            <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#7c1d1d,#b91c1c)" label="西語發音" sublabel="母音 · 子音 · 重音"
-              active={showSpanishPron} onClick={() => { resetAllViews(); setShowSpanishPron(true); }} />
-            <NavItem compact icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="西語文法" sublabel="ser/estar · 代詞 · 動詞"
-              active={showSpanishGrammar} onClick={() => { resetAllViews(); setShowSpanishGrammar(true); }} />
-            <NavItem compact icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢"
-              active={showSpanishVerbs} onClick={() => { resetAllViews(); setShowSpanishVerbs(true); }} />
-          </NavFolder>
-
-          {/* Custom vocab button */}
-          <div style={{ padding: "0 10px 6px" }}>
-            <NavItem icon="✏️" iconBg="linear-gradient(135deg,var(--accent-hover),#7c3aed)" label="自定詞彙" sublabel="建立個人單字本"
-              active={showCustomVocab} onClick={() => { resetAllViews(); setShowCustomVocab(true); }} />
-            <div style={{ height: 6 }} />
-            <NavItem icon="📖" iconBg="linear-gradient(135deg,#0f2e1c,#166534)" label="字典" sublabel="英・西・法 A-Z"
-              active={showDict} onClick={() => { resetAllViews(); setShowDict(true); }} />
-          </div>
-          </>
+          {!isMobile && (() => {
+            // 每一區塊各自的項目（key → JSX），實際渲染順序交給對應的
+            // useReorder().order 決定，長按（超過 1 秒）拖曳就能調整。
+            const featuresItems = {
+              upgrade: (
+                <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
+                  active={showUpgrade} onClick={() => { resetAllViews(); setShowUpgrade(true); }} />
+              ),
+              cinema: (
+                <NavItem icon="🎬" iconBg="linear-gradient(135deg,var(--accent-hover),#2563eb)" label="電影院" sublabel="同步觀看影片"
+                  active={showCinema} onClick={() => { resetAllViews(); setShowCinema(true); }} />
+              ),
+              imageEditor: (
+                <NavItem icon="🖼️" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="圖片編輯" sublabel="裁剪・濾鏡・貼圖"
+                  active={showImageEditor} onClick={() => { resetAllViews(); setShowImageEditor(true); }} />
+              ),
+              aiChat: (
+                <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel="有問題都可以問我"
+                  active={showAiChat} onClick={() => { resetAllViews(); setShowAiChat(true); }} />
+              ),
+              docConvert: (
+                <NavItem icon="🔄" iconBg="linear-gradient(135deg,#0d9488,#0891b2)" label="文檔轉換" sublabel="圖片・影音格式互轉"
+                  active={showDocConvert} onClick={() => { resetAllViews(); setShowDocConvert(true); }} />
+              ),
+              aiCompanion: (
+                <NavItem icon="💞" iconBg="linear-gradient(135deg,#db2777,#9333ea)" label="AI 夥伴" sublabel={myProfile?.hasAiCompanion ? "語音陪伴" : "付費解鎖"}
+                  active={showAiCompanion} onClick={() => { resetAllViews(); setShowAiCompanion(true); }} />
+              ),
+            };
+            const langEnItems = {
+              englishPron: (
+                <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音"
+                  active={showEnglishPron} onClick={() => { resetAllViews(); setShowEnglishPron(true); }} />
+              ),
+              ieltsBand4: (
+                <NavItem compact icon="🎯" iconBg="linear-gradient(135deg,#1e3a1e,#6366f1)" label="IELTS 4.0 入門" sublabel="詞彙・聽力・口說"
+                  active={showIeltsBand4} onClick={() => { resetAllViews(); setShowIeltsBand4(true); }} />
+              ),
+              vocab: (
+                <NavItem icon="📚" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習"
+                  active={showVocab} onClick={() => { resetAllViews(); setShowVocab(true); }} />
+              ),
+            };
+            const langEsItems = {
+              spanish: (
+                <NavItem icon="🇪🇸" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西班牙語學習" sublabel="CEFR A1/A2"
+                  active={showSpanish} onClick={() => { resetAllViews(); setShowSpanish(true); }} />
+              ),
+              spanishCourse: (
+                <NavItem compact icon="🗺️" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="西語 A1 路線" sublabel="初學者情境課程"
+                  active={showSpanishCourse} onClick={() => { resetAllViews(); setShowSpanishCourse(true); }} />
+              ),
+              spanishPron: (
+                <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#7c1d1d,#b91c1c)" label="西語發音" sublabel="母音 · 子音 · 重音"
+                  active={showSpanishPron} onClick={() => { resetAllViews(); setShowSpanishPron(true); }} />
+              ),
+              spanishGrammar: (
+                <NavItem compact icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="西語文法" sublabel="ser/estar · 代詞 · 動詞"
+                  active={showSpanishGrammar} onClick={() => { resetAllViews(); setShowSpanishGrammar(true); }} />
+              ),
+              spanishVerbs: (
+                <NavItem compact icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢"
+                  active={showSpanishVerbs} onClick={() => { resetAllViews(); setShowSpanishVerbs(true); }} />
+              ),
+            };
+            const topItems = {
+              leaderboard: (
+                <NavItem icon="🏆" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
+                  active={showLeaderboard} onClick={() => { resetAllViews(); setShowLeaderboard(true); }} />
+              ),
+              calendar: (
+                <NavItem icon="📅" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="行事曆" sublabel="日曆備忘錄"
+                  active={showCalendar} onClick={() => { resetAllViews(); setShowCalendar(true); }} />
+              ),
+              features: (
+                <NavFolder id="features" icon="🧩" label="更多功能"
+                  hasActiveChild={showUpgrade || showCinema || showImageEditor || showAiChat || showDocConvert || showAiCompanion}>
+                  {featuresReorder.order.map(key => (
+                    <DragReorderWrap key={key} dragKey={key} controller={featuresReorder}>{featuresItems[key]}</DragReorderWrap>
+                  ))}
+                </NavFolder>
+              ),
+              "lang-en": (
+                <NavFolder id="lang-en" icon="🇬🇧" label="英語學習"
+                  hasActiveChild={showEnglishPron || showIeltsBand4 || showVocab}>
+                  {langEnReorder.order.map(key => (
+                    <DragReorderWrap key={key} dragKey={key} controller={langEnReorder}>{langEnItems[key]}</DragReorderWrap>
+                  ))}
+                </NavFolder>
+              ),
+              "lang-es": (
+                <NavFolder id="lang-es" icon="🇪🇸" label="西班牙語"
+                  hasActiveChild={showSpanish || showSpanishCourse || showSpanishPron || showSpanishGrammar || showSpanishVerbs}>
+                  {langEsReorder.order.map(key => (
+                    <DragReorderWrap key={key} dragKey={key} controller={langEsReorder}>{langEsItems[key]}</DragReorderWrap>
+                  ))}
+                </NavFolder>
+              ),
+              customVocab: (
+                <NavItem icon="✏️" iconBg="linear-gradient(135deg,var(--accent-hover),#7c3aed)" label="自定詞彙" sublabel="建立個人單字本"
+                  active={showCustomVocab} onClick={() => { resetAllViews(); setShowCustomVocab(true); }} />
+              ),
+              dict: (
+                <NavItem icon="📖" iconBg="linear-gradient(135deg,#0f2e1c,#166534)" label="字典" sublabel="英・西・法 A-Z"
+                  active={showDict} onClick={() => { resetAllViews(); setShowDict(true); }} />
+              ),
+            };
+            const topPadding = { leaderboard: "4px 10px 6px", calendar: "0 10px 6px", customVocab: "0 10px 6px", dict: "0 10px 6px" };
+            return (
+              <>
+                {topNavReorder.order.map(key => (
+                  <DragReorderWrap key={key} dragKey={key} controller={topNavReorder} style={topPadding[key]}>
+                    {topItems[key]}
+                  </DragReorderWrap>
+                ))}
+              </>
+            );
+          })()}
           )}
 
           {/* Groups section — desktop 版群組改用 .cr-sidebar 外面那條 Discord 風格
@@ -2970,13 +3111,13 @@ export default function ChatApp({ user }) {
                   return (
                     <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
                       className={`fb ${isActive ? "act" : ""}`}>
-                      <div className="cr-fb-icon">
+                      <div className="cr-fb-icon" style={{ width: 44, height: 44, fontSize: 20 }}>
                         {isGroupAvatarImage(group.avatar)
                           ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
                           : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="cr-fb-name">{group.name}</div>
+                        <div className="cr-fb-name" style={{ fontSize: 14 }}>{group.name}</div>
                         <div className="cr-fb-sub">{(group.members || []).length} 人</div>
                       </div>
                     </button>
@@ -3011,12 +3152,12 @@ export default function ChatApp({ user }) {
                       onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, friend }); }}
                       className={`fb ${isActive ? "act" : ""}`}>
                       <div style={{ position: "relative", flexShrink: 0 }}>
-                        <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={36} />
+                        <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={44} />
                         <span style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="cr-fb-name">{friend.nickname}</div>
-                        <div className="cr-fb-sub">{friend.statusText || getStatus(friend.status).label}</div>
+                        <div className="cr-fb-name" style={{ fontSize: 14 }}>{friend.nickname}</div>
+                        <div className="cr-fb-sub">{friend.signature || getStatus(friend.status).label}</div>
                       </div>
                     </button>
                   );
