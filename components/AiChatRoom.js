@@ -50,6 +50,12 @@ export default function AiChatRoom({ user, db }) {
   const [model, setModel] = useState("deepseek-v4-flash");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // 聊天模式／圖片生成模式切換。圖片生成目前是純前端暫存（images），不會存進
+  // aiChats 對話紀錄——先讓功能能用，之後真的要留存再另外接 Firestore。
+  const [mode, setMode] = useState("chat"); // "chat" | "image"
+  const [images, setImages] = useState([]); // [{ prompt, imageUrl }]
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
   const endRef = useRef(null);
   const modelMenuRef = useRef(null);
   const historyRef = useRef(null);
@@ -126,7 +132,7 @@ export default function AiChatRoom({ user, db }) {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, sending]);
+  }, [messages, sending, images, generating]);
 
   // Click-outside-to-close, same pattern as ThemeToggle's dropdown.
   useEffect(() => {
@@ -159,6 +165,27 @@ export default function AiChatRoom({ user, db }) {
       toast(err.message || "傳送失敗，請重試");
     } finally {
       setSending(false);
+    }
+  };
+
+  const generateImage = async () => {
+    const p = imagePrompt.trim();
+    if (!p || generating) return;
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/ai/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: p }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "圖片生成發生錯誤");
+      setImages(prev => [...prev, { prompt: p, imageUrl: data.imageUrl }]);
+      setImagePrompt("");
+    } catch (err) {
+      toast(err.message || "生成失敗，請重試");
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -206,8 +233,25 @@ export default function AiChatRoom({ user, db }) {
           <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>1.0 EVON AI</div>
           <div style={{ fontSize: 11, color: "var(--text-faint)" }}>有問題都可以問我</div>
         </div>
+
+        {/* 聊天模式／圖片生成模式切換 */}
+        <div style={{ display: "flex", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 999, padding: 3, gap: 2, marginLeft: 4 }}>
+          {[["chat", "聊天模式"], ["image", "圖片生成"]].map(([key, label]) => (
+            <button key={key} onClick={() => setMode(key)}
+              style={{
+                border: "none", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                background: mode === key ? "var(--accent)" : "transparent",
+                color: mode === key ? "var(--accent-text)" : "var(--text-muted)",
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div style={{ flex: 1 }} />
 
+        {mode === "chat" && (
+        <>
         <div ref={historyRef} style={{ position: "relative" }}>
           <button onClick={() => setHistoryOpen(v => !v)}
             style={{ height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", padding: "6px 14px", color: "var(--text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -255,6 +299,8 @@ export default function AiChatRoom({ user, db }) {
           }}>
           🆕 新對話
         </button>
+        </>
+        )}
       </div>
 
       {/* Messages — className="cr-chat-panel" gives this its own floating
@@ -263,37 +309,65 @@ export default function AiChatRoom({ user, db }) {
           other theme's --chatpanel-* tokens default to 0/none so this stays
           a plain flush container exactly as before. */}
       <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14, backgroundSize: "var(--chat-world-bg-size, auto), cover", backgroundRepeat: "var(--chat-world-bg-repeat, repeat), no-repeat", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
-        {messages.length === 0 && (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--empty-icon-bg, none)", border: "var(--empty-icon-border, none)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "var(--empty-title-color)" }}>💬</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--empty-title-color)" }}>有什麼問題開始對話吧</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ width: "var(--empty-line-w, 0px)", height: 1, background: "var(--empty-sub-color)", opacity: 0.3 }} />
-              <span style={{ fontSize: 13, color: "var(--empty-sub-color)" }}>我可以幫你回答問題、提供建議、撰寫內容等</span>
-              <span style={{ width: "var(--empty-line-w, 0px)", height: 1, background: "var(--empty-sub-color)", opacity: 0.3 }} />
-            </div>
-          </div>
+        {mode === "chat" ? (
+          <>
+            {messages.length === 0 && (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--empty-icon-bg, none)", border: "var(--empty-icon-border, none)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "var(--empty-title-color)" }}>💬</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: "var(--empty-title-color)" }}>有什麼問題開始對話吧</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: "var(--empty-line-w, 0px)", height: 1, background: "var(--empty-sub-color)", opacity: 0.3 }} />
+                  <span style={{ fontSize: 13, color: "var(--empty-sub-color)" }}>我可以幫你回答問題、提供建議、撰寫內容等</span>
+                  <span style={{ width: "var(--empty-line-w, 0px)", height: 1, background: "var(--empty-sub-color)", opacity: 0.3 }} />
+                </div>
+              </div>
+            )}
+            {messages.map((m, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{
+                  maxWidth: "70%", padding: "10px 14px", borderRadius: "var(--radius-lg)",
+                  background: m.role === "user" ? "var(--accent)" : "var(--bubble-assistant-bg, var(--panel-alt))",
+                  color: m.role === "user" ? "var(--accent-text)" : "var(--text)",
+                  fontSize: 14, whiteSpace: "pre-wrap", wordBreak: "break-word",
+                }}>
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {sending && (
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <div style={{ padding: "10px 14px", borderRadius: "var(--radius-lg)", background: "var(--bubble-assistant-bg, var(--panel-alt))", color: "var(--text-faint)", fontSize: 14 }}>
+                  思考中...
+                </div>
+              </div>
+            )}
+            <div ref={endRef} />
+          </>
+        ) : (
+          <>
+            {images.length === 0 && !generating && (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--empty-icon-bg, none)", border: "var(--empty-icon-border, none)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "var(--empty-title-color)" }}>🎨</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: "var(--empty-title-color)" }}>描述你想要的圖片</div>
+                <div style={{ fontSize: 13, color: "var(--empty-sub-color)" }}>由 gpt-image-2 生成</div>
+              </div>
+            )}
+            {images.map((img, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{img.prompt}</div>
+                <img src={img.imageUrl} alt={img.prompt} style={{ maxWidth: "100%", maxHeight: 480, borderRadius: "var(--radius-lg)", display: "block", objectFit: "contain" }} />
+              </div>
+            ))}
+            {generating && (
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <div style={{ padding: "10px 14px", borderRadius: "var(--radius-lg)", background: "var(--bubble-assistant-bg, var(--panel-alt))", color: "var(--text-faint)", fontSize: 14 }}>
+                  生成中...
+                </div>
+              </div>
+            )}
+            <div ref={endRef} />
+          </>
         )}
-        {messages.map((m, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
-            <div style={{
-              maxWidth: "70%", padding: "10px 14px", borderRadius: "var(--radius-lg)",
-              background: m.role === "user" ? "var(--accent)" : "var(--bubble-assistant-bg, var(--panel-alt))",
-              color: m.role === "user" ? "var(--accent-text)" : "var(--text)",
-              fontSize: 14, whiteSpace: "pre-wrap", wordBreak: "break-word",
-            }}>
-              {m.content}
-            </div>
-          </div>
-        ))}
-        {sending && (
-          <div style={{ display: "flex", justifyContent: "flex-start" }}>
-            <div style={{ padding: "10px 14px", borderRadius: "var(--radius-lg)", background: "var(--bubble-assistant-bg, var(--panel-alt))", color: "var(--text-faint)", fontSize: 14 }}>
-              思考中...
-            </div>
-          </div>
-        )}
-        <div ref={endRef} />
       </div>
 
       {/* Input row — model picker sits directly to the left of 傳送. className
@@ -301,6 +375,8 @@ export default function AiChatRoom({ user, db }) {
           (also gives it the opaque panel the other 3 rooms' input bars
           already had, which this one was previously missing). */}
       <div className="cr-input-bar" style={{ padding: "12px 16px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, boxSizing: "border-box" }}>
+        {mode === "chat" ? (
+          <>
         {/* Decorative under 幽影深窗 only (--plusbtn-display defaults to
             none everywhere else) — DeepSeek's text-only API has nowhere to
             send an attachment yet, so this doesn't wire up a real upload. */}
@@ -362,6 +438,25 @@ export default function AiChatRoom({ user, db }) {
           }}>
           傳送
         </button>
+          </>
+        ) : (
+          <>
+        <input type="text" value={imagePrompt} onChange={e => setImagePrompt(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && generateImage()}
+          placeholder="描述你想要的圖片..." disabled={generating}
+          style={{ flex: 1, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
+
+        <button onClick={generateImage} disabled={generating || !imagePrompt.trim()}
+          style={{
+            width: "var(--sendbtn-width, auto)", height: "var(--sendbtn-height, auto)", boxSizing: "border-box",
+            background: "var(--sendbtn-bg, var(--accent))", border: "none", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))",
+            padding: "9px 18px", color: "var(--accent-text)", fontSize: 14, fontWeight: 600,
+            cursor: generating ? "default" : "pointer", opacity: generating || !imagePrompt.trim() ? 0.6 : 1, flexShrink: 0,
+          }}>
+          生成圖片
+        </button>
+          </>
+        )}
       </div>
     </>
   );
