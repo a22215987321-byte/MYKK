@@ -946,6 +946,64 @@ export default function ChatApp({ user }) {
   const privateFileRef = useRef(null);
   const groupFileRef = useRef(null);
   const groupAvatarFileRef = useRef(null);
+
+  // 群組直排欄可以長按拖曳到畫面任意位置（浮動），放開後記住位置；
+  // groupRailPos 是 null 時維持在側欄旁邊的預設位置（正常 flex 排列）。
+  const [groupRailPos, setGroupRailPos] = useState(null);
+  const groupRailDragRef = useRef({ pressing: false, dragging: false });
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("cr-group-rail-pos");
+      if (raw) {
+        const pos = JSON.parse(raw);
+        if (pos && typeof pos.x === "number" && typeof pos.y === "number") setGroupRailPos(pos);
+      }
+    } catch {}
+  }, []);
+
+  const startGroupRailDrag = useCallback((e) => {
+    // 只在按到面板本身的空白處（不是按到裡面的方塊按鈕）才觸發長按拖曳，
+    // 避免點群組圖示切換群組時被誤判成想拖曳整個面板。
+    if (e.target !== e.currentTarget || e.button !== 0) return;
+    const st = groupRailDragRef.current;
+    st.pressing = true;
+    st.dragging = false;
+    const timer = setTimeout(() => {
+      if (!st.pressing) return;
+      st.dragging = true;
+      document.body.style.userSelect = "none";
+    }, 450);
+    const onMove = (ev) => {
+      if (!st.dragging) return;
+      ev.preventDefault();
+      const x = Math.max(4, Math.min(window.innerWidth - 68, ev.clientX - 32));
+      const y = Math.max(4, Math.min(window.innerHeight - 68, ev.clientY - 32));
+      setGroupRailPos({ x, y });
+    };
+    const onUp = () => {
+      clearTimeout(timer);
+      st.pressing = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.userSelect = "";
+      if (st.dragging) {
+        st.dragging = false;
+        setGroupRailPos(pos => {
+          try { localStorage.setItem("cr-group-rail-pos", JSON.stringify(pos)); } catch {}
+          return pos;
+        });
+      }
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, []);
+
+  const resetGroupRailPos = useCallback((e) => {
+    if (e.target !== e.currentTarget) return;
+    setGroupRailPos(null);
+    try { localStorage.removeItem("cr-group-rail-pos"); } catch {}
+  }, []);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnectionsRef = useRef({});
@@ -2383,18 +2441,28 @@ export default function ChatApp({ user }) {
           </button>
         )}
 
-        {/* Discord 風格群組直排 icon 欄：獨立的一個直排方塊面板，卡在側欄跟主聊天區
+        {/* Discord 風格群組直排 icon 欄：獨立的一個直排方塊面板，預設卡在側欄跟主聊天區
             中間，用原生 title 做 hover 顯示群組名稱的 tooltip。寬度剛好夠塞一個方塊
             圖示，自己的 margin 讓它跟兩側之間永遠留一點間距，不依賴各主題各自的
-            --panel-gap（很多主題預設是 0）。手機版沒有空間放這條獨立欄，群組維持在
-            側欄裡的文字列表（見上面 isMobile 那段）。 */}
+            --panel-gap（很多主題預設是 0）。長按面板空白處（不是按到裡面的方塊）可以
+            拖曳到畫面任意位置，放開後記住位置、下次進來還在那裡；雙擊空白處重設回預設
+            位置。手機版沒有空間放這條獨立欄，群組維持在側欄裡的文字列表（見上面
+            isMobile 那段）。 */}
         {!isMobile && (
-          <div style={{
-            width: 64, flexShrink: 0, display: "flex", flexDirection: "column",
-            alignItems: "center", gap: 8, padding: "10px 0", margin: "8px 4px",
-            overflowY: "auto", borderRadius: "var(--radius-md)",
-            background: "var(--panel)", border: "1px solid var(--border)",
-          }}>
+          <div
+            onMouseDown={startGroupRailDrag}
+            onDoubleClick={resetGroupRailPos}
+            title="長按空白處可拖曳移動位置（雙擊重設）"
+            style={{
+              width: 64, flexShrink: 0, display: "flex", flexDirection: "column",
+              alignItems: "center", gap: 8, padding: "10px 0", margin: "8px 4px",
+              overflowY: "auto", borderRadius: "var(--radius-md)",
+              background: "var(--panel)", border: "1px solid var(--border)",
+              cursor: "grab", boxSizing: "border-box",
+              ...(groupRailPos
+                ? { position: "fixed", left: groupRailPos.x, top: groupRailPos.y, margin: 0, zIndex: 500, maxHeight: "70vh", boxShadow: "var(--card-shadow)" }
+                : {}),
+            }}>
             <button onClick={() => setShowCreateGroup(true)} title="新增群組" aria-label="新增群組"
               style={{
                 width: 40, height: 40, borderRadius: "30%", flexShrink: 0,
