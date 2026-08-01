@@ -2398,7 +2398,6 @@ export default function ChatApp({ user }) {
               </>
             );
           })()}
-          )}
 
           {/* Groups section — desktop 版群組改用 .cr-sidebar 外面那條 Discord 風格
               直排 icon 欄（見 .cr-shell 內、cr-main 前面），這裡的文字列表只在
