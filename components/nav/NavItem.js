@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 
 const NAV_MIN_W = 80;
-const NAV_MAX_W = 420;
+// 側欄本身最窄可以拖到 220px（見 ChatRoom.js 的 startPanelResize），扣掉左右
+// padding 後留一點安全距離，這樣不管側欄多窄，項目都不可能被拖到超出側欄邊界、
+// 蓋到旁邊的群組直排欄。
+const NAV_MAX_W = 180;
 
 export default function NavItem({ icon, iconBg, label, sublabel, active, onClick, compact, mobileTouch }) {
   // 每個項目的闊度可以自己拖曳調整、各自記住——用 label 當 localStorage key，
