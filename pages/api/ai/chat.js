@@ -31,8 +31,8 @@ const MODELS = {
   "claude-sonnet": { provider: "openrouter", model: "anthropic/claude-sonnet-5" },
   "gpt-5": { provider: "openrouter", model: "openai/gpt-5.5" },
   "claude-haiku": { provider: "openrouter", model: "anthropic/claude-haiku-4.5" },
-  "gpt-5-mini": { provider: "openrouter", model: "openai/gpt-5.2-mini" },
-  "gemini-pro": { provider: "openrouter", model: "google/gemini-3-pro" },
+  "gpt-5-mini": { provider: "openrouter", model: "openai/gpt-5-mini" },
+  "gemini-pro": { provider: "openrouter", model: "google/gemini-2.5-pro" },
 };
 const DEFAULT_MODEL_ID = "deepseek-v4-flash";
 
