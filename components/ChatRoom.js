@@ -2387,7 +2387,12 @@ export default function ChatApp({ user }) {
                   active={showDict} onClick={() => { resetAllViews(); setShowDict(true); }} />
               ),
             };
-            const topPadding = { leaderboard: "4px 10px 6px", calendar: "0 10px 6px", customVocab: "0 10px 6px", dict: "0 10px 6px" };
+            const topPadding = {
+              leaderboard: { padding: "4px 10px 6px" },
+              calendar: { padding: "0 10px 6px" },
+              customVocab: { padding: "0 10px 6px" },
+              dict: { padding: "0 10px 6px" },
+            };
             return (
               <>
                 {topNavReorder.order.map(key => (
