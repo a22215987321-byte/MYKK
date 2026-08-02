@@ -191,6 +191,7 @@ function NewPostForm({ profile, onPosted }) {
       imageUrl: null,
       imageUrls: [],
       videoUrl: null,
+      audioUrl: null,
       subtitles: null,
       likes: [],
       visibility,
@@ -199,11 +200,12 @@ function NewPostForm({ profile, onPosted }) {
     };
     try {
       if (media.hasMedia) {
-        console.log("[ProfileView.NewPostForm] uploading media", { imageCount: media.imageFiles.length, hasVideo: !!media.videoFile });
-        const { imageUrls, videoUrl, subtitles } = await media.upload();
+        console.log("[ProfileView.NewPostForm] uploading media", { imageCount: media.imageFiles.length, hasVideo: !!media.videoFile, hasAudio: !!media.audioFile });
+        const { imageUrls, videoUrl, audioUrl, subtitles } = await media.upload();
         payload.imageUrls = imageUrls;
         payload.imageUrl = imageUrls[0] || null;
         payload.videoUrl = videoUrl;
+        payload.audioUrl = audioUrl;
         payload.subtitles = subtitles;
       }
       console.log("[ProfileView.NewPostForm] submitting post", {
@@ -264,11 +266,11 @@ function NewPostForm({ profile, onPosted }) {
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <button onClick={() => media.fileRef.current?.click()}
                 style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}>
-                📎 加入圖片/影片（可多選）
+                📎 加入圖片/影片/音樂（可多選圖片）
               </button>
               <VisibilityMenu value={visibility} onChange={setVisibility} />
             </div>
-            <input ref={media.fileRef} type="file" accept="image/*,video/*" multiple onChange={media.onFile} style={{ display: "none" }} />
+            <input ref={media.fileRef} type="file" accept="image/*,video/*,audio/mpeg,audio/mp3,.mp3" multiple onChange={media.onFile} style={{ display: "none" }} />
             <button onClick={submit} disabled={!canPost}
               style={{ background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: "8px 20px", color: canPost ? "var(--accent-text)" : "var(--text-dim)", cursor: canPost ? "pointer" : "default", fontSize: 14, fontWeight: 700 }}>
               {posting ? "發佈中..." : "發佈"}
@@ -351,7 +353,7 @@ function PostItem({ post, profile, isOwner, onTogglePin, onOpenMedia }) {
               )}
             </div>
             {post.text && (
-              <div style={{ fontSize: 15, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: (post.imageUrl || post.videoUrl) ? 10 : 0 }}>
+              <div style={{ fontSize: 15, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: (post.imageUrl || post.videoUrl || post.audioUrl) ? 10 : 0 }}>
                 {post.text}
               </div>
             )}
@@ -364,6 +366,12 @@ function PostItem({ post, profile, isOwner, onTogglePin, onOpenMedia }) {
               <div style={{ borderRadius: 16, overflow: "hidden", marginTop: 10, cursor: "zoom-in" }}
                 onClick={() => onOpenMedia(post)}>
                 <PostImageGrid images={post.imageUrls?.length ? post.imageUrls : [post.imageUrl]} maxHeight={400} />
+              </div>
+            )}
+            {post.audioUrl && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", marginTop: 10 }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>🎵</span>
+                <audio src={post.audioUrl} controls style={{ flex: 1, minWidth: 0, height: 34 }} />
               </div>
             )}
             <div style={{ display: "flex", gap: 20, marginTop: 12 }}>
@@ -443,11 +451,124 @@ function VideosTab({ videoPosts, isMobile, onOpen }) {
   );
 }
 
-// 收藏分頁：影片收藏是真資料（帶 videoUrl 的收藏貼文，縮圖/時長/讚數都跟
-// VideosTab 共用同一個 VideoThumb）。音頻收藏先做版面——這個 app 目前完全
-//沒有「音頻」這種內容類型（沒有音檔上傳、沒有音樂貼文），所以這裡沒有真的
-// 資料可以顯示；「播放時順序播放、可調單曲循環」這個播放器行為要等有真的
-// 音頻內容才有意義做，先誠實顯示「尚未支援」，不要生假資料充版面。
+function formatAudioTime(sec) {
+  if (!isFinite(sec) || sec < 0) return "0:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// 音頻收藏的播放器——收藏清單裡任一首開始播放後，播完自動接下一首（順序
+// 播放），可以切「單曲循環」讓目前這首重複播放。只用一個共用的 <audio>
+// 元素切換 src，不是每首歌各自一個 <audio>。
+function AudioQueuePlayer({ tracks }) {
+  const audioRef = useRef(null);
+  const [currentIndex, setCurrentIndex] = useState(null);
+  const [playing, setPlaying] = useState(false);
+  const [repeatOne, setRepeatOne] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const currentTrack = currentIndex != null ? tracks[currentIndex] : null;
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || currentIndex == null) return;
+    a.src = tracks[currentIndex]?.audioUrl;
+    a.play().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex]);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onTime = () => setCurrent(a.currentTime);
+    const onLoaded = () => setDuration(a.duration || 0);
+    const onEnded = () => {
+      if (repeatOne) {
+        a.currentTime = 0;
+        a.play().catch(() => {});
+        return;
+      }
+      setCurrentIndex(idx => {
+        if (idx == null) return idx;
+        const next = idx + 1;
+        return next < tracks.length ? next : null;
+      });
+    };
+    a.addEventListener("play", onPlay);
+    a.addEventListener("pause", onPause);
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("loadedmetadata", onLoaded);
+    a.addEventListener("ended", onEnded);
+    return () => {
+      a.removeEventListener("play", onPlay);
+      a.removeEventListener("pause", onPause);
+      a.removeEventListener("timeupdate", onTime);
+      a.removeEventListener("loadedmetadata", onLoaded);
+      a.removeEventListener("ended", onEnded);
+    };
+  }, [repeatOne, tracks]);
+
+  const togglePlay = () => {
+    const a = audioRef.current;
+    if (!a || currentIndex == null) return;
+    if (a.paused) a.play().catch(() => {}); else a.pause();
+  };
+  const playPrev = () => setCurrentIndex(idx => (idx == null ? 0 : Math.max(idx - 1, 0)));
+  const playNext = () => setCurrentIndex(idx => (idx == null ? 0 : Math.min(idx + 1, tracks.length - 1)));
+
+  return (
+    <div>
+      <audio ref={audioRef} style={{ display: "none" }} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {tracks.map((t, i) => {
+          const isCurrent = currentIndex === i;
+          return (
+            <button key={t.id} onClick={() => (isCurrent ? togglePlay() : setCurrentIndex(i))}
+              style={{ display: "flex", alignItems: "center", gap: 10, background: isCurrent ? "var(--panel-hover)" : "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", cursor: "pointer", textAlign: "left" }}>
+              <span style={{ fontSize: 16, width: 20, textAlign: "center", flexShrink: 0 }}>{isCurrent && playing ? "⏸" : "▶"}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: isCurrent ? "var(--accent)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {t.text?.trim() || "（未命名音樂）"}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{t.userNickname}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {currentTrack && (
+        <div style={{ position: "sticky", bottom: 8, marginTop: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10, boxShadow: "var(--card-shadow)" }}>
+          <button onClick={playPrev} disabled={currentIndex === 0} aria-label="上一首" style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 16, opacity: currentIndex === 0 ? 0.4 : 1 }}>⏮</button>
+          <button onClick={togglePlay} aria-label={playing ? "暫停" : "播放"} style={{ background: "var(--accent)", border: "none", borderRadius: "50%", width: 30, height: 30, color: "var(--accent-text)", cursor: "pointer", fontSize: 14, flexShrink: 0 }}>{playing ? "⏸" : "▶"}</button>
+          <button onClick={playNext} disabled={currentIndex === tracks.length - 1} aria-label="下一首" style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 16, opacity: currentIndex === tracks.length - 1 ? 0.4 : 1 }}>⏭</button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentTrack.text?.trim() || "（未命名音樂）"}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+              <span style={{ fontSize: 10, color: "var(--text-faint)" }}>{formatAudioTime(current)}</span>
+              <div style={{ flex: 1, height: 3, background: "var(--border)", borderRadius: 2 }}>
+                <div style={{ width: duration ? `${(current / duration) * 100}%` : "0%", height: "100%", background: "var(--accent)", borderRadius: 2 }} />
+              </div>
+              <span style={{ fontSize: 10, color: "var(--text-faint)" }}>{formatAudioTime(duration)}</span>
+            </div>
+          </div>
+          <button onClick={() => setRepeatOne(v => !v)} title="單曲循環" aria-pressed={repeatOne}
+            style={{ background: repeatOne ? "var(--accent-active)" : "none", border: "1px solid var(--border)", borderRadius: "50%", width: 28, height: 28, color: repeatOne ? "var(--accent)" : "var(--text-faint)", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>
+            🔁
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 收藏分頁：影片收藏、音頻收藏都是真資料（收藏貼文裡分別帶 videoUrl／
+// audioUrl 的），影片縮圖沿用 VideosTab 的 VideoThumb，音頻是上面那個
+// AudioQueuePlayer（順序播放＋單曲循環）。
 function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen }) {
   const [saving, setSaving] = useState(false);
   const isPublic = profile.favoritesPublic !== false; // 沒設過欄位 = 預設公開
@@ -475,6 +596,7 @@ function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen
   }
 
   const videoFavorites = favoritePosts.filter(p => p.videoUrl);
+  const audioFavorites = favoritePosts.filter(p => p.audioUrl);
 
   return (
     <div style={{ padding: 16 }}>
@@ -500,9 +622,13 @@ function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen
       )}
 
       <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: "24px 0 10px" }}>音頻收藏</div>
-      <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-dim)", fontSize: 13 }}>
-        尚未支援音頻收藏功能
-      </div>
+      {!favoritesLoaded ? (
+        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-dim)", fontSize: 13 }}>載入中...</div>
+      ) : audioFavorites.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-dim)", fontSize: 13 }}>還沒有收藏任何音樂</div>
+      ) : (
+        <AudioQueuePlayer tracks={audioFavorites} />
+      )}
     </div>
   );
 }
@@ -1569,7 +1695,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
                   <div style={{ fontSize: 16 }}>{isOwner ? "還沒有貼文，發第一篇吧！" : "還沒有任何貼文"}</div>
                 </div>
               )}
-              {orderedPosts.filter(p => p.text || p.imageUrl || p.videoUrl).map(post => (
+              {orderedPosts.filter(p => p.text || p.imageUrl || p.videoUrl || p.audioUrl).map(post => (
                 <PostItem key={post.id} post={post} profile={profile} isOwner={isOwner} onTogglePin={togglePin} onOpenMedia={openMediaFor} />
               ))}
             </>

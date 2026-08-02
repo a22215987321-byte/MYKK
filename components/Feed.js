@@ -255,6 +255,16 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
         </div>
       )}
 
+      {/* Audio (MP3) */}
+      {post.audioUrl && (
+        <div style={{ padding: "0 16px 12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>🎵</span>
+            <audio src={post.audioUrl} controls style={{ flex: 1, minWidth: 0, height: 34 }} />
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 18, borderTop: "1px solid var(--panel)" }}>
         <button onClick={toggleLike} className="feed-action-btn"
@@ -411,6 +421,7 @@ function NewPostForm({ myProfile, onPosted }) {
       imageUrl: null,
       imageUrls: [],
       videoUrl: null,
+      audioUrl: null,
       subtitles: null,
       likes: [],
       bookmarks: [],
@@ -418,11 +429,12 @@ function NewPostForm({ myProfile, onPosted }) {
     };
     try {
       if (media.hasMedia) {
-        console.log("[Feed.NewPostForm] uploading media", { imageCount: media.imageFiles.length, hasVideo: !!media.videoFile });
-        const { imageUrls, videoUrl, subtitles } = await media.upload();
+        console.log("[Feed.NewPostForm] uploading media", { imageCount: media.imageFiles.length, hasVideo: !!media.videoFile, hasAudio: !!media.audioFile });
+        const { imageUrls, videoUrl, audioUrl, subtitles } = await media.upload();
         payload.imageUrls = imageUrls;
         payload.imageUrl = imageUrls[0] || null;
         payload.videoUrl = videoUrl;
+        payload.audioUrl = audioUrl;
         payload.subtitles = subtitles;
       }
       console.log("[Feed.NewPostForm] submitting post", {
@@ -504,9 +516,9 @@ function NewPostForm({ myProfile, onPosted }) {
                 onClick={() => media.fileRef.current?.click()}
                 style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}
               >
-                📎 加入圖片/影片（可多選）
+                📎 加入圖片/影片/音樂（可多選圖片）
               </button>
-              <input ref={media.fileRef} type="file" accept="image/*,video/*" multiple onChange={onFile} style={{ display: "none" }} />
+              <input ref={media.fileRef} type="file" accept="image/*,video/*,audio/mpeg,audio/mp3,.mp3" multiple onChange={onFile} style={{ display: "none" }} />
             </div>
           )}
         </div>

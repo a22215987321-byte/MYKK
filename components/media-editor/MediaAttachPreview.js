@@ -74,12 +74,15 @@ function SubtitleGenerateButton({ videoFile, subtitles, onSubtitles }) {
 // 發文表單裡「已附加的媒體」預覽區——縮圖格、逐張移除、單張圖片可編輯、
 // 影片可剪輯，點縮圖可以全螢幕預覽。Feed.js 跟 ProfileView.js 共用同一份。
 export default function MediaAttachPreview({ media, thumbSize = 100 }) {
-  const { imageFiles, imagePreviews, videoFile, videoPreview, fileRef, removeImage, replaceImage, removeVideo, replaceVideo, subtitles, setSubtitles } = media;
+  const {
+    imageFiles, imagePreviews, videoFile, videoPreview, audioFile, audioPreview, fileRef,
+    removeImage, replaceImage, removeVideo, replaceVideo, removeAudio, subtitles, setSubtitles,
+  } = media;
   const [editingPhotoIdx, setEditingPhotoIdx] = useState(null);
   const [editingVideo, setEditingVideo] = useState(false);
   const [lightbox, setLightbox] = useState(null); // { type: "image", idx } | { type: "video" } | null
 
-  if (!imagePreviews.length && !videoPreview) return null;
+  if (!imagePreviews.length && !videoPreview && !audioPreview) return null;
 
   return (
     <>
@@ -127,7 +130,24 @@ export default function MediaAttachPreview({ media, thumbSize = 100 }) {
             </button>
           </div>
         )}
+
+        {audioPreview && (
+          <div style={{ position: "relative", width: thumbSize, height: thumbSize, borderRadius: 10, overflow: "hidden", background: "var(--panel-alt)", border: "1px solid var(--border)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 8, flexShrink: 0, boxSizing: "border-box" }}>
+            <span style={{ fontSize: 26 }}>🎵</span>
+            <span style={{ fontSize: 10, color: "var(--text-faint)", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", marginTop: 4 }}>
+              {audioFile?.name}
+            </span>
+            <button onClick={e => { e.stopPropagation(); removeAudio(); }} aria-label="移除音樂"
+              style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: "50%", width: 22, height: 22, color: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              ✕
+            </button>
+          </div>
+        )}
       </div>
+
+      {audioPreview && (
+        <audio src={audioPreview} controls style={{ width: "100%", marginTop: 8, height: 34 }} />
+      )}
 
       {videoFile && (
         <div onClick={e => e.stopPropagation()}>
