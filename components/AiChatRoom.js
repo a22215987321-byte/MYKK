@@ -312,8 +312,16 @@ export default function AiChatRoom({ user, db }) {
         {mode === "chat" ? (
           <>
             {messages.length === 0 && (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--empty-icon-bg, none)", border: "var(--empty-icon-border, none)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "var(--empty-title-color)" }}>💬</div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                {/* 小惡魔吉祥物——邊緣用 mask-image 羽化淡出，蓋掉裁圖時留下的
+                    深色背景矩形邊界，不管疊在哪個主題的空白畫面上都不會看到
+                    一塊硬邊的方形。 */}
+                <img src="/images/ai-devil-mascot.png" alt="" aria-hidden="true"
+                  style={{
+                    width: 168, height: "auto", marginBottom: -6,
+                    maskImage: "radial-gradient(ellipse 62% 60% at center, #000 55%, transparent 88%)",
+                    WebkitMaskImage: "radial-gradient(ellipse 62% 60% at center, #000 55%, transparent 88%)",
+                  }} />
                 <div style={{ fontSize: 16, fontWeight: 600, color: "var(--empty-title-color)" }}>有什麼問題開始對話吧</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: "var(--empty-line-w, 0px)", height: 1, background: "var(--empty-sub-color)", opacity: 0.3 }} />
