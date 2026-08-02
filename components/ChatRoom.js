@@ -1527,7 +1527,12 @@ export default function ChatApp({ user }) {
     setShowFeed(false); setShowImageEditor(false); setShowAiChat(false); setShowDocConvert(false);
     setShowAiCompanion(false); setShowUpgrade(false); setViewProfileUid(null);
     setShowCalendar(false);
-    setShowVideoHub(false); setVideoHubUid(null);
+    // 影片功能故意不歸零 videoHubUid：切去別的功能頁只是把這個 view 藏起來
+    // （見 .cr-main 裡 showVideoHub 那段改用 display:none 而不是整個卸載），
+    // 這樣使用者點回「影片」時，剛剛看到哪個頻道／哪支影片、播到哪裡都還在。
+    // 真的要離開某個頻道回到搜尋列表，是 ChannelProfileView 自己的返回鍵
+    // 呼叫 setVideoHubUid(null)，不是靠切換頁面順便清掉。
+    setShowVideoHub(false);
   }, []);
 
   // Cinema states
@@ -3251,18 +3256,23 @@ export default function ChatApp({ user }) {
               點了某個頻道之後換成 ChannelProfileView——YouTube 頻道風格的獨立
               版面（橫幅+訂閱+分頁+影片格網），刻意跟動態消息那邊的個人頁
               （ProfileView）不一樣，一眼能分辨現在是在「看影片」還是「看動態」。
-              點左上角關閉回到搜尋清單，不會整個離開這個 view。 */}
-          {showVideoHub && !activeFriendId && !activeGroupId && (
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-              {videoHubUid ? (
-                <ChannelProfileView key={videoHubUid} uid={videoHubUid}
-                  onClose={() => setVideoHubUid(null)}
-                  onOpenChannel={setVideoHubUid} />
-              ) : (
-                <VideoHub onOpenChannel={setVideoHubUid} />
-              )}
-            </div>
-          )}
+              點左上角關閉回到搜尋清單，不會整個離開這個 view。
+              跟其他功能頁不一樣：這裡故意用 display:none 藏起來，不是條件式
+              整個卸載（{cond && <X/>}）——這樣使用者切去別的功能頁面時，正在
+              播放的 <video> 元素、播到哪個頻道/哪支影片都還留在原地，點回
+              「影片」不會重新整理，播放進度接著上次繼續。 */}
+          <div style={{
+            flex: 1, minHeight: 0, display: (showVideoHub && !activeFriendId && !activeGroupId) ? "flex" : "none",
+            flexDirection: "column",
+          }}>
+            {videoHubUid ? (
+              <ChannelProfileView key={videoHubUid} uid={videoHubUid}
+                onClose={() => setVideoHubUid(null)}
+                onOpenChannel={setVideoHubUid} />
+            ) : (
+              <VideoHub onOpenChannel={setVideoHubUid} />
+            )}
+          </div>
 
           {/* Leaderboard view — warm-ivory "luxury magazine" pastel design,
               per an exact reference mock (see RANK_PALETTE above for the
