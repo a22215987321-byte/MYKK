@@ -411,6 +411,7 @@ function NewPostForm({ myProfile, onPosted }) {
       imageUrl: null,
       imageUrls: [],
       videoUrl: null,
+      subtitles: null,
       likes: [],
       bookmarks: [],
       createdAt: serverTimestamp(),
@@ -418,10 +419,11 @@ function NewPostForm({ myProfile, onPosted }) {
     try {
       if (media.hasMedia) {
         console.log("[Feed.NewPostForm] uploading media", { imageCount: media.imageFiles.length, hasVideo: !!media.videoFile });
-        const { imageUrls, videoUrl } = await media.upload();
+        const { imageUrls, videoUrl, subtitles } = await media.upload();
         payload.imageUrls = imageUrls;
         payload.imageUrl = imageUrls[0] || null;
         payload.videoUrl = videoUrl;
+        payload.subtitles = subtitles;
       }
       console.log("[Feed.NewPostForm] submitting post", {
         uid: auth.currentUser.uid, imageCount: payload.imageUrls.length, hasVideo: !!payload.videoUrl,

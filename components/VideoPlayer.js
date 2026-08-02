@@ -10,7 +10,7 @@ function formatTime(sec) {
 // 自訂影片播放器（取代原生 <video controls>）：一般模式下滑鼠離開播放器範圍，
 // 控制列跟中間播放鈕就會消失；進到全螢幕後，滑鼠 3 秒沒有動作也會自動收起，
 // 跟一般影音平台的播放器行為一致。
-export default function VideoPlayer({ src, poster, autoPlay = false }) {
+export default function VideoPlayer({ src, poster, autoPlay = false, subtitles }) {
   const containerRef = useRef(null);
   const videoRef = useRef(null);
   const hideTimerRef = useRef(null);
@@ -108,6 +108,11 @@ export default function VideoPlayer({ src, poster, autoPlay = false }) {
   };
 
   const progress = duration ? (current / duration) * 100 : 0;
+  // AI 自動生成的字幕（見 lib/generateSubtitles.js）——純燒錄式疊字，沒有
+  // CC 開關，跟著 current 播放時間找目前該顯示哪一段。
+  const activeCaption = subtitles?.length
+    ? subtitles.find(s => current >= s.start && current < s.end)?.text || ""
+    : "";
 
   return (
     <div ref={containerRef} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}
@@ -127,6 +132,17 @@ export default function VideoPlayer({ src, poster, autoPlay = false }) {
       <video ref={videoRef} src={src} poster={poster} autoPlay={autoPlay} playsInline
         onClick={togglePlay}
         style={{ maxWidth: "100%", maxHeight: "100%", width: "100%", height: "100%", objectFit: "contain", display: "block", cursor: "pointer" }} />
+
+      {activeCaption && (
+        <div style={{
+          position: "absolute", left: "50%", bottom: showControls ? 78 : 20, transform: "translateX(-50%)",
+          maxWidth: "88%", textAlign: "center", background: "rgba(0,0,0,0.65)", color: "#fff",
+          fontSize: 15, fontWeight: 600, padding: "4px 12px", borderRadius: 6, lineHeight: 1.4,
+          transition: "bottom 0.25s", pointerEvents: "none", zIndex: 3,
+        }}>
+          {activeCaption}
+        </div>
+      )}
 
       {/* 中間大播放鈕：暫停時、且控制列可見時才顯示 */}
       {!playing && (

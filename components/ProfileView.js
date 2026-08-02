@@ -191,6 +191,7 @@ function NewPostForm({ profile, onPosted }) {
       imageUrl: null,
       imageUrls: [],
       videoUrl: null,
+      subtitles: null,
       likes: [],
       visibility,
       pinned: false,
@@ -199,10 +200,11 @@ function NewPostForm({ profile, onPosted }) {
     try {
       if (media.hasMedia) {
         console.log("[ProfileView.NewPostForm] uploading media", { imageCount: media.imageFiles.length, hasVideo: !!media.videoFile });
-        const { imageUrls, videoUrl } = await media.upload();
+        const { imageUrls, videoUrl, subtitles } = await media.upload();
         payload.imageUrls = imageUrls;
         payload.imageUrl = imageUrls[0] || null;
         payload.videoUrl = videoUrl;
+        payload.subtitles = subtitles;
       }
       console.log("[ProfileView.NewPostForm] submitting post", {
         uid: auth.currentUser.uid, imageCount: payload.imageUrls.length, hasVideo: !!payload.videoUrl,
@@ -640,7 +642,7 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
             area never depends on how much text happens to be below it. */}
         <div style={{ position: "relative", flex: isMobile ? "0 0 62%" : "1 1 auto", height: isMobile ? undefined : "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           {post.videoUrl
-            ? <VideoPlayer src={post.videoUrl} autoPlay />
+            ? <VideoPlayer src={post.videoUrl} autoPlay subtitles={post.subtitles} />
             : images.length > 0 && <img src={images[imgIdx]} alt="貼文圖片" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
           }
           {images.length > 1 && (

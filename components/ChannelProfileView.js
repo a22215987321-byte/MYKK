@@ -158,7 +158,7 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
         </div>
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "10px 20px 40px" }}>
           <div style={{ borderRadius: 12, overflow: "hidden", background: "#000" }}>
-            <VideoPlayer key={watchVideo.id} src={watchVideo.videoUrl} autoPlay />
+            <VideoPlayer key={watchVideo.id} src={watchVideo.videoUrl} autoPlay subtitles={watchVideo.subtitles} />
           </div>
 
           <h1 style={{ fontSize: 19, fontWeight: 800, color: "var(--text)", margin: "16px 0 10px" }}>

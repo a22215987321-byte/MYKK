@@ -1,11 +1,80 @@
 import { useState } from "react";
 import { PhotoEditorLazy, VideoEditorLazy } from "./index";
 import { MAX_POST_IMAGES } from "../../lib/useMediaAttachments";
+import { generateSubtitles } from "../../lib/generateSubtitles";
+import { toast } from "../../lib/toast";
+
+const SUBTITLE_PROGRESS_LABEL = {
+  model: "下載語音辨識模型中",
+  decode: "讀取影片聲音中",
+  transcribe: "辨識字幕中",
+};
+
+// 影片字幕生成按鈕——完全在瀏覽器裡跑 Whisper（見 lib/generateSubtitles.js），
+// 第一次用會下載語音模型（幾十 MB），瀏覽器快取後之後不用重下。這是選擇性
+// 動作（使用者自己按），不是貼影片就自動觸發，避免沒開口的人也要等模型下載。
+function SubtitleGenerateButton({ videoFile, subtitles, onSubtitles }) {
+  const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState(null);
+
+  const run = async () => {
+    setGenerating(true);
+    setProgress({ stage: "decode" });
+    try {
+      const result = await generateSubtitles(videoFile, (p) => setProgress(p));
+      if (!result.length) {
+        toast("沒有辨識到可用的語音內容");
+      } else {
+        onSubtitles(result);
+        toast(`已生成 ${result.length} 段字幕`, "success");
+      }
+    } catch (e) {
+      console.error("[SubtitleGenerateButton] generate failed", e);
+      toast(e?.message || "字幕生成失敗，請重試");
+    } finally {
+      setGenerating(false);
+      setProgress(null);
+    }
+  };
+
+  if (generating) {
+    const label = SUBTITLE_PROGRESS_LABEL[progress?.stage] || "處理中";
+    const pct = progress?.stage === "model" && typeof progress.progress === "number" ? `${Math.round(progress.progress)}%` : "";
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-faint)", marginTop: 6 }}>
+        <span className="cr-spinner" style={{ width: 12, height: 12, border: "2px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} />
+        {label}{pct && ` ${pct}`}...
+        <style>{"@keyframes spin { to { transform: rotate(360deg); } }"}</style>
+      </div>
+    );
+  }
+
+  if (subtitles?.length) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+        <span style={{ fontSize: 12, color: "var(--accent)" }}>✓ 已生成 {subtitles.length} 段字幕</span>
+        <button onClick={run} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, padding: 0, textDecoration: "underline" }}>
+          重新生成
+        </button>
+        <button onClick={() => onSubtitles(null)} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, padding: 0, textDecoration: "underline" }}>
+          移除
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={run}
+      style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6, background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "4px 10px", color: "var(--text-faint)", cursor: "pointer", fontSize: 12 }}>
+      🤖 自動生成字幕
+    </button>
+  );
+}
 
 // 發文表單裡「已附加的媒體」預覽區——縮圖格、逐張移除、單張圖片可編輯、
 // 影片可剪輯，點縮圖可以全螢幕預覽。Feed.js 跟 ProfileView.js 共用同一份。
 export default function MediaAttachPreview({ media, thumbSize = 100 }) {
-  const { imageFiles, imagePreviews, videoFile, videoPreview, fileRef, removeImage, replaceImage, removeVideo, replaceVideo } = media;
+  const { imageFiles, imagePreviews, videoFile, videoPreview, fileRef, removeImage, replaceImage, removeVideo, replaceVideo, subtitles, setSubtitles } = media;
   const [editingPhotoIdx, setEditingPhotoIdx] = useState(null);
   const [editingVideo, setEditingVideo] = useState(false);
   const [lightbox, setLightbox] = useState(null); // { type: "image", idx } | { type: "video" } | null
@@ -59,6 +128,12 @@ export default function MediaAttachPreview({ media, thumbSize = 100 }) {
           </div>
         )}
       </div>
+
+      {videoFile && (
+        <div onClick={e => e.stopPropagation()}>
+          <SubtitleGenerateButton videoFile={videoFile} subtitles={subtitles} onSubtitles={setSubtitles} />
+        </div>
+      )}
 
       {lightbox && (
         <div role="dialog" aria-modal="true" aria-label="媒體預覽" onClick={() => setLightbox(null)}
