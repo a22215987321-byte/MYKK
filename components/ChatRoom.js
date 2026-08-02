@@ -21,6 +21,7 @@ import FeedApp from "./Feed";
 import ProfileView from "./ProfileView";
 import VideoHub from "./VideoHub";
 import ChannelProfileView from "./ChannelProfileView";
+import GroupInfoView from "./GroupInfoView";
 import {
   bumpPrivateChatSummary as bumpPrivateChatSummaryLib,
   bumpGroupChatSummary as bumpGroupChatSummaryLib,
@@ -1349,6 +1350,9 @@ export default function ChatApp({ user }) {
   const [showCreateGroup,setShowCreateGroup]= useState(false);
   const [groupInput,     setGroupInput]     = useState("");
   const [groupUploading, setGroupUploading] = useState(false);
+  // 點群組聊天上方的名字打開的群組資訊頁（GroupInfoView）——取代整個中間欄，
+  // 不是疊在上面的浮層，所以切換群組時要記得歸零，不然切去別的群組還留著。
+  const [showGroupInfo,  setShowGroupInfo]  = useState(false);
 
   // Leaderboard states
   const [showLeaderboard,  setShowLeaderboard]  = useState(false);
@@ -1521,7 +1525,7 @@ export default function ChatApp({ user }) {
     setShowEnglishPron(false); setShowIeltsBand4(false);
     setShowFeed(false); setShowImageEditor(false); setShowAiChat(false); setShowDocConvert(false);
     setShowAiCompanion(false); setShowUpgrade(false); setViewProfileUid(null);
-    setShowCalendar(false);
+    setShowCalendar(false); setShowGroupInfo(false);
     // 影片功能故意不歸零 videoHubUid：切去別的功能頁只是把這個 view 藏起來
     // （見 .cr-main 裡 showVideoHub 那段改用 display:none 而不是整個卸載），
     // 這樣使用者點回「影片」時，剛剛看到哪個頻道／哪支影片、播到哪裡都還在。
@@ -3663,7 +3667,16 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Group chat */}
-          {activeGroupId && activeGroup && (
+          {activeGroupId && activeGroup && showGroupInfo && (
+            <GroupInfoView
+              group={activeGroup}
+              messages={groupMessages}
+              myUid={uid}
+              onClose={() => setShowGroupInfo(false)}
+              onOpenProfile={(m) => { setShowGroupInfo(false); setViewProfileUid(m); }}
+            />
+          )}
+          {activeGroupId && activeGroup && !showGroupInfo && (
             <>
               <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
                 <input ref={groupAvatarFileRef} type="file" accept="image/*" style={{ display: "none" }}
@@ -3681,10 +3694,11 @@ export default function ChatApp({ user }) {
                     ? <img src={activeGroup.avatar} alt={activeGroup.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     : (activeGroup.avatar || (activeGroup.name ? activeGroup.name.slice(0, 1).toUpperCase() : "👥"))}
                 </button>
-                <div>
+                <button onClick={() => setShowGroupInfo(true)} title="查看群組資訊"
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
                   <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{activeGroup.name}</div>
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(activeGroup.members || []).length} 位成員</div>
-                </div>
+                </button>
               </div>
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, background: "transparent" }}>
                 {groupMessages.length === 0 && (
