@@ -213,6 +213,17 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
     }
   };
 
+  // 主題拉桿專用：跟 selectTheme 做一樣的事，但不會選完就關掉選單——拖曳
+  // 拉桿是連續手勢，途中每格都會觸發 onChange，若像點擊清單那樣選完立刻
+  // setOpen(false)，選單會在使用者手指/滑鼠都還沒放開時就被關掉。
+  const selectThemeFromSlider = (id) => {
+    setTheme(id);
+    applyTheme(id);
+    if (id === "pastel-pearl" && !localStorage.getItem("pastelPalette")) {
+      applyPalette(pastelPalette);
+    }
+  };
+
   const selectPalette = (id) => {
     setPastelPalette(id);
     applyPalette(id);
@@ -375,23 +386,22 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
                 style={{ width: "100%", cursor: "pointer" }} />
             </div>
           )}
-          {THEMES.map(t => (
-            <button
-              key={t.id}
-              onClick={() => selectTheme(t.id)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%",
-                padding: "9px 14px", background: "none", border: "none",
-                borderBottom: t.id === "pastel-pearl" && showPaletteGrid && !isMobile ? "1px solid var(--border-soft)" : "none",
-                color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
-              onMouseLeave={e => e.currentTarget.style.background = "none"}
-            >
-              <span>{t.label}</span>
-              {theme === t.id && <span>✓</span>}
-            </button>
-          ))}
+          <div style={{
+            padding: "10px 14px",
+            borderBottom: showPaletteGrid && !isMobile ? "1px solid var(--border-soft)" : "1px solid var(--border-soft)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>主題</span>
+              <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{THEMES.find(t => t.id === theme)?.label}</span>
+            </div>
+            <input
+              type="range" min={0} max={THEMES.length - 1} step={1}
+              value={Math.max(0, THEMES.findIndex(t => t.id === theme))}
+              onChange={e => selectThemeFromSlider(THEMES[Number(e.target.value)].id)}
+              style={{ width: "100%", cursor: "pointer" }}
+              aria-label="主題"
+            />
+          </div>
 
           {/* Second-level accent picker, expanded inline once 柔和珠光 is the
               active theme. On mobile this is skipped here and rendered as a

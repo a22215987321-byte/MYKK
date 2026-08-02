@@ -10,6 +10,7 @@ import VideoPlayer from "./VideoPlayer";
 import { formatDate, formatFullDate } from "../lib/format";
 import { toast } from "../lib/toast";
 import { Avatar, CommentSection } from "./PostComments";
+import SharePostModal from "./SharePostModal";
 
 const TABS = [
   { id: "videos", label: "影片" },
@@ -46,6 +47,7 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
   const [bioExpanded, setBioExpanded] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [watchVideoId, setWatchVideoId] = useState(null);
+  const [showShare, setShowShare] = useState(false);
 
   const isOwner = viewerUid != null && viewerUid === uid;
 
@@ -129,18 +131,6 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
     }
   };
 
-  const shareVideo = async (video) => {
-    const url = `${window.location.origin}/profile/${uid}?post=${video.id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: video.text?.slice(0, 60) || "影片", url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        toast("連結已複製", "success");
-      }
-    } catch { /* 使用者取消分享 */ }
-  };
-
   const openVideo = (video) => { setWatchVideoId(video.id); setDescExpanded(false); };
 
   if (loading) return <LoadingState label="載入頻道..." minHeight="100%" />;
@@ -200,12 +190,14 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
                 style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 14px", color: liked ? "var(--accent)" : "var(--text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 {liked ? "❤️" : "🤍"} {(watchVideo.likes || []).length}
               </button>
-              <button onClick={() => shareVideo(watchVideo)}
+              <button onClick={() => setShowShare(true)}
                 style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 14px", color: "var(--text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 🔗 分享
               </button>
             </div>
           </div>
+
+          {showShare && <SharePostModal post={watchVideo} onClose={() => setShowShare(false)} />}
 
           {watchVideo.text && (
             <div style={{ background: "var(--panel-alt)", borderRadius: 12, padding: "10px 14px", marginTop: 14, fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>

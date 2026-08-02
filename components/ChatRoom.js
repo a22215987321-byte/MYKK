@@ -21,6 +21,10 @@ import FeedApp from "./Feed";
 import ProfileView from "./ProfileView";
 import VideoHub from "./VideoHub";
 import ChannelProfileView from "./ChannelProfileView";
+import {
+  bumpPrivateChatSummary as bumpPrivateChatSummaryLib,
+  bumpGroupChatSummary as bumpGroupChatSummaryLib,
+} from "../lib/chatSummary";
 import SpanishPronunciation from "./SpanishPronunciation";
 import SpanishGrammar from "./SpanishGrammar";
 import SpanishVerbConjugator from "./SpanishVerbConjugator";
@@ -522,6 +526,35 @@ function FolderBlock({ id, name, open, count, isDropTarget, onToggle, onRename, 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   useEffect(() => { setDraft(name); }, [name]);
+
+  // 收合狀態：只有一個小圖案（跟「新增資料夾」的 + 圖案同一種尺寸），不是
+  // 一整條「名字＋副標＋箭頭」的列——側欄變窄之後，收起來的資料夾要盡量
+  // 不佔垂直空間。點一下展開；長按 0.5 秒（見 LayoutDragWrap）可以把其他
+  // 功能方塊拖進來，兩個手勢共用同一顆按鈕，靠按住時間長短分辨。
+  if (!open && !editing) {
+    return (
+      <button onClick={onToggle} title={`${name}（${count} 個功能，點擊展開）`}
+        style={{
+          width: "var(--navcard-icon-size, 34px)", height: "var(--navcard-icon-size, 34px)",
+          borderRadius: "var(--navcard-icon-radius, var(--radius-md))",
+          border: isDropTarget ? "1px solid var(--accent)" : "1px solid var(--navcard-border, transparent)",
+          boxShadow: isDropTarget ? "0 0 0 2px var(--accent-active)" : "none",
+          background: "linear-gradient(135deg,#475569,#1e293b)", color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 16, cursor: "pointer", position: "relative", flexShrink: 0, padding: 0,
+        }}>
+        📁
+        {count > 0 && (
+          <span style={{ position: "absolute", bottom: -4, right: -4, minWidth: 14, height: 14, padding: "0 3px", borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, border: "2px solid var(--panel-alt)" }}>
+            {count}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  // 展開狀態（或正在重新命名）：窄窄一條標題列，優先讓底下的功能方塊本身
+  // 佔滿寬度——子項目渲染時不再額外縮排，闊度會跟頂層功能方塊完全一樣。
   return (
     <div style={{
       width: "100%", borderRadius: "var(--navcard-radius, var(--radius-md))",
@@ -529,42 +562,34 @@ function FolderBlock({ id, name, open, count, isDropTarget, onToggle, onRename, 
       boxShadow: isDropTarget ? "0 0 0 2px var(--accent-active)" : "none",
       background: "var(--navcard-bg, transparent)", boxSizing: "border-box",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 10px" }}>
-        <div onClick={editing ? undefined : onToggle} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, cursor: editing ? "default" : "pointer" }}>
-          <div style={{
-            width: "var(--navcard-icon-size, 34px)", height: "var(--navcard-icon-size, 34px)",
-            borderRadius: "var(--navcard-icon-radius, var(--radius-md))",
-            background: "linear-gradient(135deg,#475569,#1e293b)", display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 18, flexShrink: 0,
-          }}>📁</div>
-          <div style={{ minWidth: 0, overflow: "hidden", flex: 1 }}>
-            {editing ? (
-              <input
-                autoFocus value={draft} onChange={e => setDraft(e.target.value)}
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => e.stopPropagation()}
-                onKeyDown={e => {
-                  if (e.key === "Enter") { onRename(draft.trim() || name); setEditing(false); }
-                  if (e.key === "Escape") { setDraft(name); setEditing(false); }
-                }}
-                onBlur={() => { onRename(draft.trim() || name); setEditing(false); }}
-                style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "2px 6px", boxSizing: "border-box" }}
-              />
-            ) : (
-              <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-            )}
-            {!editing && <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{count} 個功能・點擊{open ? "收合" : "展開"}</div>}
-          </div>
-          {!editing && (
-            <span style={{ fontSize: 11, color: "var(--text-faint)", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}>▶</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px" }}>
+        <div onClick={editing ? undefined : onToggle} style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, cursor: editing ? "default" : "pointer" }}>
+          <span style={{ fontSize: 14, flexShrink: 0 }}>📁</span>
+          {editing ? (
+            <input
+              autoFocus value={draft} onChange={e => setDraft(e.target.value)}
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => e.stopPropagation()}
+              onKeyDown={e => {
+                if (e.key === "Enter") { onRename(draft.trim() || name); setEditing(false); }
+                if (e.key === "Escape") { setDraft(name); setEditing(false); }
+              }}
+              onBlur={() => { onRename(draft.trim() || name); setEditing(false); }}
+              style={{ flex: 1, minWidth: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 12, fontWeight: 600, padding: "2px 6px", boxSizing: "border-box" }}
+            />
+          ) : (
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+              {name}（{count}）
+            </span>
           )}
+          {!editing && <span style={{ fontSize: 11, color: "var(--text-faint)", flexShrink: 0 }}>收合 ▲</span>}
         </div>
         {!editing && (
           <>
             <button onClick={() => setEditing(true)} onMouseDown={e => e.stopPropagation()} title="重新命名"
-              style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, flexShrink: 0, padding: 4 }}>✏️</button>
+              style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, flexShrink: 0, padding: 2 }}>✏️</button>
             <button onClick={() => { if (confirm(`刪除資料夾「${name}」？（裡面的功能會移回外層）`)) onDelete(); }} onMouseDown={e => e.stopPropagation()} title="刪除資料夾"
-              style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, flexShrink: 0, padding: 4 }}>🗑️</button>
+              style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, flexShrink: 0, padding: 2 }}>🗑️</button>
           </>
         )}
       </div>
@@ -572,15 +597,21 @@ function FolderBlock({ id, name, open, count, isDropTarget, onToggle, onRename, 
   );
 }
 
-// 新增資料夾：預設是一顆虛線按鈕，點下去變成輸入名字的欄位。
+// 新增資料夾：預設是一個跟收合資料夾同尺寸的小 + 圖案按鈕（放最左側，不佔
+// 一整排寬度），點下去變成輸入名字的欄位。
 function AddFolderButton({ onAdd }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
   if (!editing) {
     return (
-      <button onClick={() => setEditing(true)}
-        style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "1px dashed var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, boxSizing: "border-box" }}>
-        <span style={{ fontSize: 15 }}>➕</span> 新增資料夾
+      <button onClick={() => setEditing(true)} title="新增資料夾"
+        style={{
+          width: "var(--navcard-icon-size, 34px)", height: "var(--navcard-icon-size, 34px)",
+          borderRadius: "var(--navcard-icon-radius, var(--radius-md))",
+          border: "1px dashed var(--border)", background: "none", color: "var(--text-faint)",
+          cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
+        }}>
+        ➕
       </button>
     );
   }
@@ -681,6 +712,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
   const hasMedia = msg.imageUrl || msg.videoUrl;
   const isEmojiMsg = msg.type === "emoji";
   const isStickerMsg = msg.type === "sticker";
+  const isPostShareMsg = msg.type === "post_share" && !!msg.sharedPost;
   // 純文字訊息，但整則內容就是一個 [[sticker:id]] 代碼（表情面板插入的貼圖，
   // 沒有跟其他文字混在一起）——外觀比照 isStickerMsg，跟文字混用時則維持
   // 普通文字泡泡、代碼縮小成行內圖片（見下面 renderMessageText）。
@@ -727,12 +759,12 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
         <div style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start" }}>
           {!isMine && showSender && <span style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 3, marginLeft: 2 }}>{msg.sender}</span>}
           <div onDoubleClick={() => setShowPicker(v => !v)} style={{
-            padding: isEmojiMsg || isStickerMsg || soloSticker ? 0 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
+            padding: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? 0 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
             borderRadius: isEmojiMsg ? 0 : (isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px"),
-            background: isEmojiMsg || isStickerMsg || soloSticker ? "none" : (isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)"),
+            background: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : (isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)"),
             color: isMine ? "#fff" : "var(--text)", fontSize: msgFontSize, lineHeight: 1.5, cursor: "default",
-            border: isEmojiMsg || isStickerMsg || soloSticker ? "none" : (isMine ? "none" : "1px solid var(--border)"),
-            backdropFilter: isEmojiMsg || isStickerMsg || soloSticker ? "none" : "var(--panel-blur)", WebkitBackdropFilter: isEmojiMsg || isStickerMsg || soloSticker ? "none" : "var(--panel-blur)",
+            border: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : (isMine ? "none" : "1px solid var(--border)"),
+            backdropFilter: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : "var(--panel-blur)", WebkitBackdropFilter: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : "var(--panel-blur)",
             overflow: "hidden",
           }}>
             {isEmojiMsg ? (
@@ -744,6 +776,27 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
                   ? <img src={msg.stickerSrc} alt={msg.text} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                   : <span style={{ fontSize: 84, lineHeight: 1 }}>{msg.text}</span>}
               </div>
+            ) : isPostShareMsg ? (
+              <Link href={`/profile/${msg.sharedPost.userId}?post=${msg.sharedPost.id}`} onClick={e => e.stopPropagation()}
+                style={{ display: "block", textDecoration: "none", color: "var(--text)", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 10, width: 220, boxShadow: "var(--glow-shadow)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <AvatarImg avatarImage={msg.sharedPost.userAvatarImage} avatar={msg.sharedPost.userAvatar} color={msg.sharedPost.userColor} size={20} />
+                  <span style={{ fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{msg.sharedPost.userNickname}</span>
+                </div>
+                {(msg.sharedPost.imageUrl || msg.sharedPost.videoUrl) && (
+                  <div style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 6, overflow: "hidden", marginBottom: 6, background: "#000" }}>
+                    {msg.sharedPost.videoUrl
+                      ? <video src={msg.sharedPost.videoUrl} muted style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      : <img src={msg.sharedPost.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                  </div>
+                )}
+                {msg.sharedPost.text && (
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                    {msg.sharedPost.text}
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: "var(--accent)", marginTop: 4, fontWeight: 700 }}>查看貼文 ›</div>
+              </Link>
             ) : (
               <>
                 {msg.videoUrl && (
@@ -1346,7 +1399,7 @@ export default function ChatApp({ user }) {
 
   // 桌面版可拖曳調整寬度：側欄跟日曆欄各自的寬度、拖完存 localStorage，
   // 中間 <main> 本來就是 flex:1，兩邊寬度一變它自動跟著縮放，不用另外處理。
-  const SIDEBAR_DEFAULT_WIDTH = 280;
+  const SIDEBAR_DEFAULT_WIDTH = 236;
   const CAL_DEFAULT_WIDTH = 252;
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [calWidth, setCalWidth] = useState(CAL_DEFAULT_WIDTH);
@@ -1787,34 +1840,19 @@ export default function ChatApp({ user }) {
     }
   }, [myProfile, uid]);
 
-  // 每次真的送出訊息後，同步更新聊天室摘要文件（lastMessage/lastMessageAt/
-  // lastSenderId + 每個成員各自的未讀數）——只加這一次額外的 update，不動
-  // 原本的訊息寫入邏輯。unreadCount 每次都把「目前知道的完整成員清單」重新
-  // 寫一遍（而不是只挑被改到的那個 key），這樣不管用 setDoc merge 還是
-  // updateDoc，nested map 都不會漏掉其他人已經存在的未讀數。
-  // private_chats/{chatId} 這個父文件可能還沒被建立過（過去都只有 messages
-  // 子集合），所以用 setDoc(...,{merge:true}) 而不是 updateDoc，避免「找不到
-  // 文件」的錯誤；groups/{groupId} 一定已經存在（建立群組時就有），用 updateDoc。
+  // 每次真的送出訊息後，同步更新聊天室摘要文件——實際邏輯搬到
+  // lib/chatSummary.js（SharePostModal 分享貼文到私訊/群組時也要做同一件事，
+  // 兩邊共用同一份，不再各自維護一份 unreadCount 寫法）。這裡只是包一層
+  // useCallback 方便原本呼叫端的寫法不用改。
   const bumpPrivateChatSummary = useCallback((otherUid, preview) => {
-    const cid = [uid, otherUid].sort().join('_');
-    setDoc(doc(db, 'private_chats', cid), {
-      lastMessage: preview,
-      lastMessageAt: serverTimestamp(),
-      lastSenderId: uid,
-      unreadCount: { [uid]: 0, [otherUid]: increment(1) },
-    }, { merge: true }).catch(e => console.error('[bumpPrivateChatSummary] failed', { code: e?.code, message: e?.message }));
+    bumpPrivateChatSummaryLib(uid, otherUid, preview)
+      .catch(e => console.error('[bumpPrivateChatSummary] failed', { code: e?.code, message: e?.message }));
   }, [uid]);
 
   const bumpGroupChatSummary = useCallback((groupId, preview) => {
     const group = myGroups.find(g => g.id === groupId);
-    const unreadCount = {};
-    (group?.members || []).forEach(m => { unreadCount[m] = m === uid ? 0 : increment(1); });
-    updateDoc(doc(db, 'groups', groupId), {
-      lastMessage: preview,
-      lastMessageAt: serverTimestamp(),
-      lastSenderId: uid,
-      unreadCount,
-    }).catch(e => console.error('[bumpGroupChatSummary] failed', { code: e?.code, message: e?.message }));
+    bumpGroupChatSummaryLib(uid, group?.members, groupId, preview)
+      .catch(e => console.error('[bumpGroupChatSummary] failed', { code: e?.code, message: e?.message }));
   }, [uid, myGroups]);
 
   const sendPrivate = useCallback(async () => {
@@ -2907,7 +2945,10 @@ export default function ChatApp({ user }) {
                           />
                         </LayoutDragWrap>
                         {folder.open && (
-                          <div style={{ marginLeft: 14, marginTop: 2, paddingLeft: 8, borderLeft: "1px solid var(--border)" }}>
+                          // 子項目不縮排、不額外加框——闊度直接跟頂層功能方塊一樣
+                          // （用同一份 itemPadding），這是「功能方塊闊度必須跟原先
+                          // 闊度一樣」的意思：被收進資料夾不會讓方塊變窄。
+                          <div style={{ marginTop: 2 }}>
                             {folder.items.map(key => (
                               <LayoutDragWrap key={key} dragKey={key} sourceContainer={fid} controller={L} style={itemPadding}>
                                 {topItems[key]}

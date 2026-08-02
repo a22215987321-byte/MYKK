@@ -13,6 +13,7 @@ import { toast } from "../lib/toast";
 import { useMediaAttachments } from "../lib/useMediaAttachments";
 import MediaAttachPreview from "./media-editor/MediaAttachPreview";
 import { Avatar, CommentSection } from "./PostComments";
+import SharePostModal from "./SharePostModal";
 
 const HASHTAG_RE = /#[\p{L}\p{N}_]+/gu;
 function extractHashtags(text) {
@@ -112,6 +113,7 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
+  const [showShare, setShowShare] = useState(false);
   const liked = (post.likes || []).includes(myUid);
   const bookmarked = (post.bookmarks || []).includes(myUid);
   const isMine = post.userId === myUid;
@@ -139,18 +141,6 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
     } catch (err) {
       console.error("[Feed.PostCard] toggleBookmark failed", { code: err?.code, message: err?.message, postId: post.id });
     }
-  };
-
-  const share = async () => {
-    const url = `${window.location.origin}/feed#${post.id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "EVONCHAT 動態", text: post.text?.slice(0, 80) || "", url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        toast("連結已複製", "success");
-      }
-    } catch { /* 使用者取消分享，不用處理 */ }
   };
 
   const handleDelete = async () => {
@@ -277,7 +267,7 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
           <span style={{ fontSize: 18 }}>💬</span>
           <span>{commentCount}</span>
         </button>
-        <button onClick={share} className="feed-action-btn"
+        <button onClick={() => setShowShare(true)} className="feed-action-btn"
           style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}>
           <Icon name="send" size={17} />
         </button>
@@ -293,6 +283,8 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
           <CommentSection postId={post.id} myProfile={myProfile} />
         </div>
       )}
+
+      {showShare && <SharePostModal post={post} onClose={() => setShowShare(false)} />}
     </div>
   );
 }
