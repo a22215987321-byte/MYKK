@@ -20,6 +20,7 @@ import DictionaryRoom from "./DictionaryRoom";
 import FeedApp from "./Feed";
 import ProfileView from "./ProfileView";
 import VideoHub from "./VideoHub";
+import ChannelProfileView from "./ChannelProfileView";
 import SpanishPronunciation from "./SpanishPronunciation";
 import SpanishGrammar from "./SpanishGrammar";
 import SpanishVerbConjugator from "./SpanishVerbConjugator";
@@ -2990,14 +2991,16 @@ export default function ChatApp({ user }) {
           )}
 
           {/* 影片瀏覽入口：videoHubUid 沒有值時是搜尋/熱門頻道清單（VideoHub），
-              點了某個頻道之後換成那個人的 ProfileView、直接開在「影片」分頁；
+              點了某個頻道之後換成 ChannelProfileView——YouTube 頻道風格的獨立
+              版面（橫幅+訂閱+分頁+影片格網），刻意跟動態消息那邊的個人頁
+              （ProfileView）不一樣，一眼能分辨現在是在「看影片」還是「看動態」。
               點左上角關閉回到搜尋清單，不會整個離開這個 view。 */}
           {showVideoHub && !activeFriendId && !activeGroupId && (
             <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
               {videoHubUid ? (
-                <ProfileView key={videoHubUid} uid={videoHubUid} embedded initialTab="videos"
+                <ChannelProfileView key={videoHubUid} uid={videoHubUid}
                   onClose={() => setVideoHubUid(null)}
-                  onOpenProfile={setVideoHubUid} />
+                  onOpenChannel={setVideoHubUid} />
               ) : (
                 <VideoHub onOpenChannel={setVideoHubUid} />
               )}
