@@ -256,6 +256,351 @@ function DragGhost({ controller, children }) {
   );
 }
 
+// 側欄「資料夾」系統：跟 useReorder 一樣的按住 0.5 秒才觸發拖曳、放開回到
+// 原位／碰到目標才交換的手感，多加一層「容器」概念——layout 是最上層清單
+// （項目 key 或 "folder:<id>"），folders 另外存每個資料夾自己的名字／展開狀態／
+// 裡面的項目清單。同容器內拖曳＝即時交換位置（跟原本一樣），跨容器（拖進/拖出
+// 資料夾）則是放開滑鼠當下才真正搬過去，過程中只用 dropTarget 高亮顯示目標。
+function useSidebarLayout(storageKey, legacyKey, defaultOrder) {
+  const [layout, setLayout] = useState(defaultOrder);
+  const [folders, setFolders] = useState({});
+  const [dragState, setDragState] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+  const topRefs = useRef(new Map());
+  const childRefs = useRef(new Map());
+  const justDraggedRef = useRef(null);
+  const loadedRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved && Array.isArray(saved.layout) && saved.folders && typeof saved.folders === "object") {
+          const folderIds = new Set(Object.keys(saved.folders).map(id => `folder:${id}`));
+          const validLayout = saved.layout.filter(k => defaultOrder.includes(k) || folderIds.has(k));
+          const placed = new Set([
+            ...validLayout.filter(k => !k.startsWith("folder:")),
+            ...Object.values(saved.folders).flatMap(f => Array.isArray(f.items) ? f.items.filter(k => defaultOrder.includes(k)) : []),
+          ]);
+          const missing = defaultOrder.filter(k => !placed.has(k));
+          const cleanedFolders = {};
+          for (const [fid, f] of Object.entries(saved.folders)) {
+            cleanedFolders[fid] = { name: f.name || "資料夾", open: !!f.open, items: Array.isArray(f.items) ? f.items.filter(k => defaultOrder.includes(k)) : [] };
+          }
+          setLayout([...validLayout, ...missing]);
+          setFolders(cleanedFolders);
+          loadedRef.current = true;
+          return;
+        }
+      }
+      if (legacyKey) {
+        const rawLegacy = localStorage.getItem(legacyKey);
+        if (rawLegacy) {
+          const savedLegacy = JSON.parse(rawLegacy);
+          if (Array.isArray(savedLegacy)) {
+            const cleaned = savedLegacy.filter(k => defaultOrder.includes(k));
+            const missing = defaultOrder.filter(k => !cleaned.includes(k));
+            setLayout([...cleaned, ...missing]);
+          }
+        }
+      }
+    } catch {}
+    loadedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    try { localStorage.setItem(storageKey, JSON.stringify({ layout, folders })); } catch {}
+  }, [storageKey, layout, folders]);
+
+  const registerTop = useCallback((key) => (el) => {
+    if (el) topRefs.current.set(key, el); else topRefs.current.delete(key);
+  }, []);
+  const registerChild = useCallback((fid, key) => (el) => {
+    if (el) childRefs.current.set(key, { fid, el }); else childRefs.current.delete(key);
+  }, []);
+
+  const startDrag = useCallback((dragKey, sourceContainer) => (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    let armed = false, moved = false;
+    let currentDrop = null;
+    const setDrop = (v) => { currentDrop = v; setDropTarget(v); };
+    const timer = setTimeout(() => {
+      const el = sourceContainer === "top" ? topRefs.current.get(dragKey) : childRefs.current.get(dragKey)?.el;
+      if (!el) return;
+      armed = true;
+      const rect = el.getBoundingClientRect();
+      setDragState({ key: dragKey, sourceContainer, x: rect.left, y: rect.top, w: rect.width, h: rect.height, grabX: e.clientX - rect.left, grabY: e.clientY - rect.top });
+    }, 500);
+
+    const findHit = (map, cx, cy) => {
+      for (const [k, v] of map) {
+        if (k === dragKey) continue;
+        const el = v.el || v;
+        const r = el.getBoundingClientRect();
+        if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return { key: k, fid: v.fid };
+      }
+      return null;
+    };
+
+    const onMove = (ev) => {
+      if (!armed) return;
+      moved = true;
+      ev.preventDefault();
+      setDragState(prev => prev ? { ...prev, x: ev.clientX - prev.grabX, y: ev.clientY - prev.grabY } : prev);
+      const cx = ev.clientX, cy = ev.clientY;
+
+      if (sourceContainer !== "top") {
+        const hitChild = findHit(childRefs.current, cx, cy);
+        if (hitChild && hitChild.fid === sourceContainer) {
+          setDrop(null);
+          setFolders(prev => {
+            const items = prev[sourceContainer]?.items || [];
+            const a = items.indexOf(dragKey), b = items.indexOf(hitChild.key);
+            if (a < 0 || b < 0 || a === b) return prev;
+            const next = items.slice();
+            [next[a], next[b]] = [next[b], next[a]];
+            return { ...prev, [sourceContainer]: { ...prev[sourceContainer], items: next } };
+          });
+          return;
+        }
+      }
+
+      const hitTop = findHit(topRefs.current, cx, cy);
+      if (hitTop) {
+        if (hitTop.key.startsWith("folder:")) {
+          const fid = hitTop.key.slice(7);
+          if (sourceContainer === "top" && dragKey.startsWith("folder:")) {
+            setDrop(null);
+            setLayout(prev => {
+              const a = prev.indexOf(dragKey), b = prev.indexOf(hitTop.key);
+              if (a < 0 || b < 0 || a === b) return prev;
+              const next = prev.slice();
+              [next[a], next[b]] = [next[b], next[a]];
+              return next;
+            });
+          } else if (fid === sourceContainer) {
+            setDrop(null);
+          } else {
+            setDrop({ folderId: fid });
+          }
+        } else {
+          if (sourceContainer === "top") {
+            setDrop(null);
+            setLayout(prev => {
+              const a = prev.indexOf(dragKey), b = prev.indexOf(hitTop.key);
+              if (a < 0 || b < 0 || a === b) return prev;
+              const next = prev.slice();
+              [next[a], next[b]] = [next[b], next[a]];
+              return next;
+            });
+          } else {
+            setDrop({ top: true });
+          }
+        }
+      } else {
+        setDrop(null);
+      }
+    };
+
+    const onUp = () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      setDragState(null);
+      setDropTarget(null);
+      if (armed && moved) {
+        justDraggedRef.current = dragKey;
+        if (sourceContainer === "top") {
+          if (currentDrop?.folderId) {
+            const fid = currentDrop.folderId;
+            setLayout(l => l.filter(k => k !== dragKey));
+            setFolders(f => ({ ...f, [fid]: { ...f[fid], items: [...(f[fid]?.items || []), dragKey] } }));
+          }
+        } else {
+          if (currentDrop?.folderId && currentDrop.folderId !== sourceContainer) {
+            const fid = currentDrop.folderId;
+            setFolders(f => ({
+              ...f,
+              [sourceContainer]: { ...f[sourceContainer], items: (f[sourceContainer]?.items || []).filter(k => k !== dragKey) },
+              [fid]: { ...f[fid], items: [...(f[fid]?.items || []), dragKey] },
+            }));
+          } else if (currentDrop?.top) {
+            setFolders(f => ({ ...f, [sourceContainer]: { ...f[sourceContainer], items: (f[sourceContainer]?.items || []).filter(k => k !== dragKey) } }));
+            setLayout(l => [...l, dragKey]);
+          }
+        }
+      }
+    };
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, []);
+
+  const wasJustDragged = useCallback((key) => {
+    if (justDraggedRef.current === key) { justDraggedRef.current = null; return true; }
+    return false;
+  }, []);
+
+  const addFolder = useCallback((name) => {
+    const id = `f${Date.now()}`;
+    setFolders(f => ({ ...f, [id]: { name, open: true, items: [] } }));
+    setLayout(l => [...l, `folder:${id}`]);
+  }, []);
+
+  const renameFolder = useCallback((id, name) => {
+    setFolders(f => (f[id] ? { ...f, [id]: { ...f[id], name } } : f));
+  }, []);
+
+  const toggleFolder = useCallback((id) => {
+    setFolders(f => (f[id] ? { ...f, [id]: { ...f[id], open: !f[id].open } } : f));
+  }, []);
+
+  const deleteFolder = useCallback((id) => {
+    const removed = folders[id];
+    if (!removed) return;
+    setFolders(f => { const { [id]: _drop, ...rest } = f; return rest; });
+    setLayout(l => l.flatMap(k => (k === `folder:${id}` ? removed.items : [k])));
+  }, [folders]);
+
+  return { layout, folders, dragState, dropTarget, startDrag, wasJustDragged, registerTop, registerChild, addFolder, renameFolder, toggleFolder, deleteFolder };
+}
+
+// 包住每個放進資料夾系統的項目／資料夾本身：sourceContainer 是 "top"（最上層）
+// 或某個資料夾 id（代表這個項目目前放在該資料夾裡面）。
+function LayoutDragWrap({ dragKey, sourceContainer, controller, style, children }) {
+  const { dragState, startDrag, wasJustDragged, registerTop, registerChild } = controller;
+  const isDragging = dragState?.key === dragKey;
+  const ref = sourceContainer === "top" ? registerTop(dragKey) : registerChild(sourceContainer, dragKey);
+  return (
+    <div
+      ref={ref}
+      onMouseDown={startDrag(dragKey, sourceContainer)}
+      onClickCapture={e => { if (wasJustDragged(dragKey)) { e.stopPropagation(); e.preventDefault(); } }}
+      style={{ ...style, visibility: isDragging ? "hidden" : "visible", cursor: "grab" }}>
+      {children}
+    </div>
+  );
+}
+
+function LayoutDragGhost({ controller, topItems }) {
+  const { dragState, folders } = controller;
+  if (!dragState) return null;
+  const key = dragState.key;
+  let content = null;
+  if (key.startsWith("folder:")) {
+    const fid = key.slice(7);
+    const f = folders[fid];
+    if (f) {
+      content = (
+        <FolderBlock id={fid} name={f.name} open={f.open} count={f.items.length}
+          isDropTarget={false} onToggle={() => {}} onRename={() => {}} onDelete={() => {}} />
+      );
+    }
+  } else {
+    content = topItems[key];
+  }
+  return (
+    <div style={{
+      position: "fixed", left: dragState.x, top: dragState.y,
+      width: dragState.w, height: dragState.h, zIndex: 1000,
+      pointerEvents: "none", opacity: 0.92, transform: "scale(1.02)",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.45)", borderRadius: "var(--radius-md)", overflow: "hidden",
+    }}>
+      {content}
+    </div>
+  );
+}
+
+// 資料夾方塊：外觀比照 NavItem，多一個展開/收合箭頭跟重新命名／刪除。
+// isDropTarget 為 true 時（有東西正拖到它上面）外框亮起來提示放這裡。
+function FolderBlock({ id, name, open, count, isDropTarget, onToggle, onRename, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+  useEffect(() => { setDraft(name); }, [name]);
+  return (
+    <div style={{
+      width: "100%", borderRadius: "var(--navcard-radius, var(--radius-md))",
+      border: isDropTarget ? "1px solid var(--accent)" : "1px solid var(--navcard-border, transparent)",
+      boxShadow: isDropTarget ? "0 0 0 2px var(--accent-active)" : "none",
+      background: "var(--navcard-bg, transparent)", boxSizing: "border-box",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 10px" }}>
+        <div onClick={editing ? undefined : onToggle} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, cursor: editing ? "default" : "pointer" }}>
+          <div style={{
+            width: "var(--navcard-icon-size, 34px)", height: "var(--navcard-icon-size, 34px)",
+            borderRadius: "var(--navcard-icon-radius, var(--radius-md))",
+            background: "linear-gradient(135deg,#475569,#1e293b)", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 18, flexShrink: 0,
+          }}>📁</div>
+          <div style={{ minWidth: 0, overflow: "hidden", flex: 1 }}>
+            {editing ? (
+              <input
+                autoFocus value={draft} onChange={e => setDraft(e.target.value)}
+                onMouseDown={e => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
+                onKeyDown={e => {
+                  if (e.key === "Enter") { onRename(draft.trim() || name); setEditing(false); }
+                  if (e.key === "Escape") { setDraft(name); setEditing(false); }
+                }}
+                onBlur={() => { onRename(draft.trim() || name); setEditing(false); }}
+                style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 13, fontWeight: 600, padding: "2px 6px", boxSizing: "border-box" }}
+              />
+            ) : (
+              <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+            )}
+            {!editing && <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{count} 個功能・點擊{open ? "收合" : "展開"}</div>}
+          </div>
+          {!editing && (
+            <span style={{ fontSize: 11, color: "var(--text-faint)", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}>▶</span>
+          )}
+        </div>
+        {!editing && (
+          <>
+            <button onClick={() => setEditing(true)} onMouseDown={e => e.stopPropagation()} title="重新命名"
+              style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, flexShrink: 0, padding: 4 }}>✏️</button>
+            <button onClick={() => { if (confirm(`刪除資料夾「${name}」？（裡面的功能會移回外層）`)) onDelete(); }} onMouseDown={e => e.stopPropagation()} title="刪除資料夾"
+              style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, flexShrink: 0, padding: 4 }}>🗑️</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 新增資料夾：預設是一顆虛線按鈕，點下去變成輸入名字的欄位。
+function AddFolderButton({ onAdd }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState("");
+  if (!editing) {
+    return (
+      <button onClick={() => setEditing(true)}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "1px dashed var(--border)", borderRadius: "var(--radius-md)", padding: "8px 10px", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, boxSizing: "border-box" }}>
+        <span style={{ fontSize: 15 }}>➕</span> 新增資料夾
+      </button>
+    );
+  }
+  const commit = () => {
+    const trimmed = name.trim();
+    if (trimmed) onAdd(trimmed);
+    setName(""); setEditing(false);
+  };
+  return (
+    <div style={{ display: "flex", gap: 6 }}>
+      <input
+        autoFocus value={name} onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setName(""); setEditing(false); } }}
+        onBlur={() => { if (!name.trim()) setEditing(false); }}
+        placeholder="資料夾名稱" style={{ flex: 1, minWidth: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, padding: "6px 10px", boxSizing: "border-box" }}
+      />
+      <button onClick={commit} style={{ background: "var(--accent)", border: "none", borderRadius: 8, color: "#fff", padding: "0 12px", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>✓</button>
+    </div>
+  );
+}
+
 // 群組頭像跟 avatar emoji 共用同一個欄位（預設 "👥"，上傳後變成 R2 圖片網址）——
 // 用這個判斷目前存的是要當文字顯示的 emoji，還是要當 <img src> 顯示的圖片網址。
 function isGroupAvatarImage(avatar) {
@@ -961,7 +1306,7 @@ export default function ChatApp({ user }) {
   // 側欄功能方塊按住拖曳調整順序——桌面版限定（手機版側欄是完全不同的簡化排法）。
   // 動態消息／公共大廳固定在最上面當錨點，其餘全部（原本分在三個資料夾裡的
   // 項目也拆出來攤平）都在同一份順序清單裡，彼此都可以互相拖曳交換位置。
-  const topNavReorder = useReorder("cr-order-top-v3", [
+  const sidebarLayout = useSidebarLayout("cr-sidebar-v1", "cr-order-top-v3", [
     "leaderboard", "calendar", "videoHub",
     "upgrade", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion",
     "englishPron", "ieltsBand4", "vocab",
@@ -2420,16 +2765,50 @@ export default function ChatApp({ user }) {
               ),
             };
             const itemPadding = { padding: "0 10px 6px" };
+            const L = sidebarLayout;
             return (
               <>
-                {topNavReorder.order.map(key => (
-                  <DragReorderWrap key={key} dragKey={key} controller={topNavReorder} style={itemPadding}>
-                    {topItems[key]}
-                  </DragReorderWrap>
-                ))}
-                <DragGhost controller={topNavReorder}>
-                  {topNavReorder.dragState && topItems[topNavReorder.dragState.key]}
-                </DragGhost>
+                {L.layout.map(entry => {
+                  if (entry.startsWith("folder:")) {
+                    const fid = entry.slice(7);
+                    const folder = L.folders[fid];
+                    if (!folder) return null;
+                    return (
+                      <div key={entry} style={itemPadding}>
+                        <LayoutDragWrap dragKey={entry} sourceContainer="top" controller={L}>
+                          <FolderBlock
+                            id={fid} name={folder.name} open={folder.open} count={folder.items.length}
+                            isDropTarget={L.dropTarget?.folderId === fid}
+                            onToggle={() => L.toggleFolder(fid)}
+                            onRename={(name) => L.renameFolder(fid, name)}
+                            onDelete={() => L.deleteFolder(fid)}
+                          />
+                        </LayoutDragWrap>
+                        {folder.open && (
+                          <div style={{ marginLeft: 14, marginTop: 2, paddingLeft: 8, borderLeft: "1px solid var(--border)" }}>
+                            {folder.items.map(key => (
+                              <LayoutDragWrap key={key} dragKey={key} sourceContainer={fid} controller={L} style={itemPadding}>
+                                {topItems[key]}
+                              </LayoutDragWrap>
+                            ))}
+                            {folder.items.length === 0 && (
+                              <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "4px 10px 8px" }}>拖曳功能方塊到這裡</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <LayoutDragWrap key={entry} dragKey={entry} sourceContainer="top" controller={L} style={itemPadding}>
+                      {topItems[entry]}
+                    </LayoutDragWrap>
+                  );
+                })}
+                <LayoutDragGhost controller={L} topItems={topItems} />
+                <div style={{ padding: "2px 10px 6px" }}>
+                  <AddFolderButton onAdd={(name) => L.addFolder(name)} />
+                </div>
               </>
             );
           })()}

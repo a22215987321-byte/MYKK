@@ -13,8 +13,8 @@ import useIsMobile from "../lib/useIsMobile";
 import { uploadToR2 } from "../lib/uploadToR2";
 import { formatDate } from "../lib/format";
 import { toast } from "../lib/toast";
-import { PhotoEditorLazy, VideoEditorLazy } from "./media-editor";
-import { validatePhotoFile, validateVideoFile } from "./media-editor/mediaValidation";
+import { useMediaAttachments } from "../lib/useMediaAttachments";
+import MediaAttachPreview from "./media-editor/MediaAttachPreview";
 import { getNotificationVolume, setNotificationVolume, playNotificationSound } from "../lib/notificationSound";
 import {
   doc, onSnapshot, collection, query, where, orderBy, getDocs, addDoc,
@@ -124,53 +124,17 @@ const TEXTAREA_MAX_HEIGHT_RATIO = 0.55;
 function NewPostForm({ profile, onPosted }) {
   const [text, setText] = useState("");
   const [visibility, setVisibility] = useState("public");
-  const [mediaFile, setMediaFile] = useState(null);
-  const [mediaType, setMediaType] = useState(null);
-  const [preview, setPreview] = useState(null);
+  const media = useMediaAttachments();
   const [posting, setPosting] = useState(false);
-  const [editingPhoto, setEditingPhoto] = useState(false);
-  const [editingVideo, setEditingVideo] = useState(false);
-  const [previewLightbox, setPreviewLightbox] = useState(false);
-  const fileRef = useRef();
   const textareaRef = useRef();
   const manualHeightRef = useRef(0);
   const pendingCursorRef = useRef(null);
 
-  const attachFile = (file) => {
-    const isVideo = file.type.startsWith("video/");
-    const err = isVideo ? validateVideoFile(file) : validatePhotoFile(file);
-    if (err) { toast(err); return false; }
-    setMediaFile(file);
-    setMediaType(isVideo ? "video" : "image");
-    setPreview(URL.createObjectURL(file));
-    return true;
-  };
-
-  const onFile = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    attachFile(file);
-  };
-
-  const removeMedia = () => {
-    setMediaFile(null);
-    setMediaType(null);
-    setPreview(null);
-    if (fileRef.current) fileRef.current.value = "";
-  };
-
   const onTextareaPaste = (e) => {
     const items = e.clipboardData?.items;
     if (!items) return;
-    const imageItem = Array.from(items).find(it => it.type.startsWith("image/"));
-    if (!imageItem) return;
-    e.preventDefault();
-    const file = imageItem.getAsFile();
-    if (!file) return;
-    if (mediaFile) { toast("已經有附加媒體了，請先移除再貼上新圖片"); return; }
-    const named = new File([file], file.name || `pasted-${Date.now()}.png`, { type: file.type });
-    if (!attachFile(named)) return;
-    toast("圖片已加入", "success");
+    const handled = media.onPasteImages(items, () => e.preventDefault());
+    if (!handled) return;
 
     const pastedText = e.clipboardData.getData("text/plain");
     if (pastedText) {
@@ -205,7 +169,7 @@ function NewPostForm({ profile, onPosted }) {
   };
 
   const submit = async () => {
-    if (!text.trim() && !mediaFile) { toast("請輸入內容"); return; }
+    if (!text.trim() && !media.hasMedia) { toast("請輸入內容"); return; }
     if (!auth.currentUser || !profile?.uid) {
       console.error("[ProfileView.NewPostForm] submit blocked: no authenticated user", { authCurrentUser: auth.currentUser, profileUid: profile?.uid });
       toast("請先登入後再發布");
@@ -225,6 +189,7 @@ function NewPostForm({ profile, onPosted }) {
       userColor: profile.color || "var(--accent)",
       text: text.trim(),
       imageUrl: null,
+      imageUrls: [],
       videoUrl: null,
       likes: [],
       visibility,
@@ -232,20 +197,21 @@ function NewPostForm({ profile, onPosted }) {
       createdAt: serverTimestamp(),
     };
     try {
-      if (mediaFile) {
-        console.log("[ProfileView.NewPostForm] uploading media", { name: mediaFile.name, type: mediaFile.type, size: mediaFile.size });
-        const url = await uploadToR2(mediaFile);
-        if (mediaType === "video") payload.videoUrl = url;
-        else payload.imageUrl = url;
+      if (media.hasMedia) {
+        console.log("[ProfileView.NewPostForm] uploading media", { imageCount: media.imageFiles.length, hasVideo: !!media.videoFile });
+        const { imageUrls, videoUrl } = await media.upload();
+        payload.imageUrls = imageUrls;
+        payload.imageUrl = imageUrls[0] || null;
+        payload.videoUrl = videoUrl;
       }
       console.log("[ProfileView.NewPostForm] submitting post", {
-        uid: auth.currentUser.uid, hasImage: !!payload.imageUrl, hasVideo: !!payload.videoUrl,
+        uid: auth.currentUser.uid, imageCount: payload.imageUrls.length, hasVideo: !!payload.videoUrl,
         textLength: payload.text.length, payload,
       });
       const ref = await addDoc(collection(db, "posts"), payload);
       console.log("[ProfileView.NewPostForm] post created", { id: ref.id });
       setText("");
-      removeMedia();
+      media.removeAll();
       setVisibility("public");
       onPosted?.();
     } catch (err) {
@@ -267,7 +233,7 @@ function NewPostForm({ profile, onPosted }) {
     }
   };
 
-  const canPost = (text.trim() || mediaFile) && !posting;
+  const canPost = (text.trim() || media.hasMedia) && !posting;
 
   return (
     <div style={{ borderBottom: "1px solid var(--panel)", padding: 16 }}>
@@ -291,82 +257,16 @@ function NewPostForm({ profile, onPosted }) {
               minHeight: TEXTAREA_MIN_HEIGHT, maxHeight: `${TEXTAREA_MAX_HEIGHT_RATIO * 100}vh`, overflowY: "auto", resize: "vertical",
             }}
           />
-          {preview && (
-            <div
-              onClick={() => setPreviewLightbox(true)}
-              style={{ position: "relative", marginTop: 8, width: 120, height: 120, borderRadius: 10, overflow: "hidden", cursor: "zoom-in", flexShrink: 0 }}
-            >
-              {mediaType === "video"
-                ? <video src={preview} muted style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                : <img src={preview} alt="預覽" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              }
-              {mediaType === "image" && (
-                <button onClick={e => { e.stopPropagation(); setEditingPhoto(true); }} aria-label="編輯圖片"
-                  style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: 13, width: 26, height: 26, color: "#fff", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  ✏️
-                </button>
-              )}
-              {mediaType === "video" && (
-                <button onClick={e => { e.stopPropagation(); setEditingVideo(true); }} aria-label="剪輯影片"
-                  style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: 13, width: 26, height: 26, color: "#fff", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  ✂️
-                </button>
-              )}
-              <button onClick={e => { e.stopPropagation(); removeMedia(); }} aria-label="移除附加媒體"
-                style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.65)", border: "none", borderRadius: "50%", width: 22, height: 22, color: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                ✕
-              </button>
-            </div>
-          )}
-
-          {previewLightbox && preview && (
-            <div role="dialog" aria-modal="true" aria-label="媒體預覽" onClick={() => setPreviewLightbox(false)}
-              style={{ position: "fixed", inset: 0, zIndex: 1500, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
-              {mediaType === "video"
-                ? <video src={preview} controls autoPlay onClick={e => e.stopPropagation()} style={{ maxWidth: "92vw", maxHeight: "92vh" }} />
-                : <img src={preview} alt="預覽" onClick={e => e.stopPropagation()} style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain" }} />
-              }
-              <button onClick={() => setPreviewLightbox(false)} aria-label="關閉預覽"
-                style={{ position: "absolute", top: 20, right: 20, background: "rgba(30,41,59,0.9)", border: "1px solid var(--border)", color: "#f1f5f9", fontSize: 20, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                ✕
-              </button>
-            </div>
-          )}
-
-          {editingPhoto && mediaFile && (
-            <PhotoEditorLazy
-              file={mediaFile}
-              onCancel={() => setEditingPhoto(false)}
-              onExport={(blob) => {
-                const edited = new File([blob], mediaFile.name.replace(/\.\w+$/, "") + "-edited.jpg", { type: "image/jpeg" });
-                setMediaFile(edited);
-                setPreview(URL.createObjectURL(blob));
-                setEditingPhoto(false);
-              }}
-            />
-          )}
-
-          {editingVideo && mediaFile && (
-            <VideoEditorLazy
-              files={[mediaFile]}
-              onCancel={() => setEditingVideo(false)}
-              onExport={(videoBlob) => {
-                const edited = new File([videoBlob], mediaFile.name.replace(/\.\w+$/, "") + "-edited.mp4", { type: "video/mp4" });
-                setMediaFile(edited);
-                setPreview(URL.createObjectURL(videoBlob));
-                setEditingVideo(false);
-              }}
-            />
-          )}
+          <MediaAttachPreview media={media} thumbSize={120} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, gap: 8, flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button onClick={() => fileRef.current?.click()}
+              <button onClick={() => media.fileRef.current?.click()}
                 style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}>
-                📎 加入圖片/影片
+                📎 加入圖片/影片（可多選）
               </button>
               <VisibilityMenu value={visibility} onChange={setVisibility} />
             </div>
-            <input ref={fileRef} type="file" accept="image/*,video/*" onChange={onFile} style={{ display: "none" }} />
+            <input ref={media.fileRef} type="file" accept="image/*,video/*" multiple onChange={media.onFile} style={{ display: "none" }} />
             <button onClick={submit} disabled={!canPost}
               style={{ background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)", border: "none", borderRadius: 10, padding: "8px 20px", color: canPost ? "var(--accent-text)" : "var(--text-dim)", cursor: canPost ? "pointer" : "default", fontSize: 14, fontWeight: 700 }}>
               {posting ? "發佈中..." : "發佈"}
@@ -374,6 +274,36 @@ function NewPostForm({ profile, onPosted }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// 貼文列表卡片裡的圖片區——1 張整寬顯示（跟原本一樣），多張排成方格，
+// 點擊一律交給外層開 MediaLightbox（裡面自己有張與張之間的左右切換）。
+function PostImageGrid({ images, maxHeight = 400 }) {
+  const n = images.length;
+  if (n === 1) {
+    return (
+      <img src={images[0]} alt="貼文圖片" style={{ width: "100%", maxHeight, objectFit: "cover", display: "block", transition: "filter 0.2s" }}
+        onMouseEnter={e => e.currentTarget.style.filter = "brightness(0.85)"}
+        onMouseLeave={e => e.currentTarget.style.filter = "brightness(1)"} />
+    );
+  }
+  const shown = images.slice(0, 4);
+  const extra = n - shown.length;
+  const cols = n === 3 ? 3 : 2;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 2 }}>
+      {shown.map((src, i) => (
+        <div key={i} style={{ position: "relative", aspectRatio: "1 / 1", overflow: "hidden", background: "#000" }}>
+          <img src={src} alt={`貼文圖片 ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          {extra > 0 && i === shown.length - 1 && (
+            <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700 }}>
+              +{extra}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -428,12 +358,10 @@ function PostItem({ post, profile, isOwner, onTogglePin, onOpenMedia }) {
                 <video src={post.videoUrl} controls style={{ width: "100%", maxHeight: 400, display: "block" }} />
               </div>
             )}
-            {post.imageUrl && (
+            {!post.videoUrl && post.imageUrl && (
               <div style={{ borderRadius: 16, overflow: "hidden", marginTop: 10, cursor: "zoom-in" }}
                 onClick={() => onOpenMedia(post)}>
-                <img src={post.imageUrl} alt="貼文圖片" style={{ width: "100%", maxHeight: 400, objectFit: "cover", display: "block", transition: "filter 0.2s" }}
-                  onMouseEnter={e => e.currentTarget.style.filter = "brightness(0.85)"}
-                  onMouseLeave={e => e.currentTarget.style.filter = "brightness(1)"} />
+                <PostImageGrid images={post.imageUrls?.length ? post.imageUrls : [post.imageUrl]} maxHeight={400} />
               </div>
             )}
             <div style={{ display: "flex", gap: 20, marginTop: 12 }}>
@@ -594,6 +522,12 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
   const [commentText, setCommentText] = useState("");
   const [sendingComment, setSendingComment] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
+  // 一則貼文可能有多張圖——先在「這則貼文的圖片」之間左右切換，切到頭/尾了
+  // 才換去上一則/下一則貼文（跟 index 是分開的兩層導覽）。
+  const [imgIdx, setImgIdx] = useState(0);
+  const images = !post?.videoUrl ? (post?.imageUrls?.length ? post.imageUrls : (post?.imageUrl ? [post.imageUrl] : [])) : [];
+
+  useEffect(() => { setImgIdx(0); }, [post?.id]);
 
   useEffect(() => {
     if (!post) return;
@@ -602,14 +536,26 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
     }, (e) => console.error("[ProfileView.MediaLightbox] comments listener failed", e));
   }, [post?.id]);
 
+  const goPrev = () => {
+    if (images.length > 1 && imgIdx > 0) { setImgIdx(i => i - 1); return; }
+    if (index > 0) onIndexChange(index - 1);
+  };
+  const goNext = () => {
+    if (images.length > 1 && imgIdx < images.length - 1) { setImgIdx(i => i + 1); return; }
+    if (index < mediaList.length - 1) onIndexChange(index + 1);
+  };
+  const hasPrev = (images.length > 1 && imgIdx > 0) || index > 0;
+  const hasNext = (images.length > 1 && imgIdx < images.length - 1) || index < mediaList.length - 1;
+
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "ArrowLeft" && index > 0) onIndexChange(index - 1);
-      else if (e.key === "ArrowRight" && index < mediaList.length - 1) onIndexChange(index + 1);
+      if (e.key === "ArrowLeft") goPrev();
+      else if (e.key === "ArrowRight") goNext();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [index, mediaList.length, onIndexChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, imgIdx, mediaList.length, images.length]);
 
   if (!post) {
     return (
@@ -695,16 +641,21 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
         <div style={{ position: "relative", flex: isMobile ? "0 0 62%" : "1 1 auto", height: isMobile ? undefined : "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           {post.videoUrl
             ? <VideoPlayer src={post.videoUrl} autoPlay />
-            : <img src={post.imageUrl} alt="貼文圖片" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+            : images.length > 0 && <img src={images[imgIdx]} alt="貼文圖片" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
           }
-          {index > 0 && (
-            <button onClick={() => onIndexChange(index - 1)} aria-label="上一張"
+          {images.length > 1 && (
+            <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 20 }}>
+              {imgIdx + 1} / {images.length}
+            </div>
+          )}
+          {hasPrev && (
+            <button onClick={goPrev} aria-label="上一張"
               style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", color: "#fff", width: 36, height: 36, borderRadius: "50%", cursor: "pointer", fontSize: 18 }}>
               ‹
             </button>
           )}
-          {index < mediaList.length - 1 && (
-            <button onClick={() => onIndexChange(index + 1)} aria-label="下一張"
+          {hasNext && (
+            <button onClick={goNext} aria-label="下一張"
               style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.5)", border: "none", color: "#fff", width: 36, height: 36, borderRadius: "50%", cursor: "pointer", fontSize: 18 }}>
               ›
             </button>
@@ -1545,6 +1496,11 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
                       ? <video src={post.videoUrl} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                       : <img src={post.imageUrl} alt="媒體" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.2s", transform: hoveredMedia === post.id ? "scale(1.06)" : "scale(1)" }} />
                     }
+                    {post.imageUrls?.length > 1 && (
+                      <div title={`${post.imageUrls.length} 張圖片`} style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 10 }}>
+                        🖼️ {post.imageUrls.length}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
