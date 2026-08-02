@@ -40,7 +40,7 @@ import { ChevronLeft, ChevronRight, CalendarDays, Settings, LogOut, Plus, Search
 import {
   doc, collection, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
   query, orderBy, limitToLast, serverTimestamp,
-  arrayUnion, arrayRemove, getDocs, where, limit, getDoc,
+  arrayUnion, arrayRemove, getDocs, where, limit, getDoc, increment,
 } from "firebase/firestore";
 
 const EMOJI_QUICK  = QUICK_REACTIONS;
@@ -599,6 +599,22 @@ function AddFolderButton({ onAdd }) {
       />
       <button onClick={commit} style={{ background: "var(--accent)", border: "none", borderRadius: 8, color: "#fff", padding: "0 12px", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>✓</button>
     </div>
+  );
+}
+
+// 側欄好友/群組項目上的未讀角標——0 不顯示，1-99 顯示數字，超過顯示「99+」。
+// 疊在頭像/圖示右上角，跟左下角既有的線上狀態小圓點分開，不會互相遮住。
+function UnreadBadge({ count }) {
+  if (!count) return null;
+  return (
+    <span style={{
+      position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, padding: "0 4px",
+      borderRadius: 999, background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 700,
+      display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1,
+      border: "2px solid var(--panel-alt)", boxSizing: "content-box", pointerEvents: "none",
+    }}>
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }
 
@@ -1249,6 +1265,9 @@ export default function ChatApp({ user }) {
   const [searchQuery,    setSearchQuery]    = useState("");
   const [contextMenu,    setContextMenu]    = useState(null);
   const [friendInfo,     setFriendInfo]     = useState(null);
+  // 每個好友聊天室的未讀數（{ [friendUid]: count }）——來自下面對每個好友各自
+  // 開的 private_chats/{chatId} 全域監聽，掛載後就跑，不用打開聊天室才有資料。
+  const [privateUnread,  setPrivateUnread]  = useState({});
 
   // Group states
   const [myGroups,       setMyGroups]       = useState([]);
@@ -1501,6 +1520,73 @@ export default function ChatApp({ user }) {
     });
   }, [friendsKey]);
 
+  // 全域未讀監聽——每個好友各自的 private_chats/{chatId} 摘要文件開一份
+  // onSnapshot，不管有沒有打開那個聊天室都在跑（掛載後就啟動，整個 session
+  // 期間都在），側欄好友列表才能不用點進去就看到未讀角標。好友清單變動時
+  // 自動補齊/收掉對應的監聽。
+  const privateUnreadUnsubsRef = useRef(new Map());
+  useEffect(() => {
+    const friends = myProfile?.friends || [];
+    const unsubs = privateUnreadUnsubsRef.current;
+    for (const [fid, unsub] of unsubs) {
+      if (!friends.includes(fid)) {
+        unsub();
+        unsubs.delete(fid);
+        setPrivateUnread(prev => {
+          if (!(fid in prev)) return prev;
+          const next = { ...prev };
+          delete next[fid];
+          return next;
+        });
+      }
+    }
+    friends.forEach(fid => {
+      if (unsubs.has(fid)) return;
+      const cid = [uid, fid].sort().join('_');
+      const unsub = onSnapshot(doc(db, 'private_chats', cid), snap => {
+        const count = snap.exists() ? (snap.data().unreadCount?.[uid] || 0) : 0;
+        setPrivateUnread(prev => (prev[fid] === count ? prev : { ...prev, [fid]: count }));
+      }, (e) => console.error('[ChatRoom] private unread listener failed', { fid, code: e?.code }));
+      unsubs.set(fid, unsub);
+    });
+  }, [friendsKey, uid]);
+
+  useEffect(() => () => { privateUnreadUnsubsRef.current.forEach(unsub => unsub()); }, []);
+
+  // 打開聊天室（好友或群組）時把自己的未讀數寫回 0——依賴陣列同時包含
+  // privateUnread/myGroups，訊息在聊天室開著的當下持續進來也會立刻歸零，
+  // 不會等使用者切走再切回來才清掉。
+  useEffect(() => {
+    if (!activeFriendId) return;
+    if (!(privateUnread[activeFriendId] > 0)) return;
+    const cid = [uid, activeFriendId].sort().join('_');
+    setDoc(doc(db, 'private_chats', cid), { unreadCount: { [uid]: 0 } }, { merge: true })
+      .catch(e => console.error('[ChatRoom] clear private unread failed', e));
+  }, [activeFriendId, privateUnread, uid]);
+
+  useEffect(() => {
+    if (!activeGroupId) return;
+    const g = myGroups.find(x => x.id === activeGroupId);
+    if (!(g?.unreadCount?.[uid] > 0)) return;
+    updateDoc(doc(db, 'groups', activeGroupId), { [`unreadCount.${uid}`]: 0 })
+      .catch(e => console.error('[ChatRoom] clear group unread failed', e));
+  }, [activeGroupId, myGroups, uid]);
+
+  // 分頁標題角標：任何聊天室有未讀就在 <title> 前面加 (N)，歸零時還原。
+  const originalTitleRef = useRef(null);
+  useEffect(() => {
+    if (originalTitleRef.current == null) {
+      originalTitleRef.current = document.title.replace(/^\(\d+\+?\)\s*/, '');
+    }
+  }, []);
+  useEffect(() => {
+    const totalPrivate = Object.values(privateUnread).reduce((a, b) => a + (b || 0), 0);
+    const totalGroup = myGroups.reduce((a, g) => a + (g.unreadCount?.[uid] || 0), 0);
+    const total = totalPrivate + totalGroup;
+    const base = originalTitleRef.current ?? document.title;
+    document.title = total > 0 ? `(${total > 99 ? '99+' : total}) ${base}` : base;
+  }, [privateUnread, myGroups, uid]);
+
   // Guards the first snapshot of each message listener below, which fires
   // with the whole existing history as a batch of "added" docChanges —
   // without this, opening a chat would play one ding per historical message
@@ -1701,6 +1787,36 @@ export default function ChatApp({ user }) {
     }
   }, [myProfile, uid]);
 
+  // 每次真的送出訊息後，同步更新聊天室摘要文件（lastMessage/lastMessageAt/
+  // lastSenderId + 每個成員各自的未讀數）——只加這一次額外的 update，不動
+  // 原本的訊息寫入邏輯。unreadCount 每次都把「目前知道的完整成員清單」重新
+  // 寫一遍（而不是只挑被改到的那個 key），這樣不管用 setDoc merge 還是
+  // updateDoc，nested map 都不會漏掉其他人已經存在的未讀數。
+  // private_chats/{chatId} 這個父文件可能還沒被建立過（過去都只有 messages
+  // 子集合），所以用 setDoc(...,{merge:true}) 而不是 updateDoc，避免「找不到
+  // 文件」的錯誤；groups/{groupId} 一定已經存在（建立群組時就有），用 updateDoc。
+  const bumpPrivateChatSummary = useCallback((otherUid, preview) => {
+    const cid = [uid, otherUid].sort().join('_');
+    setDoc(doc(db, 'private_chats', cid), {
+      lastMessage: preview,
+      lastMessageAt: serverTimestamp(),
+      lastSenderId: uid,
+      unreadCount: { [uid]: 0, [otherUid]: increment(1) },
+    }, { merge: true }).catch(e => console.error('[bumpPrivateChatSummary] failed', { code: e?.code, message: e?.message }));
+  }, [uid]);
+
+  const bumpGroupChatSummary = useCallback((groupId, preview) => {
+    const group = myGroups.find(g => g.id === groupId);
+    const unreadCount = {};
+    (group?.members || []).forEach(m => { unreadCount[m] = m === uid ? 0 : increment(1); });
+    updateDoc(doc(db, 'groups', groupId), {
+      lastMessage: preview,
+      lastMessageAt: serverTimestamp(),
+      lastSenderId: uid,
+      unreadCount,
+    }).catch(e => console.error('[bumpGroupChatSummary] failed', { code: e?.code, message: e?.message }));
+  }, [uid, myGroups]);
+
   const sendPrivate = useCallback(async () => {
     if (!privateInput.trim() || !activeFriendId || !myProfile) return;
     const text = privateInput.trim();
@@ -1710,7 +1826,8 @@ export default function ChatApp({ user }) {
       senderAvatarImage: myProfile.avatarImage || "",
       text, createdAt: serverTimestamp(),
     });
-  }, [privateInput, activeFriendId, myProfile, uid, chatId]);
+    bumpPrivateChatSummary(activeFriendId, text.slice(0, 50));
+  }, [privateInput, activeFriendId, myProfile, uid, chatId, bumpPrivateChatSummary]);
 
   const sendPrivateMedia = useCallback(async (file) => {
     if (!activeFriendId || !myProfile) return;
@@ -1723,12 +1840,13 @@ export default function ChatApp({ user }) {
         senderAvatarImage: myProfile.avatarImage || "",
         text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
       });
+      bumpPrivateChatSummary(activeFriendId, isVideo ? "[影片]" : "[圖片]");
     } catch {
       toast("上傳失敗，請重試");
     } finally {
       setPrivateUploading(false);
     }
-  }, [activeFriendId, myProfile, uid, chatId]);
+  }, [activeFriendId, myProfile, uid, chatId, bumpPrivateChatSummary]);
 
   const sendGroup = useCallback(async () => {
     if (!groupInput.trim() || !activeGroupId || !myProfile) return;
@@ -1739,7 +1857,8 @@ export default function ChatApp({ user }) {
       senderAvatarImage: myProfile.avatarImage || "",
       text, imageUrl: "", videoUrl: "", createdAt: serverTimestamp(),
     });
-  }, [groupInput, activeGroupId, myProfile, uid]);
+    bumpGroupChatSummary(activeGroupId, text.slice(0, 50));
+  }, [groupInput, activeGroupId, myProfile, uid, bumpGroupChatSummary]);
 
   const sendGroupMedia = useCallback(async (file) => {
     if (!activeGroupId || !myProfile) return;
@@ -1752,12 +1871,13 @@ export default function ChatApp({ user }) {
         senderAvatarImage: myProfile.avatarImage || "",
         text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
       });
+      bumpGroupChatSummary(activeGroupId, isVideo ? "[影片]" : "[圖片]");
     } catch {
       toast("上傳失敗，請重試");
     } finally {
       setGroupUploading(false);
     }
-  }, [activeGroupId, myProfile, uid]);
+  }, [activeGroupId, myProfile, uid, bumpGroupChatSummary]);
 
   // 群組頭像：跟 avatar emoji 共用同一個欄位，上傳成功後存成 R2 圖片網址；
   // 顯示端用 isGroupAvatarImage() 判斷欄位裡存的是 emoji 字串還是圖片網址。
@@ -1801,19 +1921,21 @@ export default function ChatApp({ user }) {
     if (!activeFriendId || !myProfile) return;
     try {
       await addDoc(collection(db, 'private_chats', chatId, 'messages'), buildItemMessage(item));
+      bumpPrivateChatSummary(activeFriendId, item.type === "sticker" ? "[貼圖]" : (item.emoji || "[表情]"));
     } catch (e) {
       console.error("[sendPrivateItem] failed", { code: e?.code, message: e?.message, item });
     }
-  }, [activeFriendId, myProfile, chatId, buildItemMessage]);
+  }, [activeFriendId, myProfile, chatId, buildItemMessage, bumpPrivateChatSummary]);
 
   const sendGroupItem = useCallback(async (item) => {
     if (!activeGroupId || !myProfile) return;
     try {
       await addDoc(collection(db, 'groups', activeGroupId, 'messages'), buildItemMessage(item));
+      bumpGroupChatSummary(activeGroupId, item.type === "sticker" ? "[貼圖]" : (item.emoji || "[表情]"));
     } catch (e) {
       console.error("[sendGroupItem] failed", { code: e?.code, message: e?.message, item });
     }
-  }, [activeGroupId, myProfile, buildItemMessage]);
+  }, [activeGroupId, myProfile, buildItemMessage, bumpGroupChatSummary]);
 
   const handleSaveProfile = useCallback(async (patch) => {
     await updateDoc(doc(db, 'users', uid), patch);
@@ -2830,10 +2952,13 @@ export default function ChatApp({ user }) {
               return (
                 <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); settleDrawer(false); }}
                   className={`fb ${isActive ? "act" : ""}`}>
-                  <div className="cr-fb-icon">
-                    {isGroupAvatarImage(group.avatar)
-                      ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
-                      : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <div className="cr-fb-icon">
+                      {isGroupAvatarImage(group.avatar)
+                        ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
+                        : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
+                    </div>
+                    <UnreadBadge count={group.unreadCount?.[uid]} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="cr-fb-name">{group.name}</div>
@@ -2894,6 +3019,7 @@ export default function ChatApp({ user }) {
                   <div style={{ position: "relative", flexShrink: 0 }}>
                     <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={48} />
                     <span style={{ position: "absolute", bottom: 1, right: 1, width: 12, height: 12, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
+                    <UnreadBadge count={privateUnread[friend.uid]} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="cr-fb-name">{friend.nickname}</div>
@@ -3544,10 +3670,13 @@ export default function ChatApp({ user }) {
                   return (
                     <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
                       className={`fb ${isActive ? "act" : ""}`}>
-                      <div className="cr-fb-icon" style={{ width: 44, height: 44, fontSize: 20 }}>
-                        {isGroupAvatarImage(group.avatar)
-                          ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
-                          : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        <div className="cr-fb-icon" style={{ width: 44, height: 44, fontSize: 20 }}>
+                          {isGroupAvatarImage(group.avatar)
+                            ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
+                            : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
+                        </div>
+                        <UnreadBadge count={group.unreadCount?.[uid]} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="cr-fb-name" style={{ fontSize: 14 }}>{group.name}</div>
@@ -3587,6 +3716,7 @@ export default function ChatApp({ user }) {
                       <div style={{ position: "relative", flexShrink: 0 }}>
                         <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={44} />
                         <span style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
+                        <UnreadBadge count={privateUnread[friend.uid]} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="cr-fb-name" style={{ fontSize: 14 }}>{friend.nickname}</div>

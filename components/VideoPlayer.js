@@ -112,7 +112,15 @@ export default function VideoPlayer({ src, poster, autoPlay = false }) {
   return (
     <div ref={containerRef} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}
       style={{
-        position: "relative", width: "100%", height: "100%", background: "#000",
+        position: "relative", width: "100%", background: "#000",
+        // 非全螢幕時強制 16:9，不管影片本身實際比例是多少——直向手機錄影塞進
+        // 版面常常會被拉伸/裁得很怪，統一成 16:9 版面才不會每支影片高度都不
+        // 一樣。進全螢幕後改用 height:100%（撐滿整個全螢幕視窗），裡面
+        // <video> 的 objectFit:contain 自然會照它自己真正的比例做信箱黑邊，
+        // 這就是「點擊全螢幕才回復自身影片比例」。
+        aspectRatio: isFullscreen ? undefined : "16 / 9",
+        height: isFullscreen ? "100%" : undefined,
+        maxHeight: "100%",
         display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
         cursor: showControls ? "default" : "none",
       }}>
