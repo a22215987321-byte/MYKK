@@ -146,7 +146,7 @@ html[data-theme="shadow-window"] {
      "windows" with real gaps between them, per an exact reference mock —
      not a recolor of the existing edge-to-edge dashboard layout. */
   --panel-gap: 12px;
-  --sidebar-w-override: 360px;
+  --sidebar-w-override: 296px;
   --cal-w-override: 260px;
 
   /* side/cal 寬度拖曳把手整個關閉：這個主題的三個面板改成固定寬度

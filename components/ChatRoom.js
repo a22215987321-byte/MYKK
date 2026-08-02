@@ -469,9 +469,23 @@ function useSidebarLayout(storageKey, legacyKey, defaultOrder) {
     if (!removed) return;
     setFolders(f => { const { [id]: _drop, ...rest } = f; return rest; });
     setLayout(l => l.flatMap(k => (k === `folder:${id}` ? removed.items : [k])));
+    setActiveFolderId(prev => (prev === id ? null : prev));
   }, [folders]);
 
-  return { layout, folders, dragState, dropTarget, startDrag, wasJustDragged, registerTop, registerChild, addFolder, renameFolder, toggleFolder, deleteFolder };
+  // 資料夾圖示放到最左側那條窄窄的 rail（見 FolderRailIcon）之後，「打開」
+  // 資料夾不再是原地展開一整條列表，而是「這個資料夾目前是不是主清單顯示
+  // 的對象」——activeFolderId 是 rail 跟主清單共用的同一份狀態。點同一個
+  // 資料夾兩次等於收合回「全部功能」清單。
+  const [activeFolderId, setActiveFolderId] = useState(null);
+  const setActiveFolder = useCallback((id) => {
+    setActiveFolderId(prev => (prev === id ? null : id));
+  }, []);
+
+  return {
+    layout, folders, dragState, dropTarget, startDrag, wasJustDragged, registerTop, registerChild,
+    addFolder, renameFolder, toggleFolder, deleteFolder,
+    activeFolderId, setActiveFolder,
+  };
 }
 
 // 包住每個放進資料夾系統的項目／資料夾本身：sourceContainer 是 "top"（最上層）
@@ -520,115 +534,115 @@ function LayoutDragGhost({ controller, topItems }) {
   );
 }
 
-// 資料夾方塊：外觀比照 NavItem，多一個展開/收合箭頭跟重新命名／刪除。
-// isDropTarget 為 true 時（有東西正拖到它上面）外框亮起來提示放這裡。
-function FolderBlock({ id, name, open, count, isDropTarget, onToggle, onRename, onDelete }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(name);
-  useEffect(() => { setDraft(name); }, [name]);
-
-  // 收合狀態：只有一個小圖案（跟「新增資料夾」的 + 圖案同一種尺寸），不是
-  // 一整條「名字＋副標＋箭頭」的列——側欄變窄之後，收起來的資料夾要盡量
-  // 不佔垂直空間。點一下展開；長按 0.5 秒（見 LayoutDragWrap）可以把其他
-  // 功能方塊拖進來，兩個手勢共用同一顆按鈕，靠按住時間長短分辨。
-  if (!open && !editing) {
-    return (
-      <button onClick={onToggle} title={`${name}（${count} 個功能，點擊展開）`}
-        style={{
-          width: "var(--navcard-icon-size, 34px)", height: "var(--navcard-icon-size, 34px)",
-          borderRadius: "var(--navcard-icon-radius, var(--radius-md))",
-          border: isDropTarget ? "1px solid var(--accent)" : "1px solid var(--navcard-border, transparent)",
-          boxShadow: isDropTarget ? "0 0 0 2px var(--accent-active)" : "none",
-          background: "linear-gradient(135deg,#475569,#1e293b)", color: "#fff",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 16, cursor: "pointer", position: "relative", flexShrink: 0, padding: 0,
-        }}>
+// 資料夾圖示——放在側欄最左邊那條窄 rail 裡（跟 Discord 伺服器欄同樣概念），
+// 一個資料夾就是一個小圓角方塊圖示 + 底下一行極小的名字，不再是一整條
+// 「名字＋副標＋箭頭」的列。active 時角變方（跟 Discord 選中伺服器變成
+// squircle 一樣的視覺語言）。isDropTarget 為 true 時外框亮起來提示放這裡。
+function FolderRailIcon({ name, count, active, isDropTarget, onClick }) {
+  return (
+    <button onClick={onClick} title={`${name}（${count} 個功能）`}
+      style={{
+        width: 44, display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+        background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0,
+      }}>
+      <div style={{
+        width: 40, height: 40, borderRadius: active ? "30%" : "50%",
+        background: active ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "linear-gradient(135deg,#475569,#1e293b)",
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, color: "#fff", position: "relative",
+        border: isDropTarget ? "2px solid var(--accent)" : "2px solid transparent",
+        boxShadow: isDropTarget ? "0 0 0 2px var(--accent-active)" : "none",
+        transition: "border-radius 0.15s",
+      }}>
         📁
         {count > 0 && (
-          <span style={{ position: "absolute", bottom: -4, right: -4, minWidth: 14, height: 14, padding: "0 3px", borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, border: "2px solid var(--panel-alt)" }}>
+          <span style={{ position: "absolute", bottom: -3, right: -3, minWidth: 15, height: 15, padding: "0 3px", borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, border: "2px solid var(--bg)" }}>
             {count}
           </span>
         )}
-      </button>
-    );
-  }
-
-  // 展開狀態（或正在重新命名）：窄窄一條標題列，優先讓底下的功能方塊本身
-  // 佔滿寬度——子項目渲染時不再額外縮排，闊度會跟頂層功能方塊完全一樣。
-  return (
-    <div style={{
-      width: "100%", borderRadius: "var(--navcard-radius, var(--radius-md))",
-      border: isDropTarget ? "1px solid var(--accent)" : "1px solid var(--navcard-border, transparent)",
-      boxShadow: isDropTarget ? "0 0 0 2px var(--accent-active)" : "none",
-      background: "var(--navcard-bg, transparent)", boxSizing: "border-box",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px" }}>
-        <div onClick={editing ? undefined : onToggle} style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, cursor: editing ? "default" : "pointer" }}>
-          <span style={{ fontSize: 14, flexShrink: 0 }}>📁</span>
-          {editing ? (
-            <input
-              autoFocus value={draft} onChange={e => setDraft(e.target.value)}
-              onMouseDown={e => e.stopPropagation()}
-              onClick={e => e.stopPropagation()}
-              onKeyDown={e => {
-                if (e.key === "Enter") { onRename(draft.trim() || name); setEditing(false); }
-                if (e.key === "Escape") { setDraft(name); setEditing(false); }
-              }}
-              onBlur={() => { onRename(draft.trim() || name); setEditing(false); }}
-              style={{ flex: 1, minWidth: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 12, fontWeight: 600, padding: "2px 6px", boxSizing: "border-box" }}
-            />
-          ) : (
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-              {name}（{count}）
-            </span>
-          )}
-          {!editing && <span style={{ fontSize: 11, color: "var(--text-faint)", flexShrink: 0 }}>收合 ▲</span>}
-        </div>
-        {!editing && (
-          <>
-            <button onClick={() => setEditing(true)} onMouseDown={e => e.stopPropagation()} title="重新命名"
-              style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, flexShrink: 0, padding: 2 }}>✏️</button>
-            <button onClick={() => { if (confirm(`刪除資料夾「${name}」？（裡面的功能會移回外層）`)) onDelete(); }} onMouseDown={e => e.stopPropagation()} title="刪除資料夾"
-              style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, flexShrink: 0, padding: 2 }}>🗑️</button>
-          </>
-        )}
       </div>
+      <span style={{ fontSize: 9, color: active ? "var(--text)" : "var(--text-faint)", maxWidth: 44, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {name}
+      </span>
+    </button>
+  );
+}
+
+// 新增資料夾：rail 上一個跟資料夾圖示同尺寸的虛線圓形 + 圖案，點下去在旁邊
+// 彈出一個小輸入框（rail 太窄，塞不下一整條輸入欄）。
+function AddFolderRailButton({ onAdd }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  const commit = () => {
+    const trimmed = name.trim();
+    if (trimmed) onAdd(trimmed);
+    setName(""); setOpen(false);
+  };
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative", flexShrink: 0 }}>
+      <button onClick={() => setOpen(v => !v)} title="新增資料夾"
+        style={{
+          width: 40, height: 40, borderRadius: "50%", border: "1px dashed var(--border)",
+          background: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+        ➕
+      </button>
+      {open && (
+        <div style={{ position: "absolute", left: "100%", top: 0, marginLeft: 8, zIndex: 60, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "var(--card-shadow)", padding: 8, width: 170 }}>
+          <input
+            autoFocus value={name} onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setOpen(false); }}
+            placeholder="資料夾名稱"
+            style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 13, padding: "6px 8px", boxSizing: "border-box", marginBottom: 6 }}
+          />
+          <button onClick={commit} style={{ width: "100%", background: "var(--accent)", border: "none", borderRadius: 6, color: "var(--accent-text)", padding: "6px 0", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+            新增
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-// 新增資料夾：預設是一個跟收合資料夾同尺寸的小 + 圖案按鈕（放最左側，不佔
-// 一整排寬度），點下去變成輸入名字的欄位。
-function AddFolderButton({ onAdd }) {
+// 目前正在看某個資料夾內容時，主清單最上面那一條：返回鍵 + 名字 + 重新命名／刪除。
+function ActiveFolderHeader({ folder, onBack, onRename, onDelete }) {
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState("");
-  if (!editing) {
-    return (
-      <button onClick={() => setEditing(true)} title="新增資料夾"
-        style={{
-          width: "var(--navcard-icon-size, 34px)", height: "var(--navcard-icon-size, 34px)",
-          borderRadius: "var(--navcard-icon-radius, var(--radius-md))",
-          border: "1px dashed var(--border)", background: "none", color: "var(--text-faint)",
-          cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0,
-        }}>
-        ➕
-      </button>
-    );
-  }
-  const commit = () => {
-    const trimmed = name.trim();
-    if (trimmed) onAdd(trimmed);
-    setName(""); setEditing(false);
-  };
+  const [draft, setDraft] = useState(folder.name);
+  useEffect(() => { setDraft(folder.name); }, [folder.name]);
   return (
-    <div style={{ display: "flex", gap: 6 }}>
-      <input
-        autoFocus value={name} onChange={e => setName(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setName(""); setEditing(false); } }}
-        onBlur={() => { if (!name.trim()) setEditing(false); }}
-        placeholder="資料夾名稱" style={{ flex: 1, minWidth: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, padding: "6px 10px", boxSizing: "border-box" }}
-      />
-      <button onClick={commit} style={{ background: "var(--accent)", border: "none", borderRadius: 8, color: "#fff", padding: "0 12px", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>✓</button>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 10px 8px" }}>
+      <button onClick={onBack} title="返回全部功能" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 14, padding: 4, flexShrink: 0 }}>←</button>
+      {editing ? (
+        <input
+          autoFocus value={draft} onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === "Enter") { onRename(draft.trim() || folder.name); setEditing(false); }
+            if (e.key === "Escape") { setDraft(folder.name); setEditing(false); }
+          }}
+          onBlur={() => { onRename(draft.trim() || folder.name); setEditing(false); }}
+          style={{ flex: 1, minWidth: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 12, fontWeight: 700, padding: "3px 6px", boxSizing: "border-box" }}
+        />
+      ) : (
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          📁 {folder.name}
+        </span>
+      )}
+      {!editing && (
+        <>
+          <button onClick={() => setEditing(true)} title="重新命名" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, padding: 4, flexShrink: 0 }}>✏️</button>
+          <button onClick={onDelete} title="刪除資料夾" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, padding: 4, flexShrink: 0 }}>🗑️</button>
+        </>
+      )}
     </div>
   );
 }
@@ -1401,6 +1415,10 @@ export default function ChatApp({ user }) {
   // 中間 <main> 本來就是 flex:1，兩邊寬度一變它自動跟著縮放，不用另外處理。
   const SIDEBAR_DEFAULT_WIDTH = 236;
   const CAL_DEFAULT_WIDTH = 252;
+  // 資料夾 rail（.cr-folder-rail）固定寬度——收合/展開按鈕是 .cr-sidebar 的
+  // sibling、用 left 絕對定位貼齊側欄邊界，rail 插進 .cr-shell 之後側欄本身
+  // 往右挪了這麼多，這裡也要跟著補上，不然按鈕位置會對不準。
+  const FOLDER_RAIL_WIDTH = 56;
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [calWidth, setCalWidth] = useState(CAL_DEFAULT_WIDTH);
   const [resizingPanel, setResizingPanel] = useState(null); // "sidebar" | "cal" | null — suppresses the width transition mid-drag
@@ -2695,6 +2713,47 @@ export default function ChatApp({ user }) {
           </div>
         </header>
 
+        {/* 資料夾 rail：側欄最左邊一條窄欄，只放資料夾圖示（Discord 伺服器欄
+            的概念）——「全部功能」＋每個資料夾一個小圖案＋新增資料夾，跟側欄
+            本身是獨立的兩塊，收合側欄不會連帶把這條 rail 也藏起來。 */}
+        {!isMobile && (
+          <div className="cr-folder-rail" style={{
+            width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 10, padding: "12px 4px", overflowY: "auto", overflowX: "hidden",
+          }}>
+            <button
+              ref={sidebarLayout.registerTop("__home__")}
+              onClick={() => sidebarLayout.setActiveFolder(null)}
+              title="全部功能"
+              style={{
+                width: 40, height: 40, borderRadius: sidebarLayout.activeFolderId ? "50%" : "30%",
+                border: "none", cursor: "pointer", fontSize: 17, flexShrink: 0,
+                background: sidebarLayout.activeFolderId ? "var(--navcard-bg, transparent)" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
+                color: sidebarLayout.activeFolderId ? "var(--text-muted)" : "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "border-radius 0.15s",
+              }}>
+              🏠
+            </button>
+            {sidebarLayout.layout.filter(e => e.startsWith("folder:")).map(entry => {
+              const fid = entry.slice(7);
+              const folder = sidebarLayout.folders[fid];
+              if (!folder) return null;
+              return (
+                <LayoutDragWrap key={entry} dragKey={entry} sourceContainer="top" controller={sidebarLayout}>
+                  <FolderRailIcon
+                    name={folder.name} count={folder.items.length}
+                    active={sidebarLayout.activeFolderId === fid}
+                    isDropTarget={sidebarLayout.dropTarget?.folderId === fid}
+                    onClick={() => sidebarLayout.setActiveFolder(fid)}
+                  />
+                </LayoutDragWrap>
+              );
+            })}
+            <AddFolderRailButton onAdd={(name) => sidebarLayout.addFolder(name)} />
+          </div>
+        )}
+
         {/* 側邊欄：桌面版＝常駐側欄（一般 flex 排列）；手機版＝position:fixed 抽屜，
             由 sidebarOpen 狀態＋拖曳時的即時 transform 控制（見 applyDrawerTransform）。
             桌面版另外還有 sidebarCollapsed（收合成寬度 0，跟手機抽屜是兩套獨立機制）。 */}
@@ -2926,52 +2985,33 @@ export default function ChatApp({ user }) {
             };
             const itemPadding = { padding: "0 10px 6px" };
             const L = sidebarLayout;
+            // 資料夾圖示已經搬到側欄外面那條窄 rail 去了（見下面
+            // .cr-folder-rail），這裡的主清單只做兩件事其中一件：沒有選中
+            // 任何資料夾時顯示所有「沒被收進資料夾」的功能方塊；選中了某個
+            // 資料夾時只顯示那個資料夾裡面的功能方塊（優先顯示它的內容）。
+            const activeFolder = L.activeFolderId ? L.folders[L.activeFolderId] : null;
+            const visibleKeys = activeFolder ? activeFolder.items : L.layout.filter(e => !e.startsWith("folder:"));
             return (
               <>
-                {L.layout.map(entry => {
-                  if (entry.startsWith("folder:")) {
-                    const fid = entry.slice(7);
-                    const folder = L.folders[fid];
-                    if (!folder) return null;
-                    return (
-                      <div key={entry} style={itemPadding}>
-                        <LayoutDragWrap dragKey={entry} sourceContainer="top" controller={L}>
-                          <FolderBlock
-                            id={fid} name={folder.name} open={folder.open} count={folder.items.length}
-                            isDropTarget={L.dropTarget?.folderId === fid}
-                            onToggle={() => L.toggleFolder(fid)}
-                            onRename={(name) => L.renameFolder(fid, name)}
-                            onDelete={() => L.deleteFolder(fid)}
-                          />
-                        </LayoutDragWrap>
-                        {folder.open && (
-                          // 子項目不縮排、不額外加框——闊度直接跟頂層功能方塊一樣
-                          // （用同一份 itemPadding），這是「功能方塊闊度必須跟原先
-                          // 闊度一樣」的意思：被收進資料夾不會讓方塊變窄。
-                          <div style={{ marginTop: 2 }}>
-                            {folder.items.map(key => (
-                              <LayoutDragWrap key={key} dragKey={key} sourceContainer={fid} controller={L} style={itemPadding}>
-                                {topItems[key]}
-                              </LayoutDragWrap>
-                            ))}
-                            {folder.items.length === 0 && (
-                              <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "4px 10px 8px" }}>拖曳功能方塊到這裡</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return (
-                    <LayoutDragWrap key={entry} dragKey={entry} sourceContainer="top" controller={L} style={itemPadding}>
-                      {topItems[entry]}
-                    </LayoutDragWrap>
-                  );
-                })}
+                {activeFolder && (
+                  <ActiveFolderHeader
+                    folder={activeFolder}
+                    onBack={() => L.setActiveFolder(null)}
+                    onRename={(name) => L.renameFolder(L.activeFolderId, name)}
+                    onDelete={() => { if (confirm(`刪除資料夾「${activeFolder.name}」？（裡面的功能會移回外層）`)) L.deleteFolder(L.activeFolderId); }}
+                  />
+                )}
+                {visibleKeys.map(key => (
+                  <LayoutDragWrap key={key} dragKey={key} sourceContainer={activeFolder ? L.activeFolderId : "top"} controller={L} style={itemPadding}>
+                    {topItems[key]}
+                  </LayoutDragWrap>
+                ))}
+                {activeFolder && activeFolder.items.length === 0 && (
+                  <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "4px 10px 8px", textAlign: "center" }}>
+                    拖曳左側功能方塊到最左邊這個資料夾圖示
+                  </div>
+                )}
                 <LayoutDragGhost controller={L} topItems={topItems} />
-                <div style={{ padding: "2px 10px 6px" }}>
-                  <AddFolderButton onAdd={(name) => L.addFolder(name)} />
-                </div>
               </>
             );
           })()}
@@ -3110,7 +3150,7 @@ export default function ChatApp({ user }) {
               // 設定齒輪（在同一列右側、y 範圍差不多）幾乎疊在一起，往下移到
               // 可捲動導覽區塊剛開始的地方，兩顆按鈕才不會擠在同一個角落。
               position: "absolute", top: 74,
-              left: sidebarCollapsed ? 4 : sidebarWidth - 12,
+              left: FOLDER_RAIL_WIDTH + (sidebarCollapsed ? 4 : sidebarWidth - 12),
               zIndex: 40,
               width: 28, height: 28, borderRadius: "50%",
               background: "var(--panel)", border: "1px solid var(--border)",
