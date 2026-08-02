@@ -561,11 +561,6 @@ function FolderRailIcon({ name, count, active, isDropTarget, onClick }) {
         transition: "border-radius 0.15s",
       }}>
         📁
-        {count > 0 && (
-          <span style={{ position: "absolute", bottom: -3, right: -3, minWidth: 15, height: 15, padding: "0 3px", borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, border: "2px solid var(--bg)" }}>
-            {count}
-          </span>
-        )}
       </div>
       <span style={{ fontSize: 9, color: active ? "var(--text)" : "var(--text-faint)", maxWidth: 44, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {name}

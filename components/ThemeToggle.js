@@ -6,13 +6,17 @@ import useIsMobile from "../lib/useIsMobile";
 import { CHAT_WORLDS, getWorldById, getSavedWorldId, getSavedVariantId, applyWorld } from "../lib/chatWorlds";
 import { getSavedAccounts, setPendingLoginEmail } from "../lib/accountSwitcher";
 
+// hidden:true 的主題暫時不在選單裡顯示（先隱藏、不是刪除）——如果使用者
+// 之前剛好選到這個主題存在 localStorage 裡，套用邏輯還是正常運作，只是
+// 這裡的清單不會再列出來讓人選。
 const THEMES = [
   { id: "default", label: "☀️ 淺色預設" },
-  { id: "neon", label: "🌌 霓虹深色" },
-  { id: "glass", label: "🥂 玻璃質感" },
+  { id: "neon", label: "🌌 霓虹深色", hidden: true },
+  { id: "glass", label: "🥂 玻璃質感", hidden: true },
   { id: "pastel-pearl", label: "🪞 柔和珠光" },
   { id: "shadow-window", label: "🌙 幽影深窗" },
 ];
+const VISIBLE_THEMES = THEMES.filter(t => !t.hidden);
 
 const PASTEL_PALETTES = [
   { id: "champagne", label: "香檳奶油", color: "#F4BF45" },
@@ -323,7 +327,6 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
 
           {loggedIn && savedAccounts.filter(a => a.uid !== auth.currentUser?.uid).length > 0 && (
             <div style={{ borderBottom: "1px solid var(--border-soft)", padding: "6px 0" }}>
-              <div style={{ padding: "4px 14px", fontSize: 11, color: "var(--text-dim)" }}>切換帳號</div>
               {savedAccounts.filter(a => a.uid !== auth.currentUser?.uid).map(a => (
                 <button key={a.uid} onClick={() => switchToAccount(a.email)}
                   style={{
@@ -376,7 +379,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
                 style={{ width: "100%", cursor: "pointer" }} />
             </div>
           )}
-          {THEMES.map(t => (
+          {VISIBLE_THEMES.map(t => (
             <button
               key={t.id}
               onClick={() => selectTheme(t.id)}
