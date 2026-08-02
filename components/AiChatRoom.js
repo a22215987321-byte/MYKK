@@ -312,16 +312,8 @@ export default function AiChatRoom({ user, db }) {
         {mode === "chat" ? (
           <>
             {messages.length === 0 && (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                {/* 小惡魔吉祥物——邊緣用 mask-image 羽化淡出，蓋掉裁圖時留下的
-                    深色背景矩形邊界，不管疊在哪個主題的空白畫面上都不會看到
-                    一塊硬邊的方形。 */}
-                <img src="/images/ai-devil-mascot.png" alt="" aria-hidden="true"
-                  style={{
-                    width: 168, height: "auto", marginBottom: -6,
-                    maskImage: "radial-gradient(ellipse 62% 60% at center, #000 55%, transparent 88%)",
-                    WebkitMaskImage: "radial-gradient(ellipse 62% 60% at center, #000 55%, transparent 88%)",
-                  }} />
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--empty-icon-bg, none)", border: "var(--empty-icon-border, none)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "var(--empty-title-color)" }}>💬</div>
                 <div style={{ fontSize: 16, fontWeight: 600, color: "var(--empty-title-color)" }}>有什麼問題開始對話吧</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: "var(--empty-line-w, 0px)", height: 1, background: "var(--empty-sub-color)", opacity: 0.3 }} />
@@ -415,6 +407,19 @@ export default function AiChatRoom({ user, db }) {
           </button>
 
           {modelMenuOpen && (
+            <>
+              {/* 小惡魔吉祥物——扒著模型選單頂端往下看，不是單獨的裝飾，只有
+                  選單開著才出現。用 mask-image 羽化邊緣蓋掉裁圖留下的深色
+                  背景矩形；transform 往下推一點讓爪子疊進選單卡片頂端，做出
+                  「抓住卡片上緣」的感覺，跟參考圖一樣。 */}
+              <img src="/images/ai-devil-mascot.png" alt="" aria-hidden="true"
+                style={{
+                  position: "absolute", bottom: "calc(100% + 6px)", right: 60,
+                  width: 90, height: "auto", transform: "translateY(22px)",
+                  zIndex: 21, pointerEvents: "none",
+                  maskImage: "radial-gradient(ellipse 58% 62% at 50% 38%, #000 48%, transparent 82%)",
+                  WebkitMaskImage: "radial-gradient(ellipse 58% 62% at 50% 38%, #000 48%, transparent 82%)",
+                }} />
             <div style={{
               position: "absolute", bottom: "calc(100% + 6px)", right: 0,
               background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
@@ -434,6 +439,7 @@ export default function AiChatRoom({ user, db }) {
                 </button>
               ))}
             </div>
+            </>
           )}
         </div>
 
