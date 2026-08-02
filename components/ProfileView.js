@@ -443,6 +443,70 @@ function VideosTab({ videoPosts, isMobile, onOpen }) {
   );
 }
 
+// 收藏分頁：影片收藏是真資料（帶 videoUrl 的收藏貼文，縮圖/時長/讚數都跟
+// VideosTab 共用同一個 VideoThumb）。音頻收藏先做版面——這個 app 目前完全
+//沒有「音頻」這種內容類型（沒有音檔上傳、沒有音樂貼文），所以這裡沒有真的
+// 資料可以顯示；「播放時順序播放、可調單曲循環」這個播放器行為要等有真的
+// 音頻內容才有意義做，先誠實顯示「尚未支援」，不要生假資料充版面。
+function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen }) {
+  const [saving, setSaving] = useState(false);
+  const isPublic = profile.favoritesPublic !== false; // 沒設過欄位 = 預設公開
+
+  const togglePublic = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, "users", profile.uid), { favoritesPublic: !isPublic });
+    } catch (e) {
+      console.error("[FavoritesTab] toggle favoritesPublic failed", e);
+      toast("設定失敗，請重試");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isOwner && !isPublic) {
+    return (
+      <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dim)" }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+        <div style={{ fontSize: 16 }}>這個收藏是不公開的</div>
+      </div>
+    );
+  }
+
+  const videoFavorites = favoritePosts.filter(p => p.videoUrl);
+
+  return (
+    <div style={{ padding: 16 }}>
+      {isOwner && (
+        <button onClick={togglePublic} disabled={saving}
+          style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "6px 14px", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}>
+          {isPublic ? "🌐 收藏公開中" : "🔒 收藏不公開"}
+          <span style={{ color: "var(--accent)", fontWeight: 700 }}>{isPublic ? "設為不公開" : "設為公開"}</span>
+        </button>
+      )}
+
+      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>影片收藏</div>
+      {!favoritesLoaded ? (
+        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-dim)", fontSize: 13 }}>載入中...</div>
+      ) : videoFavorites.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-dim)", fontSize: 13 }}>還沒有收藏任何影片</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+          {videoFavorites.map(post => (
+            <VideoThumb key={post.id} post={post} onOpen={() => onOpen(post)} />
+          ))}
+        </div>
+      )}
+
+      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: "24px 0 10px" }}>音頻收藏</div>
+      <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-dim)", fontSize: 13 }}>
+        尚未支援音頻收藏功能
+      </div>
+    </div>
+  );
+}
+
 function AboutTab({ profile, isOwner }) {
   const languages = profile.learningLanguages || [];
 
@@ -763,6 +827,8 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
   const [viewerProfile, setViewerProfile] = useState(null);
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
+  const [favoritePosts, setFavoritePosts] = useState([]);
+  const [favoritesLoaded, setFavoritesLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [tab, setTab] = useState(initialTab);
@@ -834,6 +900,34 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
   }, [uid]);
 
   useEffect(() => { if (uid) reloadPosts(); }, [uid, reloadPosts]);
+
+  // 收藏分頁：抓的不是「這個人發的貼文」（posts 那份查詢是這樣），是「這個人
+  // 收藏過的貼文」——不限發文者是誰，靠 posts.bookmarks array-contains 這個
+  // uid 查。公開/不公開只影響「非本人能不能看到這個分頁的內容」，資料本身
+  // 一律都抓（isOwner 分頁一定要看得到自己收藏了什麼）。
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDocs(query(collection(db, "posts"), where("bookmarks", "array-contains", uid)));
+        if (cancelled) return;
+        const sorted = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+            const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+            return tb - ta;
+          });
+        setFavoritePosts(sorted);
+      } catch (e) {
+        console.error("[ProfileView] failed to load favorite posts", e);
+      } finally {
+        if (!cancelled) setFavoritesLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [uid]);
 
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") { setAvatarZoomImg(null); setMediaLightboxIndex(null); } }
@@ -1450,6 +1544,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
               ["posts", "貼文"],
               ["media", `媒體${mediaPosts.length > 0 ? ` (${mediaPosts.length})` : ""}`],
               ["videos", `影片${videoPosts.length > 0 ? ` (${videoPosts.length})` : ""}`],
+              ["favorites", "收藏"],
               ["about", "關於"],
             ].map(([key, label]) => (
               <button key={key} onClick={() => setTab(key)}
@@ -1510,6 +1605,12 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
           )}
           {tab === "videos" && (
             <VideosTab videoPosts={videoPosts} isMobile={isMobile} onOpen={post => openMediaFor(post, videoPosts)} />
+          )}
+          {tab === "favorites" && (
+            <FavoritesTab
+              profile={profile} isOwner={isOwner} favoritePosts={favoritePosts} favoritesLoaded={favoritesLoaded}
+              onOpen={post => openMediaFor(post, favoritePosts.filter(p => p.videoUrl || p.imageUrl))}
+            />
           )}
           {tab === "about" && (
             <AboutTab profile={profile} isOwner={isOwner} />
