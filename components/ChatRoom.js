@@ -22,6 +22,7 @@ import ProfileView from "./ProfileView";
 import VideoHub from "./VideoHub";
 import ChannelProfileView from "./ChannelProfileView";
 import GroupInfoView from "./GroupInfoView";
+import FriendInfoView from "./FriendInfoView";
 import {
   bumpPrivateChatSummary as bumpPrivateChatSummaryLib,
   bumpGroupChatSummary as bumpGroupChatSummaryLib,
@@ -1353,6 +1354,8 @@ export default function ChatApp({ user }) {
   // 點群組聊天上方的名字打開的群組資訊頁（GroupInfoView）——取代整個中間欄，
   // 不是疊在上面的浮層，所以切換群組時要記得歸零，不然切去別的群組還留著。
   const [showGroupInfo,  setShowGroupInfo]  = useState(false);
+  // 同樣道理，私訊聊天上方好友名字打開的好友資訊頁（FriendInfoView）。
+  const [showFriendInfo, setShowFriendInfo] = useState(false);
 
   // Leaderboard states
   const [showLeaderboard,  setShowLeaderboard]  = useState(false);
@@ -1525,7 +1528,7 @@ export default function ChatApp({ user }) {
     setShowEnglishPron(false); setShowIeltsBand4(false);
     setShowFeed(false); setShowImageEditor(false); setShowAiChat(false); setShowDocConvert(false);
     setShowAiCompanion(false); setShowUpgrade(false); setViewProfileUid(null);
-    setShowCalendar(false); setShowGroupInfo(false);
+    setShowCalendar(false); setShowGroupInfo(false); setShowFriendInfo(false);
     // 影片功能故意不歸零 videoHubUid：切去別的功能頁只是把這個 view 藏起來
     // （見 .cr-main 裡 showVideoHub 那段改用 display:none 而不是整個卸載），
     // 這樣使用者點回「影片」時，剛剛看到哪個頻道／哪支影片、播到哪裡都還在。
@@ -3606,19 +3609,32 @@ export default function ChatApp({ user }) {
           )}
 
           {/* Private chat */}
-          {activeFriendId && activeFriendProfile && (
+          {activeFriendId && activeFriendProfile && showFriendInfo && (
+            <FriendInfoView
+              friend={activeFriendProfile}
+              myUid={uid}
+              myBlocked={myProfile?.blocked}
+              messages={privateMessages}
+              myGroups={myGroups}
+              onClose={() => setShowFriendInfo(false)}
+            />
+          )}
+          {activeFriendId && activeFriendProfile && !showFriendInfo && (
             <>
               <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
-                <div style={{ position: "relative" }}>
-                  <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={34} />
-                  <span style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: getStatus(activeFriendProfile.status).color, border: "2px solid var(--panel-alt)" }} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{activeFriendProfile.nickname}</div>
-                  <div style={{ fontSize: 11, color: getStatus(activeFriendProfile.status).color }}>
-                    {getStatus(activeFriendProfile.status).label}{activeFriendProfile.statusText ? ` · ${activeFriendProfile.statusText}` : ""}
+                <button onClick={() => setShowFriendInfo(true)} title="查看好友資訊"
+                  style={{ display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
+                  <div style={{ position: "relative" }}>
+                    <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={34} />
+                    <span style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: getStatus(activeFriendProfile.status).color, border: "2px solid var(--panel-alt)" }} />
                   </div>
-                </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{activeFriendProfile.nickname}</div>
+                    <div style={{ fontSize: 11, color: getStatus(activeFriendProfile.status).color }}>
+                      {getStatus(activeFriendProfile.status).label}{activeFriendProfile.statusText ? ` · ${activeFriendProfile.statusText}` : ""}
+                    </div>
+                  </div>
+                </button>
                 <Link href={`/profile/${activeFriendProfile.uid}`} style={{ marginLeft: "auto", color: "var(--text-faint)", fontSize: 12, textDecoration: "none" }}
                   onMouseEnter={e => e.currentTarget.style.color = "var(--text-muted)"}
                   onMouseLeave={e => e.currentTarget.style.color = "var(--text-faint)"}>

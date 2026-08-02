@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { db } from "../lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { Avatar } from "./PostComments";
 import { toast } from "../lib/toast";
 import { formatDate } from "../lib/format";
 
@@ -27,6 +28,78 @@ const TILES = [
   { icon: "⚙️", label: "群組設定", sub: "管理群組名稱、權限等" },
 ];
 
+// 「+新增成員」彈窗：列出自己的好友裡還不在這個群組的人，點了就直接
+// arrayUnion 進 groups/{id}.members——規則已經允許現有成員改 members 欄位，
+// 不用另外改 Firestore rules。
+function AddGroupMemberModal({ group, myUid, onClose, onAdded }) {
+  const [loading, setLoading] = useState(true);
+  const [friends, setFriends] = useState([]);
+  const [adding, setAdding] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const meSnap = await getDoc(doc(db, "users", myUid));
+        const friendIds = (meSnap.exists() ? meSnap.data().friends : []) || [];
+        const candidateIds = friendIds.filter(fid => !(group.members || []).includes(fid));
+        const snaps = await Promise.all(candidateIds.map(fid => getDoc(doc(db, "users", fid))));
+        if (cancelled) return;
+        setFriends(snaps.filter(s => s.exists()).map(s => ({ uid: s.id, ...s.data() })));
+      } catch (e) {
+        console.error("[AddGroupMemberModal] load friends failed", e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [myUid, group.members]);
+
+  const addMember = async (friendUid) => {
+    setAdding(friendUid);
+    try {
+      await updateDoc(doc(db, "groups", group.id), { members: arrayUnion(friendUid) });
+      setFriends(prev => prev.filter(f => f.uid !== friendUid));
+      onAdded?.(friendUid);
+      toast("已加入群組", "success");
+    } catch (e) {
+      console.error("[AddGroupMemberModal] add member failed", e);
+      toast("新增失敗，請重試");
+    } finally {
+      setAdding(null);
+    }
+  };
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="新增成員" onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 360, maxHeight: "70vh", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, boxShadow: "var(--card-shadow)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>新增成員</span>
+          <button onClick={onClose} aria-label="關閉" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18 }}>✕</button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
+          {loading && <div style={{ textAlign: "center", padding: 30, color: "var(--text-faint)" }}>載入中...</div>}
+          {!loading && friends.length === 0 && (
+            <div style={{ textAlign: "center", padding: 30, color: "var(--text-dim)" }}>好友都已經在群組裡了</div>
+          )}
+          {friends.map(f => (
+            <button key={f.uid} onClick={() => addMember(f.uid)} disabled={adding === f.uid}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: 8, background: "none", border: "none", borderRadius: 10, cursor: "pointer", textAlign: "left" }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+              onMouseLeave={e => e.currentTarget.style.background = "none"}>
+              <Avatar avatar={f.avatar} avatarImage={f.avatarImage} color={f.color} size={36} />
+              <span style={{ flex: 1, fontSize: 14, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.nickname}</span>
+              <span style={{ fontSize: 12, color: "var(--accent)" }}>{adding === f.uid ? "新增中..." : "+ 加入"}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // 點群組聊天上方的名字打開的「群組資訊」中間頁——參考 WhatsApp/WeChat 那種
 // 群組詳情頁的版面。這一版是使用者明確要求「版面先做出來」：成員清單、
 // 分享媒體是真資料（成員資料抓自 users 集合、媒體抓自目前已載入的群組訊息），
@@ -34,6 +107,7 @@ const TILES = [
 // 「即將推出」，之後要接功能再另外做。
 export default function GroupInfoView({ group, messages, myUid, onClose, onOpenProfile }) {
   const [memberProfiles, setMemberProfiles] = useState({});
+  const [showAddMember, setShowAddMember] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,7 +181,7 @@ export default function GroupInfoView({ group, messages, myUid, onClose, onOpenP
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 16 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                 <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>成員 {(group.members || []).length}</span>
-                <button onClick={soon} title="新增成員" aria-label="新增成員"
+                <button onClick={() => setShowAddMember(true)} title="新增成員" aria-label="新增成員"
                   style={{ background: "var(--accent)", border: "none", borderRadius: "50%", width: 26, height: 26, color: "var(--accent-text)", cursor: "pointer", fontSize: 15, lineHeight: 1 }}>
                   +
                 </button>
@@ -180,6 +254,10 @@ export default function GroupInfoView({ group, messages, myUid, onClose, onOpenP
           </div>
         </div>
       </div>
+
+      {showAddMember && (
+        <AddGroupMemberModal group={group} myUid={myUid} onClose={() => setShowAddMember(false)} />
+      )}
     </div>
   );
 }
