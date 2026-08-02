@@ -72,6 +72,13 @@ function formatTime(ts) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function toMillis(ts) {
+  if (!ts) return null;
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  const t = d.getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
 function getStatus(status) {
   switch (status) {
     case "online": return { label: "線上",    color: "#22c55e" };
@@ -671,13 +678,23 @@ function isGroupAvatarImage(avatar) {
 
 // MessageBubble
 
-function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFontSize = 14 }) {
+function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFontSize = 14, prevCreatedAt }) {
   const [showPicker, setShowPicker] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [tapped, setTapped] = useState(false);
   const [preview, setPreview] = useState(false);
   const showActions = hovered || tapped;
   const longPressRef = useRef(null);
+
+  // 每 5 分鐘才顯示一次發送時間，不是每則訊息底下都印一行——跟上一則訊息
+  // （不是跟上一個「有顯示時間」的訊息比，單純比連續兩則）差距達 5 分鐘，
+  // 或這是這個聊天室/大廳裡的第一則，才顯示。
+  const showTimestamp = (() => {
+    const cur = toMillis(msg.createdAt);
+    const prev = toMillis(prevCreatedAt);
+    if (cur == null || prev == null) return true;
+    return cur - prev >= 5 * 60 * 1000;
+  })();
 
   const toggleReaction = async (emoji) => {
     setShowPicker(false);
@@ -718,7 +735,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
             此訊息已撤回
           </div>
         </div>
-        <span style={{ fontSize: 10, color: "var(--border)", marginTop: 2, marginLeft: isMine ? 0 : 40 }}>{formatTime(msg.createdAt)}</span>
+        {showTimestamp && <span style={{ fontSize: 10, color: "var(--border)", marginTop: 2, marginLeft: isMine ? 0 : 40 }}>{formatTime(msg.createdAt)}</span>}
       </div>
     );
   }
@@ -750,20 +767,14 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
             : <span style={{ fontSize: 160, lineHeight: 1 }}>{msg.text}</span>}
         </div>
       )}
-      {showActions && (
-        <div style={{ position: "absolute", top: 0, [isMine ? "right" : "left"]: 0, display: "flex", gap: 4, zIndex: 5 }}>
-          <button onClick={e => { e.stopPropagation(); setShowPicker(v => !v); }} title="加反應"
-            style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "2px 7px", fontSize: 13, color: "var(--text-muted)", cursor: "pointer", whiteSpace: "nowrap" }}>
-            😊+
+      {showActions && isMine && (
+        <div style={{ position: "absolute", top: 0, right: 0, display: "flex", gap: 4, zIndex: 5 }}>
+          <button onClick={e => { e.stopPropagation(); recallMsg(); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "2px 8px", fontSize: 11, color: "var(--text-muted)", cursor: "pointer", whiteSpace: "nowrap" }}>
+            撤回
           </button>
-          {isMine && (
-            <button onClick={e => { e.stopPropagation(); recallMsg(); }} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "2px 8px", fontSize: 11, color: "var(--text-muted)", cursor: "pointer", whiteSpace: "nowrap" }}>
-              撤回
-            </button>
-          )}
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, maxWidth: "72%", marginTop: showActions ? 22 : 0 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, maxWidth: "72%", marginTop: showActions && isMine ? 22 : 0 }}>
         {!isMine && showSender && (
           <div style={{ flexShrink: 0 }}>
             <AvatarImg avatarImage={msg.senderAvatarImage} avatar={msg.avatar || msg.sender?.[0]} color="var(--accent-2)" size={30} />
@@ -844,7 +855,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
           )}
         </div>
       </div>
-      <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 3, marginLeft: isMine ? 0 : 40 }}>{formatTime(msg.createdAt)}</span>
+      {showTimestamp && <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 3, marginLeft: isMine ? 0 : 40 }}>{formatTime(msg.createdAt)}</span>}
     </div>
   );
 }
@@ -1419,6 +1430,17 @@ export default function ChatApp({ user }) {
   // sibling、用 left 絕對定位貼齊側欄邊界，rail 插進 .cr-shell 之後側欄本身
   // 往右挪了這麼多，這裡也要跟著補上，不然按鈕位置會對不準。
   const FOLDER_RAIL_WIDTH = 56;
+  // 資料夾內容浮動面板：跟 rail 上被點的那個圖示同高度冒出來（不是側欄清單
+  // 的一部分，是疊在上面的獨立圖層）——shellElRef 量的是 .cr-shell 本身的
+  // 位置，folderPanelTop 是點下去那一刻算出來、面板要貼齊哪個 y 座標。
+  const shellElRef = useRef(null);
+  const [folderPanelTop, setFolderPanelTop] = useState(76);
+  const openFolderPanel = useCallback((fid, e) => {
+    const iconRect = e.currentTarget.getBoundingClientRect();
+    const shellRect = shellElRef.current?.getBoundingClientRect();
+    if (shellRect) setFolderPanelTop(Math.max(8, iconRect.top - shellRect.top));
+    sidebarLayout.setActiveFolder(fid);
+  }, [sidebarLayout]);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [calWidth, setCalWidth] = useState(CAL_DEFAULT_WIDTH);
   const [resizingPanel, setResizingPanel] = useState(null); // "sidebar" | "cal" | null — suppresses the width transition mid-drag
@@ -2325,6 +2347,91 @@ export default function ChatApp({ user }) {
   else if (showDict) activeSpanishNotes = { key: "spanish-dict", title: "西語字典" };
   else if (showSpanish) activeSpanishNotes = { key: "spanish-home", title: "西班牙語學習" };
 
+  // 原本分在「更多功能／英語學習／西班牙語」三個資料夾裡的項目全部攤平出來，
+  // 跟排行榜/行事曆/自定詞彙/字典一起放進同一份可拖曳排序清單（key → JSX），
+  // 實際渲染順序交給 sidebarLayout.layout 決定。定義在這裡（不是側欄自己的
+  // IIFE 裡）是因為資料夾內容現在是獨立的浮動面板，跟側欄本身的清單不是
+  // 同一個圖層，兩邊都要能用同一份 topItems。
+  const topItems = {
+    leaderboard: (
+      <NavItem icon="🏆" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
+        active={showLeaderboard} onClick={() => { resetAllViews(); setShowLeaderboard(true); }} />
+    ),
+    calendar: (
+      <NavItem icon="📅" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="行事曆" sublabel="日曆備忘錄"
+        active={showCalendar} onClick={() => { resetAllViews(); setShowCalendar(true); }} />
+    ),
+    videoHub: (
+      <NavItem icon="📺" iconBg="linear-gradient(135deg,#dc2626,#7f1d1d)" label="影片" sublabel="搜尋創作者頻道"
+        active={showVideoHub} onClick={() => { resetAllViews(); setShowVideoHub(true); }} />
+    ),
+    upgrade: (
+      <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
+        active={showUpgrade} onClick={() => { resetAllViews(); setShowUpgrade(true); }} />
+    ),
+    cinema: (
+      <NavItem icon="🎬" iconBg="linear-gradient(135deg,var(--accent-hover),#2563eb)" label="電影院" sublabel="同步觀看影片"
+        active={showCinema} onClick={() => { resetAllViews(); setShowCinema(true); }} />
+    ),
+    imageEditor: (
+      <NavItem icon="🖼️" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="圖片編輯" sublabel="裁剪・濾鏡・貼圖"
+        active={showImageEditor} onClick={() => { resetAllViews(); setShowImageEditor(true); }} />
+    ),
+    aiChat: (
+      <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel="有問題都可以問我"
+        active={showAiChat} onClick={() => { resetAllViews(); setShowAiChat(true); }} />
+    ),
+    docConvert: (
+      <NavItem icon="🔄" iconBg="linear-gradient(135deg,#0d9488,#0891b2)" label="文檔轉換" sublabel="圖片・影音格式互轉"
+        active={showDocConvert} onClick={() => { resetAllViews(); setShowDocConvert(true); }} />
+    ),
+    aiCompanion: (
+      <NavItem icon="💞" iconBg="linear-gradient(135deg,#db2777,#9333ea)" label="AI 夥伴" sublabel={myProfile?.hasAiCompanion ? "語音陪伴" : "付費解鎖"}
+        active={showAiCompanion} onClick={() => { resetAllViews(); setShowAiCompanion(true); }} />
+    ),
+    englishPron: (
+      <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音"
+        active={showEnglishPron} onClick={() => { resetAllViews(); setShowEnglishPron(true); }} />
+    ),
+    ieltsBand4: (
+      <NavItem compact icon="🎯" iconBg="linear-gradient(135deg,#1e3a1e,#6366f1)" label="IELTS 4.0 入門" sublabel="詞彙・聽力・口說"
+        active={showIeltsBand4} onClick={() => { resetAllViews(); setShowIeltsBand4(true); }} />
+    ),
+    vocab: (
+      <NavItem icon="📚" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習"
+        active={showVocab} onClick={() => { resetAllViews(); setShowVocab(true); }} />
+    ),
+    spanish: (
+      <NavItem icon="🇪🇸" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西班牙語學習" sublabel="CEFR A1/A2"
+        active={showSpanish} onClick={() => { resetAllViews(); setShowSpanish(true); }} />
+    ),
+    spanishCourse: (
+      <NavItem compact icon="🗺️" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="西語 A1 路線" sublabel="初學者情境課程"
+        active={showSpanishCourse} onClick={() => { resetAllViews(); setShowSpanishCourse(true); }} />
+    ),
+    spanishPron: (
+      <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#7c1d1d,#b91c1c)" label="西語發音" sublabel="母音 · 子音 · 重音"
+        active={showSpanishPron} onClick={() => { resetAllViews(); setShowSpanishPron(true); }} />
+    ),
+    spanishGrammar: (
+      <NavItem compact icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="西語文法" sublabel="ser/estar · 代詞 · 動詞"
+        active={showSpanishGrammar} onClick={() => { resetAllViews(); setShowSpanishGrammar(true); }} />
+    ),
+    spanishVerbs: (
+      <NavItem compact icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢"
+        active={showSpanishVerbs} onClick={() => { resetAllViews(); setShowSpanishVerbs(true); }} />
+    ),
+    customVocab: (
+      <NavItem icon="✏️" iconBg="linear-gradient(135deg,var(--accent-hover),#7c3aed)" label="自定詞彙" sublabel="建立個人單字本"
+        active={showCustomVocab} onClick={() => { resetAllViews(); setShowCustomVocab(true); }} />
+    ),
+    dict: (
+      <NavItem icon="📖" iconBg="linear-gradient(135deg,#0f2e1c,#166534)" label="字典" sublabel="英・西・法 A-Z"
+        active={showDict} onClick={() => { resetAllViews(); setShowDict(true); }} />
+    ),
+  };
+  const sidebarItemPadding = { padding: "0 10px 6px" };
+
   return (
     <>
       <style>{`
@@ -2648,7 +2755,7 @@ export default function ChatApp({ user }) {
         </div>
       )}
 
-      <div className="cr-shell"
+      <div className="cr-shell" ref={shellElRef}
         onPointerDown={handleShellPointerDown} onPointerMove={handleShellPointerMove}
         onPointerUp={handleShellPointerEnd} onPointerCancel={handleShellPointerEnd}
         style={{
@@ -2745,7 +2852,7 @@ export default function ChatApp({ user }) {
                     name={folder.name} count={folder.items.length}
                     active={sidebarLayout.activeFolderId === fid}
                     isDropTarget={sidebarLayout.dropTarget?.folderId === fid}
-                    onClick={() => sidebarLayout.setActiveFolder(fid)}
+                    onClick={(e) => openFolderPanel(fid, e)}
                   />
                 </LayoutDragWrap>
               );
@@ -2753,6 +2860,44 @@ export default function ChatApp({ user }) {
             <AddFolderRailButton onAdd={(name) => sidebarLayout.addFolder(name)} />
           </div>
         )}
+
+        {/* 資料夾內容浮動面板：跟 rail 上被點的資料夾圖示同高度冒出來，疊在
+            側欄上面的獨立圖層（不是側欄清單本身的一部分，兩者分開渲染，這樣
+            改資料夾內容不會動到側欄清單原本的排版/捲動狀態）。 */}
+        {!isMobile && sidebarLayout.activeFolderId && sidebarLayout.folders[sidebarLayout.activeFolderId] && (() => {
+          const L = sidebarLayout;
+          const folder = L.folders[L.activeFolderId];
+          return (
+            <div style={{
+              position: "absolute", top: folderPanelTop, left: FOLDER_RAIL_WIDTH + 6,
+              width: `var(--sidebar-w-override, ${sidebarWidth}px)`,
+              maxHeight: `calc(100% - ${folderPanelTop}px - 16px)`,
+              background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.4)",
+              backdropFilter: "var(--panel-blur)", WebkitBackdropFilter: "var(--panel-blur)",
+              zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden",
+            }}>
+              <ActiveFolderHeader
+                folder={folder}
+                onBack={() => L.setActiveFolder(null)}
+                onRename={(name) => L.renameFolder(L.activeFolderId, name)}
+                onDelete={() => { if (confirm(`刪除資料夾「${folder.name}」？（裡面的功能會移回外層）`)) L.deleteFolder(L.activeFolderId); }}
+              />
+              <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }}>
+                {folder.items.map(key => (
+                  <LayoutDragWrap key={key} dragKey={key} sourceContainer={L.activeFolderId} controller={L} style={sidebarItemPadding}>
+                    {topItems[key]}
+                  </LayoutDragWrap>
+                ))}
+                {folder.items.length === 0 && (
+                  <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "4px 10px 8px", textAlign: "center" }}>
+                    拖曳左側功能方塊到最左邊這個資料夾圖示
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 側邊欄：桌面版＝常駐側欄（一般 flex 排列）；手機版＝position:fixed 抽屜，
             由 sidebarOpen 狀態＋拖曳時的即時 transform 控制（見 applyDrawerTransform）。
@@ -2902,115 +3047,18 @@ export default function ChatApp({ user }) {
           )}
 
           {!isMobile && (() => {
-            // 原本分在「更多功能／英語學習／西班牙語」三個資料夾裡的項目全部
-            // 攤平出來，跟排行榜/行事曆/自定詞彙/字典一起放進同一份可拖曳排序
-            // 清單（key → JSX），實際渲染順序交給 topNavReorder.order 決定。
-            const topItems = {
-              leaderboard: (
-                <NavItem icon="🏆" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
-                  active={showLeaderboard} onClick={() => { resetAllViews(); setShowLeaderboard(true); }} />
-              ),
-              calendar: (
-                <NavItem icon="📅" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="行事曆" sublabel="日曆備忘錄"
-                  active={showCalendar} onClick={() => { resetAllViews(); setShowCalendar(true); }} />
-              ),
-              videoHub: (
-                <NavItem icon="📺" iconBg="linear-gradient(135deg,#dc2626,#7f1d1d)" label="影片" sublabel="搜尋創作者頻道"
-                  active={showVideoHub} onClick={() => { resetAllViews(); setShowVideoHub(true); }} />
-              ),
-              upgrade: (
-                <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
-                  active={showUpgrade} onClick={() => { resetAllViews(); setShowUpgrade(true); }} />
-              ),
-              cinema: (
-                <NavItem icon="🎬" iconBg="linear-gradient(135deg,var(--accent-hover),#2563eb)" label="電影院" sublabel="同步觀看影片"
-                  active={showCinema} onClick={() => { resetAllViews(); setShowCinema(true); }} />
-              ),
-              imageEditor: (
-                <NavItem icon="🖼️" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="圖片編輯" sublabel="裁剪・濾鏡・貼圖"
-                  active={showImageEditor} onClick={() => { resetAllViews(); setShowImageEditor(true); }} />
-              ),
-              aiChat: (
-                <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel="有問題都可以問我"
-                  active={showAiChat} onClick={() => { resetAllViews(); setShowAiChat(true); }} />
-              ),
-              docConvert: (
-                <NavItem icon="🔄" iconBg="linear-gradient(135deg,#0d9488,#0891b2)" label="文檔轉換" sublabel="圖片・影音格式互轉"
-                  active={showDocConvert} onClick={() => { resetAllViews(); setShowDocConvert(true); }} />
-              ),
-              aiCompanion: (
-                <NavItem icon="💞" iconBg="linear-gradient(135deg,#db2777,#9333ea)" label="AI 夥伴" sublabel={myProfile?.hasAiCompanion ? "語音陪伴" : "付費解鎖"}
-                  active={showAiCompanion} onClick={() => { resetAllViews(); setShowAiCompanion(true); }} />
-              ),
-              englishPron: (
-                <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音"
-                  active={showEnglishPron} onClick={() => { resetAllViews(); setShowEnglishPron(true); }} />
-              ),
-              ieltsBand4: (
-                <NavItem compact icon="🎯" iconBg="linear-gradient(135deg,#1e3a1e,#6366f1)" label="IELTS 4.0 入門" sublabel="詞彙・聽力・口說"
-                  active={showIeltsBand4} onClick={() => { resetAllViews(); setShowIeltsBand4(true); }} />
-              ),
-              vocab: (
-                <NavItem icon="📚" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習"
-                  active={showVocab} onClick={() => { resetAllViews(); setShowVocab(true); }} />
-              ),
-              spanish: (
-                <NavItem icon="🇪🇸" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西班牙語學習" sublabel="CEFR A1/A2"
-                  active={showSpanish} onClick={() => { resetAllViews(); setShowSpanish(true); }} />
-              ),
-              spanishCourse: (
-                <NavItem compact icon="🗺️" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="西語 A1 路線" sublabel="初學者情境課程"
-                  active={showSpanishCourse} onClick={() => { resetAllViews(); setShowSpanishCourse(true); }} />
-              ),
-              spanishPron: (
-                <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#7c1d1d,#b91c1c)" label="西語發音" sublabel="母音 · 子音 · 重音"
-                  active={showSpanishPron} onClick={() => { resetAllViews(); setShowSpanishPron(true); }} />
-              ),
-              spanishGrammar: (
-                <NavItem compact icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="西語文法" sublabel="ser/estar · 代詞 · 動詞"
-                  active={showSpanishGrammar} onClick={() => { resetAllViews(); setShowSpanishGrammar(true); }} />
-              ),
-              spanishVerbs: (
-                <NavItem compact icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢"
-                  active={showSpanishVerbs} onClick={() => { resetAllViews(); setShowSpanishVerbs(true); }} />
-              ),
-              customVocab: (
-                <NavItem icon="✏️" iconBg="linear-gradient(135deg,var(--accent-hover),#7c3aed)" label="自定詞彙" sublabel="建立個人單字本"
-                  active={showCustomVocab} onClick={() => { resetAllViews(); setShowCustomVocab(true); }} />
-              ),
-              dict: (
-                <NavItem icon="📖" iconBg="linear-gradient(135deg,#0f2e1c,#166534)" label="字典" sublabel="英・西・法 A-Z"
-                  active={showDict} onClick={() => { resetAllViews(); setShowDict(true); }} />
-              ),
-            };
-            const itemPadding = { padding: "0 10px 6px" };
+            // 資料夾內容現在是側欄外面獨立的浮動面板（.cr-folder-panel，見下面），
+            // 跟這裡的主清單不是同一個圖層——這裡永遠只顯示「沒被收進資料夾」
+            // 的功能方塊，不會因為選了某個資料夾就整個換掉內容。
             const L = sidebarLayout;
-            // 資料夾圖示已經搬到側欄外面那條窄 rail 去了（見下面
-            // .cr-folder-rail），這裡的主清單只做兩件事其中一件：沒有選中
-            // 任何資料夾時顯示所有「沒被收進資料夾」的功能方塊；選中了某個
-            // 資料夾時只顯示那個資料夾裡面的功能方塊（優先顯示它的內容）。
-            const activeFolder = L.activeFolderId ? L.folders[L.activeFolderId] : null;
-            const visibleKeys = activeFolder ? activeFolder.items : L.layout.filter(e => !e.startsWith("folder:"));
+            const visibleKeys = L.layout.filter(e => !e.startsWith("folder:"));
             return (
               <>
-                {activeFolder && (
-                  <ActiveFolderHeader
-                    folder={activeFolder}
-                    onBack={() => L.setActiveFolder(null)}
-                    onRename={(name) => L.renameFolder(L.activeFolderId, name)}
-                    onDelete={() => { if (confirm(`刪除資料夾「${activeFolder.name}」？（裡面的功能會移回外層）`)) L.deleteFolder(L.activeFolderId); }}
-                  />
-                )}
                 {visibleKeys.map(key => (
-                  <LayoutDragWrap key={key} dragKey={key} sourceContainer={activeFolder ? L.activeFolderId : "top"} controller={L} style={itemPadding}>
+                  <LayoutDragWrap key={key} dragKey={key} sourceContainer="top" controller={L} style={sidebarItemPadding}>
                     {topItems[key]}
                   </LayoutDragWrap>
                 ))}
-                {activeFolder && activeFolder.items.length === 0 && (
-                  <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "4px 10px 8px", textAlign: "center" }}>
-                    拖曳左側功能方塊到最左邊這個資料夾圖示
-                  </div>
-                )}
                 <LayoutDragGhost controller={L} topItems={topItems} />
               </>
             );
@@ -3519,7 +3567,7 @@ export default function ChatApp({ user }) {
                   );
                   const isMine = msg.senderId === uid;
                   const showSender = !isMine && hallMessages[i-1]?.senderId !== msg.senderId;
-                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["hall_messages", msg.id]} msgFontSize={msgFontSize} />;
+                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["hall_messages", msg.id]} msgFontSize={msgFontSize} prevCreatedAt={hallMessages[i-1]?.createdAt} />;
                 })}
                 <div ref={messagesEndRef} />
               </div>
@@ -3577,7 +3625,7 @@ export default function ChatApp({ user }) {
                 </div>
                 {privateMessages.map((msg, i) => {
                   const isMine = msg.senderId === uid;
-                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={!isMine && privateMessages[i-1]?.senderId !== msg.senderId} myUid={uid} collectionPath={["private_chats", chatId, "messages", msg.id]} msgFontSize={msgFontSize} />;
+                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={!isMine && privateMessages[i-1]?.senderId !== msg.senderId} myUid={uid} collectionPath={["private_chats", chatId, "messages", msg.id]} msgFontSize={msgFontSize} prevCreatedAt={privateMessages[i-1]?.createdAt} />;
                 })}
                 <div ref={messagesEndRef} />
               </div>
@@ -3643,7 +3691,7 @@ export default function ChatApp({ user }) {
                 {groupMessages.map((msg, i) => {
                   const isMine = msg.senderId === uid;
                   const showSender = !isMine && groupMessages[i-1]?.senderId !== msg.senderId;
-                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["groups", activeGroupId, "messages", msg.id]} msgFontSize={msgFontSize} />;
+                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["groups", activeGroupId, "messages", msg.id]} msgFontSize={msgFontSize} prevCreatedAt={groupMessages[i-1]?.createdAt} />;
                 })}
                 <div ref={messagesEndRef} />
               </div>
