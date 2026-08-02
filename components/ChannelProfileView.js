@@ -7,8 +7,9 @@ import {
 } from "firebase/firestore";
 import LoadingState from "./LoadingState";
 import VideoPlayer from "./VideoPlayer";
-import { formatDate } from "../lib/format";
+import { formatDate, formatFullDate } from "../lib/format";
 import { toast } from "../lib/toast";
+import { Avatar, CommentSection } from "./PostComments";
 
 const TABS = [
   { id: "videos", label: "影片" },
@@ -28,11 +29,14 @@ const SORTS = [
 // 從「影片」入口點進某個人的頻道——刻意不沿用一般個人頁（ProfileView）的
 // 版面：YouTube 頻道那種橫幅+大頭貼+訂閱／管理按鈕+分頁+排序過的影片格網，
 // 跟原本社群導向的個人頁在版面上要能一眼分辨是「來看影片」還是「來看動態」。
+// 點進某支影片後換成「觀看頁」（播放器+標題+頻道列+說明+更多推薦+留言），
+// 同樣是獨立於 ProfileView 之外的版面，參考 YouTube 觀看頁的結構。
 // 資料沿用同一套 users/{uid} 個人資料跟 posts（videoUrl 有值的），沒有另外
 // 開一套 schema。除了「影片」分頁有實際內容，其餘分頁先做版面（顯示「即將
 // 推出」），這是使用者明確同意的範圍（先做版面就好，功能之後再說）。
 export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
   const [viewerUid, setViewerUid] = useState(undefined);
+  const [viewerProfile, setViewerProfile] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -40,7 +44,8 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
   const [tab, setTab] = useState("videos");
   const [sort, setSort] = useState("latest");
   const [bioExpanded, setBioExpanded] = useState(false);
-  const [openVideo, setOpenVideo] = useState(null);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [watchVideoId, setWatchVideoId] = useState(null);
 
   const isOwner = viewerUid != null && viewerUid === uid;
 
@@ -58,6 +63,17 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
     });
     return () => { cancelled = true; unsub(); };
   }, [uid]);
+
+  // 留言／按讚要用「目前登入者」自己的個人資料（不是正在看的這個頻道）——
+  // 自己看自己頻道時 profile 本身就是 myProfile，不用另外抓一次。
+  useEffect(() => {
+    if (!viewerUid || viewerUid === uid) { setViewerProfile(null); return; }
+    return onSnapshot(doc(db, "users", viewerUid), snap => {
+      if (snap.exists()) setViewerProfile({ uid: snap.id, ...snap.data() });
+    });
+  }, [viewerUid, uid]);
+
+  const myProfile = isOwner ? profile : viewerProfile;
 
   const loadVideos = useCallback(async () => {
     if (!uid) return;
@@ -83,6 +99,9 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
     return list;
   }, [videos, sort]);
 
+  const watchVideo = watchVideoId ? videos.find(v => v.id === watchVideoId) || null : null;
+  const recommended = watchVideo ? videos.filter(v => v.id !== watchVideo.id) : [];
+
   const isSubscribed = !!(viewerUid && (profile?.subscribers || []).includes(viewerUid));
   const toggleSubscribe = async () => {
     if (!viewerUid || !profile) { toast("請先登入後再訂閱"); return; }
@@ -96,6 +115,34 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
     }
   };
 
+  const toggleLike = async (video) => {
+    if (!viewerUid) { toast("請先登入後再按讚"); return; }
+    const liked = (video.likes || []).includes(viewerUid);
+    try {
+      await updateDoc(doc(db, "posts", video.id), { likes: liked ? arrayRemove(viewerUid) : arrayUnion(viewerUid) });
+      setVideos(prev => prev.map(v => v.id === video.id
+        ? { ...v, likes: liked ? (v.likes || []).filter(id => id !== viewerUid) : [...(v.likes || []), viewerUid] }
+        : v));
+    } catch (e) {
+      console.error("[ChannelProfileView] toggleLike failed", e);
+      toast("操作失敗，請重試");
+    }
+  };
+
+  const shareVideo = async (video) => {
+    const url = `${window.location.origin}/profile/${uid}?post=${video.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: video.text?.slice(0, 60) || "影片", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast("連結已複製", "success");
+      }
+    } catch { /* 使用者取消分享 */ }
+  };
+
+  const openVideo = (video) => { setWatchVideoId(video.id); setDescExpanded(false); };
+
   if (loading) return <LoadingState label="載入頻道..." minHeight="100%" />;
 
   if (loadError || !profile) {
@@ -104,6 +151,97 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
         <div style={{ fontSize: 48 }}>😶</div>
         <div style={{ color: "var(--text-muted)", fontSize: 16 }}>找不到此頻道</div>
         <button onClick={onClose} style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>← 返回</button>
+      </div>
+    );
+  }
+
+  // ---- 觀看頁：點了某支影片之後，取代掉頻道版面（播放器＋標題＋頻道列＋
+  // 說明＋更多推薦＋留言），關閉時回到剛剛那個頻道（不是整個離開）。
+  if (watchVideo) {
+    const liked = !!(viewerUid && (watchVideo.likes || []).includes(viewerUid));
+    return (
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "var(--bg)" }}>
+        <div style={{ padding: "10px 20px 0" }}>
+          <button onClick={() => setWatchVideoId(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14, padding: 4 }}>
+            ← 返回頻道
+          </button>
+        </div>
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: "10px 20px 40px" }}>
+          <div style={{ borderRadius: 12, overflow: "hidden", background: "#000" }}>
+            <VideoPlayer key={watchVideo.id} src={watchVideo.videoUrl} autoPlay />
+          </div>
+
+          <h1 style={{ fontSize: 19, fontWeight: 800, color: "var(--text)", margin: "16px 0 10px" }}>
+            {watchVideo.text?.trim() || "（無標題）"}
+          </h1>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <button onClick={() => onOpenChannel?.(uid)} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+              <Avatar avatar={profile.avatar} avatarImage={profile.avatarImage} color={profile.color} size={40} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{profile.nickname}</div>
+                <div style={{ fontSize: 12, color: "var(--text-faint)" }} title={formatFullDate(watchVideo.createdAt)}>{formatDate(watchVideo.createdAt)}</div>
+              </div>
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {!isOwner && (
+                <button onClick={toggleSubscribe}
+                  style={{
+                    background: isSubscribed ? "var(--panel-alt)" : "var(--accent)",
+                    border: isSubscribed ? "1px solid var(--border)" : "none",
+                    borderRadius: 20, padding: "7px 16px",
+                    color: isSubscribed ? "var(--text)" : "var(--accent-text)",
+                    fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  }}>
+                  {isSubscribed ? "已訂閱" : "訂閱"}
+                </button>
+              )}
+              <button onClick={() => toggleLike(watchVideo)}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 14px", color: liked ? "var(--accent)" : "var(--text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                {liked ? "❤️" : "🤍"} {(watchVideo.likes || []).length}
+              </button>
+              <button onClick={() => shareVideo(watchVideo)}
+                style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 14px", color: "var(--text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                🔗 分享
+              </button>
+            </div>
+          </div>
+
+          {watchVideo.text && (
+            <div style={{ background: "var(--panel-alt)", borderRadius: 12, padding: "10px 14px", marginTop: 14, fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>
+              {descExpanded || watchVideo.text.length <= 120 ? watchVideo.text : `${watchVideo.text.slice(0, 120)}…`}
+              {watchVideo.text.length > 120 && (
+                <button onClick={() => setDescExpanded(v => !v)} style={{ display: "block", background: "none", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 12, fontWeight: 700, marginTop: 4, padding: 0 }}>
+                  {descExpanded ? "顯示較少" : "顯示更多 ›"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {recommended.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>更多推薦</div>
+              <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6 }}>
+                {recommended.map(v => (
+                  <div key={v.id} onClick={() => openVideo(v)} style={{ cursor: "pointer", width: 180, flexShrink: 0 }}>
+                    <div style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 10, overflow: "hidden", background: "#000" }}>
+                      <video src={v.videoUrl} muted preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", marginTop: 6, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      {v.text?.trim() || "（無標題）"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2 }}>❤️ {(v.likes || []).length} · {formatDate(v.createdAt)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {myProfile
+            ? <CommentSection postId={watchVideo.id} myProfile={myProfile} />
+            : <div style={{ marginTop: 20, fontSize: 13, color: "var(--text-faint)", textAlign: "center" }}>登入後才能留言</div>
+          }
+        </div>
       </div>
     );
   }
@@ -215,7 +353,7 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "20px 16px", padding: "20px 0 40px" }}>
                 {sortedVideos.map(v => (
-                  <div key={v.id} onClick={() => setOpenVideo(v)} style={{ cursor: "pointer" }}>
+                  <div key={v.id} onClick={() => openVideo(v)} style={{ cursor: "pointer" }}>
                     <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", borderRadius: 12, overflow: "hidden", background: "#000" }}>
                       <video src={v.videoUrl} muted preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     </div>
@@ -241,20 +379,6 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
           </div>
         )}
       </div>
-
-      {openVideo && (
-        <div role="dialog" aria-modal="true" aria-label="影片播放" onClick={() => setOpenVideo(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 1500, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 960 }}>
-            <VideoPlayer src={openVideo.videoUrl} autoPlay />
-            {openVideo.text && <div style={{ color: "#fff", marginTop: 12, fontSize: 14, lineHeight: 1.6 }}>{openVideo.text}</div>}
-            <button onClick={() => setOpenVideo(null)} aria-label="關閉"
-              style={{ position: "absolute", top: 20, right: 20, background: "rgba(30,41,59,0.9)", border: "1px solid var(--border)", color: "#f1f5f9", fontSize: 20, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

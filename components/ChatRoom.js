@@ -2585,7 +2585,6 @@ export default function ChatApp({ user }) {
                   <ThemeToggle mode="inline" onOpenProfile={() => setShowProfile(true)}
                     msgFontSize={msgFontSize} onChangeMsgFontSize={setMsgFontSize}
                     onResetMsgFontSize={() => { setMsgFontSize(DEFAULT_MSG_FONT_SIZE); resetPanelWidths(); }} />
-                  <button onClick={() => auth.signOut()} title="登出" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 4, borderRadius: "var(--radius-sm)" }}>🚪</button>
                 </div>
               </div>
             </div>
@@ -2940,7 +2939,10 @@ export default function ChatApp({ user }) {
             title={sidebarCollapsed ? "展開導覽列" : "收合導覽列"}
             aria-label={sidebarCollapsed ? "展開導覽列" : "收合導覽列"}
             style={{
-              position: "absolute", top: 16,
+              // top:74 落在「大頭貼/名字/設定齒輪」那一列下方——原本 top:16 跟
+              // 設定齒輪（在同一列右側、y 範圍差不多）幾乎疊在一起，往下移到
+              // 可捲動導覽區塊剛開始的地方，兩顆按鈕才不會擠在同一個角落。
+              position: "absolute", top: 74,
               left: sidebarCollapsed ? 4 : sidebarWidth - 12,
               zIndex: 40,
               width: 28, height: 28, borderRadius: "50%",
