@@ -3734,86 +3734,6 @@ export default function ChatApp({ user }) {
           />
         )}
 
-        {/* 資料夾 rail：現在貼著右欄（群組/好友移到左邊後，右欄改放功能方塊，
-            資料夾圖示自然也跟過來）——「全部功能」＋每個資料夾一個小圖案＋
-            新增資料夾，跟右欄本身是獨立的兩塊。 */}
-        {!isMobile && (
-          <div className="cr-folder-rail" style={{
-            width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center",
-            gap: 10, padding: "12px 4px", overflowY: "auto", overflowX: "hidden",
-          }}>
-            <button
-              ref={sidebarLayout.registerTop("__home__")}
-              onClick={() => sidebarLayout.setActiveFolder(null)}
-              title="全部功能"
-              style={{
-                width: 40, height: 40, borderRadius: sidebarLayout.activeFolderId ? "50%" : "30%",
-                border: "none", cursor: "pointer", fontSize: 17, flexShrink: 0,
-                background: sidebarLayout.activeFolderId ? "var(--navcard-bg, transparent)" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
-                color: sidebarLayout.activeFolderId ? "var(--text-muted)" : "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "border-radius 0.15s",
-              }}>
-              🏠
-            </button>
-            {sidebarLayout.layout.filter(e => e.startsWith("folder:")).map(entry => {
-              const fid = entry.slice(7);
-              const folder = sidebarLayout.folders[fid];
-              if (!folder) return null;
-              return (
-                <LayoutDragWrap key={entry} dragKey={entry} sourceContainer="top" controller={sidebarLayout}>
-                  <FolderRailIcon
-                    name={folder.name} count={folder.items.length}
-                    active={sidebarLayout.activeFolderId === fid}
-                    isDropTarget={sidebarLayout.dropTarget?.folderId === fid}
-                    onClick={(e) => openFolderPanel(fid, e)}
-                  />
-                </LayoutDragWrap>
-              );
-            })}
-            <AddFolderRailButton onAdd={(name) => sidebarLayout.addFolder(name)} />
-          </div>
-        )}
-
-        {/* 資料夾內容浮動面板：跟 rail 上被點的資料夾圖示同高度冒出來，疊在
-            右欄上面的獨立圖層（不是右欄清單本身的一部分，兩者分開渲染，這樣
-            改資料夾內容不會動到右欄清單原本的排版/捲動狀態）。面板現在從
-            右邊界往左貼齊（rail 在右欄左側），跟 rail 移過來的方向一致。 */}
-        {!isMobile && sidebarLayout.activeFolderId && sidebarLayout.folders[sidebarLayout.activeFolderId] && (() => {
-          const L = sidebarLayout;
-          const folder = L.folders[L.activeFolderId];
-          return (
-            <div style={{
-              position: "absolute", top: folderPanelTop, right: FOLDER_RAIL_WIDTH + 6,
-              width: `var(--cal-w-override, ${calWidth}px)`,
-              maxHeight: `calc(100% - ${folderPanelTop}px - 16px)`,
-              background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
-              boxShadow: "0 16px 40px rgba(0,0,0,0.4)",
-              backdropFilter: "var(--panel-blur)", WebkitBackdropFilter: "var(--panel-blur)",
-              zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden",
-            }}>
-              <ActiveFolderHeader
-                folder={folder}
-                onBack={() => L.setActiveFolder(null)}
-                onRename={(name) => L.renameFolder(L.activeFolderId, name)}
-                onDelete={() => { if (confirm(`刪除資料夾「${folder.name}」？（裡面的功能會移回外層）`)) L.deleteFolder(L.activeFolderId); }}
-              />
-              <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }}>
-                {folder.items.map(key => (
-                  <LayoutDragWrap key={key} dragKey={key} sourceContainer={L.activeFolderId} controller={L} style={sidebarItemPadding}>
-                    {topItems[key]}
-                  </LayoutDragWrap>
-                ))}
-                {folder.items.length === 0 && (
-                  <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "4px 10px 8px", textAlign: "center" }}>
-                    拖曳右側功能方塊到這個資料夾圖示
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
         {/* 日曆欄寬度拖曳把手：只在桌面版顯示，雙擊復原成預設寬度。 */}
         {!isMobile && (
           <div
@@ -3893,6 +3813,84 @@ export default function ChatApp({ user }) {
             </div>
           )}
         </div>
+
+        {/* 資料夾 rail：現在貼著畫面最右邊（跟功能方塊清單對調位置）——
+            「全部功能」＋每個資料夾一個小圖案＋新增資料夾。 */}
+        {!isMobile && (
+          <div className="cr-folder-rail" style={{
+            width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 10, padding: "12px 4px", overflowY: "auto", overflowX: "hidden",
+          }}>
+            <button
+              ref={sidebarLayout.registerTop("__home__")}
+              onClick={() => sidebarLayout.setActiveFolder(null)}
+              title="全部功能"
+              style={{
+                width: 40, height: 40, borderRadius: sidebarLayout.activeFolderId ? "50%" : "30%",
+                border: "none", cursor: "pointer", fontSize: 17, flexShrink: 0,
+                background: sidebarLayout.activeFolderId ? "var(--navcard-bg, transparent)" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
+                color: sidebarLayout.activeFolderId ? "var(--text-muted)" : "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "border-radius 0.15s",
+              }}>
+              🏠
+            </button>
+            {sidebarLayout.layout.filter(e => e.startsWith("folder:")).map(entry => {
+              const fid = entry.slice(7);
+              const folder = sidebarLayout.folders[fid];
+              if (!folder) return null;
+              return (
+                <LayoutDragWrap key={entry} dragKey={entry} sourceContainer="top" controller={sidebarLayout}>
+                  <FolderRailIcon
+                    name={folder.name} count={folder.items.length}
+                    active={sidebarLayout.activeFolderId === fid}
+                    isDropTarget={sidebarLayout.dropTarget?.folderId === fid}
+                    onClick={(e) => openFolderPanel(fid, e)}
+                  />
+                </LayoutDragWrap>
+              );
+            })}
+            <AddFolderRailButton onAdd={(name) => sidebarLayout.addFolder(name)} />
+          </div>
+        )}
+
+        {/* 資料夾內容浮動面板：跟 rail 上被點的資料夾圖示同高度冒出來，疊在
+            右欄上面的獨立圖層。面板現在也貼著最右邊（rail 移到畫面最右側了，
+            面板從 rail 左邊冒出來，蓋住右欄）。 */}
+        {!isMobile && sidebarLayout.activeFolderId && sidebarLayout.folders[sidebarLayout.activeFolderId] && (() => {
+          const L = sidebarLayout;
+          const folder = L.folders[L.activeFolderId];
+          return (
+            <div style={{
+              position: "absolute", top: folderPanelTop, right: FOLDER_RAIL_WIDTH + 6,
+              width: `var(--cal-w-override, ${calWidth}px)`,
+              maxHeight: `calc(100% - ${folderPanelTop}px - 16px)`,
+              background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.4)",
+              backdropFilter: "var(--panel-blur)", WebkitBackdropFilter: "var(--panel-blur)",
+              zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden",
+            }}>
+              <ActiveFolderHeader
+                folder={folder}
+                onBack={() => L.setActiveFolder(null)}
+                onRename={(name) => L.renameFolder(L.activeFolderId, name)}
+                onDelete={() => { if (confirm(`刪除資料夾「${folder.name}」？（裡面的功能會移回外層）`)) L.deleteFolder(L.activeFolderId); }}
+              />
+              <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }}>
+                {folder.items.map(key => (
+                  <LayoutDragWrap key={key} dragKey={key} sourceContainer={L.activeFolderId} controller={L} style={sidebarItemPadding}>
+                    {topItems[key]}
+                  </LayoutDragWrap>
+                ))}
+                {folder.items.length === 0 && (
+                  <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "4px 10px 8px", textAlign: "center" }}>
+                    拖曳左側功能方塊到這個資料夾圖示
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {isMobile && (
           <ChatMobileTabBar
