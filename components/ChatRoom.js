@@ -2827,85 +2827,6 @@ export default function ChatApp({ user }) {
           </div>
         </header>
 
-        {/* 資料夾 rail：側欄最左邊一條窄欄，只放資料夾圖示（Discord 伺服器欄
-            的概念）——「全部功能」＋每個資料夾一個小圖案＋新增資料夾，跟側欄
-            本身是獨立的兩塊，收合側欄不會連帶把這條 rail 也藏起來。 */}
-        {!isMobile && (
-          <div className="cr-folder-rail" style={{
-            width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center",
-            gap: 10, padding: "12px 4px", overflowY: "auto", overflowX: "hidden",
-          }}>
-            <button
-              ref={sidebarLayout.registerTop("__home__")}
-              onClick={() => sidebarLayout.setActiveFolder(null)}
-              title="全部功能"
-              style={{
-                width: 40, height: 40, borderRadius: sidebarLayout.activeFolderId ? "50%" : "30%",
-                border: "none", cursor: "pointer", fontSize: 17, flexShrink: 0,
-                background: sidebarLayout.activeFolderId ? "var(--navcard-bg, transparent)" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
-                color: sidebarLayout.activeFolderId ? "var(--text-muted)" : "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "border-radius 0.15s",
-              }}>
-              🏠
-            </button>
-            {sidebarLayout.layout.filter(e => e.startsWith("folder:")).map(entry => {
-              const fid = entry.slice(7);
-              const folder = sidebarLayout.folders[fid];
-              if (!folder) return null;
-              return (
-                <LayoutDragWrap key={entry} dragKey={entry} sourceContainer="top" controller={sidebarLayout}>
-                  <FolderRailIcon
-                    name={folder.name} count={folder.items.length}
-                    active={sidebarLayout.activeFolderId === fid}
-                    isDropTarget={sidebarLayout.dropTarget?.folderId === fid}
-                    onClick={(e) => openFolderPanel(fid, e)}
-                  />
-                </LayoutDragWrap>
-              );
-            })}
-            <AddFolderRailButton onAdd={(name) => sidebarLayout.addFolder(name)} />
-          </div>
-        )}
-
-        {/* 資料夾內容浮動面板：跟 rail 上被點的資料夾圖示同高度冒出來，疊在
-            側欄上面的獨立圖層（不是側欄清單本身的一部分，兩者分開渲染，這樣
-            改資料夾內容不會動到側欄清單原本的排版/捲動狀態）。 */}
-        {!isMobile && sidebarLayout.activeFolderId && sidebarLayout.folders[sidebarLayout.activeFolderId] && (() => {
-          const L = sidebarLayout;
-          const folder = L.folders[L.activeFolderId];
-          return (
-            <div style={{
-              position: "absolute", top: folderPanelTop, left: FOLDER_RAIL_WIDTH + 6,
-              width: `var(--sidebar-w-override, ${sidebarWidth}px)`,
-              maxHeight: `calc(100% - ${folderPanelTop}px - 16px)`,
-              background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
-              boxShadow: "0 16px 40px rgba(0,0,0,0.4)",
-              backdropFilter: "var(--panel-blur)", WebkitBackdropFilter: "var(--panel-blur)",
-              zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden",
-            }}>
-              <ActiveFolderHeader
-                folder={folder}
-                onBack={() => L.setActiveFolder(null)}
-                onRename={(name) => L.renameFolder(L.activeFolderId, name)}
-                onDelete={() => { if (confirm(`刪除資料夾「${folder.name}」？（裡面的功能會移回外層）`)) L.deleteFolder(L.activeFolderId); }}
-              />
-              <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }}>
-                {folder.items.map(key => (
-                  <LayoutDragWrap key={key} dragKey={key} sourceContainer={L.activeFolderId} controller={L} style={sidebarItemPadding}>
-                    {topItems[key]}
-                  </LayoutDragWrap>
-                ))}
-                {folder.items.length === 0 && (
-                  <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "4px 10px 8px", textAlign: "center" }}>
-                    拖曳左側功能方塊到最左邊這個資料夾圖示
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
         {/* 側邊欄：桌面版＝常駐側欄（一般 flex 排列）；手機版＝position:fixed 抽屜，
             由 sidebarOpen 狀態＋拖曳時的即時 transform 控制（見 applyDrawerTransform）。
             桌面版另外還有 sidebarCollapsed（收合成寬度 0，跟手機抽屜是兩套獨立機制）。 */}
@@ -3036,40 +2957,83 @@ export default function ChatApp({ user }) {
               })()}
             </div>
           ) : (
+            // 桌面版左欄搜尋框下方改放群組 + 好友（原本在右欄，使用者要求
+            // 換邊——功能方塊清單改放到右欄去，見 .cr-cal 那段）。
             <>
-              {/* Feed view */}
-              <div style={{ padding: "4px 10px 0" }}>
-                <NavItem icon="📰" iconBg="linear-gradient(135deg,#ec4899,#f59e0b)" label="動態消息" sublabel="查看好友動態"
-                  active={showFeed}
-                  onClick={() => { resetAllViews(); setShowFeed(true); }} />
+              {/* Groups */}
+              <div className="cr-nav-hdr">
+                <span className="cr-nav-hdr-label">群組 {myGroups.length}</span>
+                <button onClick={() => setShowCreateGroup(true)} title="建立群組" className="cr-nav-icon-btn">+</button>
+              </div>
+              <div style={{ padding: "0 8px 6px" }}>
+                {myGroups.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "16px 12px", color: "var(--text-dim)", fontSize: 13 }}>
+                    還沒有群組
+                  </div>
+                )}
+                {myGroups.map(group => {
+                  const isActive = activeGroupId === group.id;
+                  return (
+                    <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
+                      className={`fb ${isActive ? "act" : ""}`}>
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        <div className="cr-fb-icon" style={{ width: 44, height: 44, fontSize: 20 }}>
+                          {isGroupAvatarImage(group.avatar)
+                            ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
+                            : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
+                        </div>
+                        <UnreadBadge count={group.unreadCount?.[uid]} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="cr-fb-name" style={{ fontSize: 14 }}>{group.name}</div>
+                        <div className="cr-fb-sub">{(group.members || []).length} 人</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Hall button */}
-              <div style={{ padding: "4px 10px 0" }}>
-                <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧"
-                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub}
-                  onClick={() => { resetAllViews(); }} />
+              {/* Friends */}
+              <div className="cr-nav-hdr">
+                <span className="cr-nav-hdr-label">好友 {myFriends.length}</span>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  {pendingInCount > 0 && (
+                    <button onClick={() => setShowFriendReqs(true)} title="好友請求" style={{ background: "#ef4444", border: "none", borderRadius: 20, padding: "2px 8px", color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                      🔔 {pendingInCount}
+                    </button>
+                  )}
+                  <button onClick={() => setShowFriendSearch(true)} title="加好友" className="cr-nav-icon-btn">+</button>
+                </div>
+              </div>
+              <div style={{ padding: "0 8px 8px" }}>
+                {myFriends.length === 0 && !searchQuery && (
+                  <div style={{ textAlign: "center", padding: "20px 12px", color: "var(--text-dim)", fontSize: 13 }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>👋</div>
+                    還沒有好友<br />
+                    <button onClick={() => setShowFriendSearch(true)} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, marginTop: 6 }}>點擊搜尋好友</button>
+                  </div>
+                )}
+                {myFriends.map(friend => {
+                  const isActive = activeFriendId === friend.uid;
+                  return (
+                    <button key={friend.uid} onClick={() => { if (longPressFiredRef.current) { longPressFiredRef.current = false; return; } resetAllViews(); setActiveFriendId(friend.uid); }}
+                      onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, friend }); }}
+                      className={`fb ${isActive ? "act" : ""}`}>
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={44} />
+                        <span style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
+                        <UnreadBadge count={privateUnread[friend.uid]} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="cr-fb-name" style={{ fontSize: 14 }}>{friend.nickname}</div>
+                        <div className="cr-fb-sub">{friend.signature || getStatus(friend.status).label}</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}
-
-          {!isMobile && (() => {
-            // 資料夾內容現在是側欄外面獨立的浮動面板（.cr-folder-panel，見下面），
-            // 跟這裡的主清單不是同一個圖層——這裡永遠只顯示「沒被收進資料夾」
-            // 的功能方塊，不會因為選了某個資料夾就整個換掉內容。
-            const L = sidebarLayout;
-            const visibleKeys = L.layout.filter(e => !e.startsWith("folder:"));
-            return (
-              <>
-                {visibleKeys.map(key => (
-                  <LayoutDragWrap key={key} dragKey={key} sourceContainer="top" controller={L} style={sidebarItemPadding}>
-                    {topItems[key]}
-                  </LayoutDragWrap>
-                ))}
-                <LayoutDragGhost controller={L} topItems={topItems} />
-              </>
-            );
-          })()}
 
           {/* Groups section — desktop 版群組改用 .cr-sidebar 外面那條 Discord 風格
               直排 icon 欄（見 .cr-shell 內、cr-main 前面），這裡的文字列表只在
@@ -3205,7 +3169,7 @@ export default function ChatApp({ user }) {
               // 設定齒輪（在同一列右側、y 範圍差不多）幾乎疊在一起，往下移到
               // 可捲動導覽區塊剛開始的地方，兩顆按鈕才不會擠在同一個角落。
               position: "absolute", top: 74,
-              left: FOLDER_RAIL_WIDTH + (sidebarCollapsed ? 4 : sidebarWidth - 12),
+              left: sidebarCollapsed ? 4 : sidebarWidth - 12,
               zIndex: 40,
               width: 28, height: 28, borderRadius: "50%",
               background: "var(--panel)", border: "1px solid var(--border)",
@@ -3770,6 +3734,86 @@ export default function ChatApp({ user }) {
           />
         )}
 
+        {/* 資料夾 rail：現在貼著右欄（群組/好友移到左邊後，右欄改放功能方塊，
+            資料夾圖示自然也跟過來）——「全部功能」＋每個資料夾一個小圖案＋
+            新增資料夾，跟右欄本身是獨立的兩塊。 */}
+        {!isMobile && (
+          <div className="cr-folder-rail" style={{
+            width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 10, padding: "12px 4px", overflowY: "auto", overflowX: "hidden",
+          }}>
+            <button
+              ref={sidebarLayout.registerTop("__home__")}
+              onClick={() => sidebarLayout.setActiveFolder(null)}
+              title="全部功能"
+              style={{
+                width: 40, height: 40, borderRadius: sidebarLayout.activeFolderId ? "50%" : "30%",
+                border: "none", cursor: "pointer", fontSize: 17, flexShrink: 0,
+                background: sidebarLayout.activeFolderId ? "var(--navcard-bg, transparent)" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
+                color: sidebarLayout.activeFolderId ? "var(--text-muted)" : "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "border-radius 0.15s",
+              }}>
+              🏠
+            </button>
+            {sidebarLayout.layout.filter(e => e.startsWith("folder:")).map(entry => {
+              const fid = entry.slice(7);
+              const folder = sidebarLayout.folders[fid];
+              if (!folder) return null;
+              return (
+                <LayoutDragWrap key={entry} dragKey={entry} sourceContainer="top" controller={sidebarLayout}>
+                  <FolderRailIcon
+                    name={folder.name} count={folder.items.length}
+                    active={sidebarLayout.activeFolderId === fid}
+                    isDropTarget={sidebarLayout.dropTarget?.folderId === fid}
+                    onClick={(e) => openFolderPanel(fid, e)}
+                  />
+                </LayoutDragWrap>
+              );
+            })}
+            <AddFolderRailButton onAdd={(name) => sidebarLayout.addFolder(name)} />
+          </div>
+        )}
+
+        {/* 資料夾內容浮動面板：跟 rail 上被點的資料夾圖示同高度冒出來，疊在
+            右欄上面的獨立圖層（不是右欄清單本身的一部分，兩者分開渲染，這樣
+            改資料夾內容不會動到右欄清單原本的排版/捲動狀態）。面板現在從
+            右邊界往左貼齊（rail 在右欄左側），跟 rail 移過來的方向一致。 */}
+        {!isMobile && sidebarLayout.activeFolderId && sidebarLayout.folders[sidebarLayout.activeFolderId] && (() => {
+          const L = sidebarLayout;
+          const folder = L.folders[L.activeFolderId];
+          return (
+            <div style={{
+              position: "absolute", top: folderPanelTop, right: FOLDER_RAIL_WIDTH + 6,
+              width: `var(--cal-w-override, ${calWidth}px)`,
+              maxHeight: `calc(100% - ${folderPanelTop}px - 16px)`,
+              background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.4)",
+              backdropFilter: "var(--panel-blur)", WebkitBackdropFilter: "var(--panel-blur)",
+              zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden",
+            }}>
+              <ActiveFolderHeader
+                folder={folder}
+                onBack={() => L.setActiveFolder(null)}
+                onRename={(name) => L.renameFolder(L.activeFolderId, name)}
+                onDelete={() => { if (confirm(`刪除資料夾「${folder.name}」？（裡面的功能會移回外層）`)) L.deleteFolder(L.activeFolderId); }}
+              />
+              <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }}>
+                {folder.items.map(key => (
+                  <LayoutDragWrap key={key} dragKey={key} sourceContainer={L.activeFolderId} controller={L} style={sidebarItemPadding}>
+                    {topItems[key]}
+                  </LayoutDragWrap>
+                ))}
+                {folder.items.length === 0 && (
+                  <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "4px 10px 8px", textAlign: "center" }}>
+                    拖曳右側功能方塊到這個資料夾圖示
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* 日曆欄寬度拖曳把手：只在桌面版顯示，雙擊復原成預設寬度。 */}
         {!isMobile && (
           <div
@@ -3815,81 +3859,37 @@ export default function ChatApp({ user }) {
               <CalendarMemo uid={uid} />
             </>
           ) : (
-            // 桌面版右欄改放群組 + 好友（日曆改成左側 showCalendar 那個可切換
-            // 的一般功能，見上面 .cr-main 裡的 Calendar view）。
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-              {/* Groups */}
-              <div className="cr-nav-hdr">
-                <span className="cr-nav-hdr-label">群組 {myGroups.length}</span>
-                <button onClick={() => setShowCreateGroup(true)} title="建立群組" className="cr-nav-icon-btn">+</button>
+            // 桌面版右欄改放功能方塊清單（原本在左欄，使用者要求換邊——
+            // 群組/好友改放到左欄搜尋框下方，見 .cr-sidebar 那段）。資料夾
+            // rail／浮動面板也跟著移到這裡外面（見上面 .cr-folder-rail）。
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 0" }}>
+              <div style={{ padding: "0 10px 0" }}>
+                <NavItem icon="📰" iconBg="linear-gradient(135deg,#ec4899,#f59e0b)" label="動態消息" sublabel="查看好友動態"
+                  active={showFeed}
+                  onClick={() => { resetAllViews(); setShowFeed(true); }} />
               </div>
-              <div style={{ padding: "0 8px 6px" }}>
-                {myGroups.length === 0 && (
-                  <div style={{ textAlign: "center", padding: "16px 12px", color: "var(--text-dim)", fontSize: 13 }}>
-                    還沒有群組
-                  </div>
-                )}
-                {myGroups.map(group => {
-                  const isActive = activeGroupId === group.id;
-                  return (
-                    <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
-                      className={`fb ${isActive ? "act" : ""}`}>
-                      <div style={{ position: "relative", flexShrink: 0 }}>
-                        <div className="cr-fb-icon" style={{ width: 44, height: 44, fontSize: 20 }}>
-                          {isGroupAvatarImage(group.avatar)
-                            ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
-                            : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
-                        </div>
-                        <UnreadBadge count={group.unreadCount?.[uid]} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="cr-fb-name" style={{ fontSize: 14 }}>{group.name}</div>
-                        <div className="cr-fb-sub">{(group.members || []).length} 人</div>
-                      </div>
-                    </button>
-                  );
-                })}
+              <div style={{ padding: "4px 10px 0" }}>
+                <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧"
+                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub}
+                  onClick={() => { resetAllViews(); }} />
               </div>
-
-              {/* Friends */}
-              <div className="cr-nav-hdr">
-                <span className="cr-nav-hdr-label">好友 {myFriends.length}</span>
-                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                  {pendingInCount > 0 && (
-                    <button onClick={() => setShowFriendReqs(true)} title="好友請求" style={{ background: "#ef4444", border: "none", borderRadius: 20, padding: "2px 8px", color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-                      🔔 {pendingInCount}
-                    </button>
-                  )}
-                  <button onClick={() => setShowFriendSearch(true)} title="加好友" className="cr-nav-icon-btn">+</button>
-                </div>
-              </div>
-              <div style={{ padding: "0 8px 8px" }}>
-                {myFriends.length === 0 && !searchQuery && (
-                  <div style={{ textAlign: "center", padding: "20px 12px", color: "var(--text-dim)", fontSize: 13 }}>
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>👋</div>
-                    還沒有好友<br />
-                    <button onClick={() => setShowFriendSearch(true)} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, marginTop: 6 }}>點擊搜尋好友</button>
-                  </div>
-                )}
-                {myFriends.map(friend => {
-                  const isActive = activeFriendId === friend.uid;
-                  return (
-                    <button key={friend.uid} onClick={() => { if (longPressFiredRef.current) { longPressFiredRef.current = false; return; } resetAllViews(); setActiveFriendId(friend.uid); }}
-                      onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, friend }); }}
-                      className={`fb ${isActive ? "act" : ""}`}>
-                      <div style={{ position: "relative", flexShrink: 0 }}>
-                        <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={44} />
-                        <span style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
-                        <UnreadBadge count={privateUnread[friend.uid]} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="cr-fb-name" style={{ fontSize: 14 }}>{friend.nickname}</div>
-                        <div className="cr-fb-sub">{friend.signature || getStatus(friend.status).label}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              {(() => {
+                // 資料夾內容是右欄外面獨立的浮動面板（見上面 .cr-folder-rail
+                // 那段），跟這裡的主清單不是同一個圖層——這裡永遠只顯示
+                // 「沒被收進資料夾」的功能方塊。
+                const L = sidebarLayout;
+                const visibleKeys = L.layout.filter(e => !e.startsWith("folder:"));
+                return (
+                  <>
+                    {visibleKeys.map(key => (
+                      <LayoutDragWrap key={key} dragKey={key} sourceContainer="top" controller={L} style={sidebarItemPadding}>
+                        {topItems[key]}
+                      </LayoutDragWrap>
+                    ))}
+                    <LayoutDragGhost controller={L} topItems={topItems} />
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>
