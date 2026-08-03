@@ -2829,11 +2829,15 @@ export default function ChatApp({ user }) {
 
         {/* 資料夾 rail：側欄最左邊一條窄欄，只放資料夾圖示（Discord 伺服器欄
             的概念）——「全部功能」＋每個資料夾一個小圖案＋新增資料夾，跟側欄
-            本身是獨立的兩塊，收合側欄不會連帶把這條 rail 也藏起來。 */}
+            本身是獨立的兩塊，收合側欄不會連帶把這條 rail 也藏起來。外面加一個
+            長方條方塊（背景+邊框+圓角），讓它看起來是獨立的一塊面板，不是
+            零散飄在側欄外面的圖示。 */}
         {!isMobile && (
           <div className="cr-folder-rail" style={{
             width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center",
             gap: 10, padding: "12px 4px", overflowY: "auto", overflowX: "hidden",
+            margin: "12px 6px", borderRadius: "var(--radius-lg, 18px)",
+            background: "var(--panel)", border: "1px solid var(--border)", boxShadow: "var(--card-shadow)",
           }}>
             <button
               ref={sidebarLayout.registerTop("__home__")}
