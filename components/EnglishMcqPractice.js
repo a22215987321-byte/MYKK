@@ -75,10 +75,96 @@ Despite this progress, challenges remain. Contamination — when non-recyclable 
       },
     ],
   },
+  {
+    id: "ch2",
+    title: "第 2 章：咖啡店的互助基金",
+    level: "中階（約 IELTS 4.5-5.5）",
+    passage: `When Maria opened her small coffee shop five years ago, she never expected to become known for anything other than her coffee. That changed last winter, when one of her part-time staff was suddenly unable to work after a minor accident. Without paid sick leave, the young employee faced weeks without any income at all.
+
+Maria decided to act. She placed a small jar beside the till labelled "Staff Support Fund" and asked customers to round up their bill to the nearest dollar if they wished. To her surprise, almost every customer agreed, and many left considerably more than the rounding required. Within two months, the fund had collected enough money to cover a full month's wages for any staff member facing an emergency.
+
+Word of the idea spread quickly through the neighbourhood, and three other small businesses have since introduced similar funds. Maria insists that the scheme only works because it is voluntary and transparent — every contribution and payout is recorded in a notebook that any customer is welcome to inspect. "People don't mind giving," she says, "as long as they can see exactly where the money goes."
+
+Not everyone has been supportive, however. A few regulars have complained that the fund makes ordering coffee feel like an obligation to donate. Maria has responded by making the jar smaller and less prominent, while keeping the option available for those who still wish to contribute.`,
+    questions: [
+      {
+        id: "q1",
+        text: "Why did Maria first decide to start the Staff Support Fund?",
+        options: [
+          "She wanted to increase her shop's profits",
+          "A customer suggested the idea to her",
+          "An employee had no income after an accident",
+          "The government required small businesses to offer one",
+        ],
+        answerIndex: 2,
+        explain: "第一段寫「one of her part-time staff was suddenly unable to work after a minor accident... faced weeks without any income」——這是起因，題目考的是「找出事件的觸發原因」，不是後來大家怎麼反應。",
+      },
+      {
+        id: "q2",
+        text: "What does \"round up their bill\" most likely mean in the second paragraph?",
+        options: [
+          "Pay less than the exact amount",
+          "Pay the exact amount only",
+          "Pay slightly more to reach a whole number",
+          "Refuse to pay at all",
+        ],
+        answerIndex: 2,
+        explain: "從後面「many left considerably more than the rounding required」可以推斷 round up 是指「多付一點湊整數」，而不是少付——這題要靠前後文的邏輯關係猜字義，不能只查字典直翻。",
+      },
+      {
+        id: "q3",
+        text: "According to Maria, what is the main reason the fund has worked well?",
+        options: [
+          "It is compulsory for every customer",
+          "It is voluntary and transparent",
+          "It is managed by the local government",
+          "It only accepts large donations",
+        ],
+        answerIndex: 1,
+        explain: "文中直接引用她的話「the scheme only works because it is voluntary and transparent」——這題答案幾乎是原句照抄，重點在辨認出哪一句是「她自己認為的原因」，不要被前面的細節混淆。",
+      },
+      {
+        id: "q4",
+        text: "What has been the effect of Maria's idea on the wider neighbourhood?",
+        options: [
+          "Other businesses have started similar funds",
+          "Local customers have stopped visiting her shop",
+          "The government has shut the fund down",
+          "Other coffee shops have lowered their prices",
+        ],
+        answerIndex: 0,
+        explain: "第三段開頭「three other small businesses have since introduced similar funds」——細節題，答案就是這句話的改寫，注意題目問的是「對周邊社區的影響」，不是對 Maria 自己生意的影響。",
+      },
+      {
+        id: "q5",
+        text: "How did Maria respond to customers who disliked the fund?",
+        options: [
+          "She removed the fund completely",
+          "She made contributions compulsory",
+          "She made the jar smaller and less noticeable",
+          "She stopped selling coffee to complainers",
+        ],
+        answerIndex: 2,
+        explain: "最後一句「making the jar smaller and less prominent, while keeping the option available」——這題考「面對批評時的具體回應」，四個選項裡只有這個是文中真的發生的事，其餘都是過度推論。",
+      },
+      {
+        id: "q6",
+        text: "Which statement best reflects the overall message of the passage?",
+        options: [
+          "Small acts of voluntary generosity can create meaningful support systems",
+          "Customers should always be forced to donate to good causes",
+          "Coffee shops are not suitable places for charity work",
+          "Government funding is the only reliable way to help workers",
+        ],
+        answerIndex: 0,
+        explain: "全文用一個具體例子（自願投幣、透明記帳、擴散到其他店家）帶出「小小的自願善意可以累積成有用的互助制度」——這是「主旨題」，要跳出單一段落，看整篇文章想傳達的核心想法。",
+      },
+    ],
+  },
 ];
 
 export default function EnglishMcqPractice({ onNav }) {
-  const [chapterIdx] = useState(0);
+  const [chapterIdx, setChapterIdx] = useState(0);
   const [stage, setStage] = useState("intro"); // intro | quiz | result
   const [qIdx, setQIdx] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -136,6 +222,27 @@ export default function EnglishMcqPractice({ onNav }) {
           <span style={{ fontSize: 11, color: "var(--text-faint)" }}>最佳成績：{bestScores[chapter.id]}/{total}</span>
         )}
       </div>
+
+      {stage === "intro" && (
+        <div style={{ display: "flex", gap: 4, padding: "6px 12px", overflowX: "auto", flexShrink: 0, borderBottom: "1px solid var(--border)", background: "var(--panel-alt)" }}>
+          {CHAPTERS.map((c, i) => {
+            const active = i === chapterIdx;
+            const best = bestScores[c.id];
+            return (
+              <button key={c.id} onClick={() => setChapterIdx(i)}
+                style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 11px", borderRadius: 20,
+                  border: `1px solid ${active ? ACCENT + "60" : "var(--border)"}`,
+                  background: active ? ACCENT + "18" : "var(--panel)",
+                  color: active ? ACCENT : "var(--text-faint)",
+                  cursor: "pointer", fontSize: 11, fontWeight: active ? 700 : 400,
+                  whiteSpace: "nowrap", flexShrink: 0, transition: "all .15s" }}>
+                第 {i + 1} 章
+                {best != null && <span style={{ background: "#10b98128", color: "#10b981", borderRadius: 10, padding: "1px 5px", fontSize: 9, fontWeight: 700 }}>{best}/{c.questions.length}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 18px" }}>
         {stage === "intro" && (
