@@ -31,6 +31,7 @@ import SpanishPronunciation from "./SpanishPronunciation";
 import SpanishGrammar from "./SpanishGrammar";
 import SpanishVerbConjugator from "./SpanishVerbConjugator";
 import EnglishPronunciation from "./EnglishPronunciation";
+import EnglishMcqPractice from "./EnglishMcqPractice";
 import IeltsBand4 from "./IeltsBand4";
 import ImageEditorRoom from "./ImageEditorRoom";
 import AiChatRoom from "./AiChatRoom";
@@ -1375,6 +1376,7 @@ export default function ChatApp({ user }) {
   const [spanishCourseNoteContext, setSpanishCourseNoteContext] = useState(null); // {key, title} reported by SpanishCourseRoom's current lesson
   const [showEnglishPron,    setShowEnglishPron]    = useState(false);
   const [showIeltsBand4,     setShowIeltsBand4]     = useState(false);
+  const [showEnglishMcq,     setShowEnglishMcq]     = useState(false);
   const [showFeed,           setShowFeed]           = useState(false);
   // 動態消息裡點擊貼文作者頭像/名字要看的個人頁面 uid（null = 沒有開啟）——
   // 用這個狀態把 ProfileView 換進 Feed 的位置，而不是像以前那樣用
@@ -1409,7 +1411,7 @@ export default function ChatApp({ user }) {
   const sidebarLayout = useSidebarLayout("cr-sidebar-v1", "cr-order-top-v3", [
     "leaderboard", "calendar", "videoHub",
     "upgrade", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion",
-    "englishPron", "ieltsBand4", "vocab",
+    "englishPron", "ieltsBand4", "englishMcq", "vocab",
     "spanish", "spanishCourse", "spanishPron", "spanishGrammar", "spanishVerbs",
     "customVocab", "dict",
   ]);
@@ -1525,7 +1527,7 @@ export default function ChatApp({ user }) {
     setShowVocab(false); setShowSpanish(false); setShowSpanishCourse(false);
     setShowCustomVocab(false); setShowDict(false); setFrenchView(null);
     setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false);
-    setShowEnglishPron(false); setShowIeltsBand4(false);
+    setShowEnglishPron(false); setShowIeltsBand4(false); setShowEnglishMcq(false);
     setShowFeed(false); setShowImageEditor(false); setShowAiChat(false); setShowDocConvert(false);
     setShowAiCompanion(false); setShowUpgrade(false); setViewProfileUid(null);
     setShowCalendar(false); setShowGroupInfo(false); setShowFriendInfo(false);
@@ -2404,6 +2406,10 @@ export default function ChatApp({ user }) {
       <NavItem compact icon="🎯" iconBg="linear-gradient(135deg,#1e3a1e,#6366f1)" label="IELTS 4.0 入門" sublabel="詞彙・聽力・口說"
         active={showIeltsBand4} onClick={() => { resetAllViews(); setShowIeltsBand4(true); }} />
     ),
+    englishMcq: (
+      <NavItem compact icon="📝" iconBg="linear-gradient(135deg,#0c4a6e,#0ea5e9)" label="英文選擇題練習" sublabel="短文理解・錯題解釋"
+        active={showEnglishMcq} onClick={() => { resetAllViews(); setShowEnglishMcq(true); }} />
+    ),
     vocab: (
       <NavItem icon="📚" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習"
         active={showVocab} onClick={() => { resetAllViews(); setShowVocab(true); }} />
@@ -3024,7 +3030,7 @@ export default function ChatApp({ user }) {
                 </div>
               </button>
               {(() => {
-                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub;
+                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub;
                 return (
                   <button onClick={() => { resetAllViews(); if (isMobile) settleDrawer(false); }}
                     style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: hallActive ? "var(--accent-active)" : "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
@@ -3051,7 +3057,7 @@ export default function ChatApp({ user }) {
               {/* Hall button */}
               <div style={{ padding: "4px 10px 0" }}>
                 <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧"
-                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub}
+                  active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub}
                   onClick={() => { resetAllViews(); }} />
               </div>
             </>
@@ -3250,7 +3256,7 @@ export default function ChatApp({ user }) {
           {/* Calendar view — 原本是右欄永遠顯示的東西，現在改成左側可切換的
               一般功能，跟排行榜等其他頁面同一套 showX 模式；右欄（.cr-cal）
               改放群組跟好友。 */}
-          {showCalendar && !activeFriendId && !activeGroupId && !showFeed && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showVideoHub && (
+          {showCalendar && !activeFriendId && !activeGroupId && !showFeed && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showVideoHub && (
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
               <div style={{ maxWidth: 480, margin: "0 auto", width: "100%" }}>
                 <CalendarMemo uid={uid} />
@@ -3556,7 +3562,12 @@ export default function ChatApp({ user }) {
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><IeltsBand4 onNav={() => { setShowIeltsBand4(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
-          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
+          {/* English MCQ practice view */}
+          {showEnglishMcq && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishMcqPractice onNav={() => { setShowEnglishMcq(false); if (isMobile) setMobileView('more'); }} /></div>
+          )}
+
+          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
             <>
               <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
                 <span style={{ fontSize: 20 }}>💬</span>
@@ -3768,7 +3779,7 @@ export default function ChatApp({ user }) {
         {/* 更多選單（手機版「更多」分頁） */}
         {isMobile && mobileView === 'more' && (
           <ChatMoreMenu
-            state={{ showLeaderboard, showCinema, showAiChat, showDocConvert, showAiCompanion, showUpgrade, showEnglishPron, showIeltsBand4, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showCustomVocab, showDict }}
+            state={{ showLeaderboard, showCinema, showAiChat, showDocConvert, showAiCompanion, showUpgrade, showEnglishPron, showIeltsBand4, showEnglishMcq, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showCustomVocab, showDict }}
             setters={{ setShowLeaderboard, setShowCinema, setShowAiChat, setShowDocConvert, setShowAiCompanion, setShowUpgrade, setShowEnglishPron, setShowIeltsBand4, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowCustomVocab, setShowDict }}
             onOpen={(setter) => { resetAllViews(); setter(true); setMobileView(null); }}
           />
