@@ -14,6 +14,10 @@ export default function ChatMoreMenu({ state, setters, onOpen }) {
           active={state.showCinema} onClick={() => onOpen(setters.setShowCinema)} />
       </div>
       <div style={{ padding: "0 10px 10px" }}>
+        <NavItem icon="🖼️" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="圖片編輯" sublabel="裁剪・濾鏡・貼圖" mobileTouch
+          active={state.showImageEditor} onClick={() => onOpen(setters.setShowImageEditor)} />
+      </div>
+      <div style={{ padding: "0 10px 10px" }}>
         <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel="有問題都可以問我" mobileTouch
           active={state.showAiChat} onClick={() => onOpen(setters.setShowAiChat)} />
       </div>
@@ -43,6 +47,10 @@ export default function ChatMoreMenu({ state, setters, onOpen }) {
       <div style={{ padding: "0 10px 10px" }}>
         <NavItem icon="📚" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習" mobileTouch
           active={state.showVocab} onClick={() => onOpen(setters.setShowVocab)} />
+      </div>
+      <div style={{ padding: "0 10px 10px" }}>
+        <NavItem icon="📝" iconBg="linear-gradient(135deg,#0c4a6e,#0ea5e9)" label="英文選擇題練習" sublabel="短文理解・錯題解析" mobileTouch
+          active={state.showEnglishMcq} onClick={() => onOpen(setters.setShowEnglishMcq)} />
       </div>
 
       <div style={{ padding: "4px 14px 4px" }}>

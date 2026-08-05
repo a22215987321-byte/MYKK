@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { MessageCircle, Newspaper, ImagePlus, Compass, Smile } from "lucide-react";
+import { Home, Newspaper, Video, Smile } from "lucide-react";
 import { auth } from "../lib/firebase";
 
 function TabButton({ Icon, label, active, onClick, badge }) {
@@ -23,17 +23,20 @@ function TabButton({ Icon, label, active, onClick, badge }) {
   );
 }
 
-// activeTab/onSelectChats/onSelectMore/onSelectImageEditor/onOpenProfile are all optional:
-// when this bar is docked inside ChatRoom, ChatRoom passes explicit callbacks that just
-// flip local SPA state. When it's mounted standalone (via MobileTabBarLayout, on pages
-// like /feed or /profile/[uid] that live outside ChatRoom entirely), none of those
-// callbacks exist — the router-based fallbacks below take over so the bar is still fully
-// usable.
-export default function ChatMobileTabBar({ activeTab, onSelectChats, onSelectMore, onSelectImageEditor, onOpenProfile, pendingCount = 0 }) {
+// 4 個底部按鈕：首頁（群組＋好友清單，點進去看對話）／動態消息／影片／我。
+// 圖片編輯、原本的「更多」分頁都不在底部了——「更多」（其他功能方塊：
+// AI助手、字典、語言學習工具等，圖片編輯也在裡面）現在改成從聊天畫面
+// 向右滑喚出（見 ChatRoom.js 的 cr-sidebar 手機版內容 + handleShellPointer*
+// 那組拖曳手勢），不用佔一個底部按鈕位置。
+//
+// activeTab/onSelectHome/onSelectVideo/onOpenProfile 都是選填：這個列表被
+// ChatRoom 內嵌使用時，ChatRoom 會傳明確的 callback 直接切換內部 state；
+// 被 MobileTabBarLayout 獨立掛載時（例如 /feed、/profile/[uid] 這些活在
+// ChatRoom 外面的頁面），沒有這些 callback，就退回用路由的 fallback。
+export default function ChatMobileTabBar({ activeTab, onSelectHome, onSelectVideo, onOpenProfile, pendingCount = 0 }) {
   const router = useRouter();
-  const goChats = onSelectChats || (() => router.push('/?view=list'));
-  const goMore = onSelectMore || (() => router.push('/?view=more'));
-  const goImageEditor = onSelectImageEditor || (() => router.push('/?view=imageEditor'));
+  const goHome = onSelectHome || (() => router.push('/?view=list'));
+  const goVideo = onSelectVideo || (() => router.push('/?view=video'));
   const goProfile = onOpenProfile || (() => router.push(`/profile/${auth.currentUser?.uid || ''}`));
 
   return (
@@ -50,7 +53,7 @@ export default function ChatMobileTabBar({ activeTab, onSelectChats, onSelectMor
           }
         }
       `}</style>
-      <TabButton Icon={MessageCircle} label="聊天" active={activeTab === 'chat'} onClick={goChats} badge={pendingCount} />
+      <TabButton Icon={Home} label="首頁" active={activeTab === 'home'} onClick={goHome} badge={pendingCount} />
       <Link href="/feed" style={{
         flex: 1, minHeight: 56, display: "flex", flexDirection: "column", alignItems: "center",
         justifyContent: "center", gap: 2, textDecoration: "none",
@@ -59,8 +62,7 @@ export default function ChatMobileTabBar({ activeTab, onSelectChats, onSelectMor
         <Newspaper size={20} strokeWidth={activeTab === 'feed' ? 2.4 : 2} />
         <span style={{ fontSize: 11, fontWeight: activeTab === 'feed' ? 700 : 500 }}>動態消息</span>
       </Link>
-      <TabButton Icon={ImagePlus} label="圖片編輯" active={activeTab === 'imageEditor'} onClick={goImageEditor} />
-      <TabButton Icon={Compass} label="更多" active={activeTab === 'more'} onClick={goMore} />
+      <TabButton Icon={Video} label="影片" active={activeTab === 'video'} onClick={goVideo} />
       <TabButton Icon={Smile} label="我" active={activeTab === 'me'} onClick={goProfile} />
     </div>
   );
