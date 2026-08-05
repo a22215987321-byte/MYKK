@@ -1401,6 +1401,9 @@ export default function ChatApp({ user }) {
   // null 時顯示搜尋/熱門頻道清單，有值時顯示那個人的頻道頁。
   const [showVideoHub,       setShowVideoHub]       = useState(false);
   const [videoHubUid,        setVideoHubUid]        = useState(null);
+  // 從「影片」首頁的熱門影片格網直接點某支影片時，要記住是哪一支，讓
+  // ChannelProfileView 一開就直接播放它，而不是先停在頻道列表頁再手動點。
+  const [videoHubVideoId,    setVideoHubVideoId]    = useState(null);
 
   // Mobile / sidebar states
   const isMobile = useIsMobile();
@@ -2376,7 +2379,7 @@ export default function ChatApp({ user }) {
         active={showCalendar} onClick={() => { resetAllViews(); setShowCalendar(true); }} />
     ),
     videoHub: (
-      <NavItem icon="📺" iconBg="linear-gradient(135deg,#dc2626,#7f1d1d)" label="影片" sublabel="搜尋創作者頻道"
+      <NavItem icon={<span style={{ color: "#fff", fontSize: 15 }}>▶</span>} iconBg="linear-gradient(135deg,#ef4444,#b91c1c)" label="影片" sublabel="搜尋創作者頻道"
         active={showVideoHub} onClick={() => { resetAllViews(); setShowVideoHub(true); }} />
     ),
     upgrade: (
@@ -3283,11 +3286,12 @@ export default function ChatApp({ user }) {
             flexDirection: "column",
           }}>
             {videoHubUid ? (
-              <ChannelProfileView key={videoHubUid} uid={videoHubUid}
-                onClose={() => setVideoHubUid(null)}
-                onOpenChannel={setVideoHubUid} />
+              <ChannelProfileView key={videoHubUid} uid={videoHubUid} initialVideoId={videoHubVideoId}
+                onClose={() => { setVideoHubUid(null); setVideoHubVideoId(null); }}
+                onOpenChannel={(nextUid) => { setVideoHubVideoId(null); setVideoHubUid(nextUid); }} />
             ) : (
-              <VideoHub onOpenChannel={setVideoHubUid} />
+              <VideoHub viewerUid={uid} onOpenChannel={setVideoHubUid}
+                onOpenVideo={(channelUid, videoId) => { setVideoHubVideoId(videoId); setVideoHubUid(channelUid); }} />
             )}
           </div>
 

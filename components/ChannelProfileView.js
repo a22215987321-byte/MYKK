@@ -92,7 +92,7 @@ function GenerateSubtitlesButton({ video, onDone }) {
 // 資料沿用同一套 users/{uid} 個人資料跟 posts（videoUrl 有值的），沒有另外
 // 開一套 schema。除了「影片」分頁有實際內容，其餘分頁先做版面（顯示「即將
 // 推出」），這是使用者明確同意的範圍（先做版面就好，功能之後再說）。
-export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
+export default function ChannelProfileView({ uid, onClose, onOpenChannel, initialVideoId }) {
   const [viewerUid, setViewerUid] = useState(undefined);
   const [viewerProfile, setViewerProfile] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -103,7 +103,7 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
   const [sort, setSort] = useState("latest");
   const [bioExpanded, setBioExpanded] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
-  const [watchVideoId, setWatchVideoId] = useState(null);
+  const [watchVideoId, setWatchVideoId] = useState(initialVideoId || null);
   const [showShare, setShowShare] = useState(false);
 
   const isOwner = viewerUid != null && viewerUid === uid;
