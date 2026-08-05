@@ -359,7 +359,7 @@ function PostItem({ post, profile, isOwner, onTogglePin, onOpenMedia }) {
             )}
             {post.videoUrl && (
               <div style={{ borderRadius: 16, overflow: "hidden", marginTop: 10 }}>
-                <video src={post.videoUrl} controls style={{ width: "100%", maxHeight: 400, display: "block" }} />
+                <VideoPlayer src={post.videoUrl} subtitles={post.subtitles} />
               </div>
             )}
             {!post.videoUrl && post.imageUrl && (

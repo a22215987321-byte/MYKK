@@ -20,6 +20,7 @@ export default function VideoPlayer({ src, poster, autoPlay = false, subtitles }
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [subtitlesOn, setSubtitlesOn] = useState(true);
 
   const togglePlay = useCallback((e) => {
     e?.stopPropagation();
@@ -108,9 +109,11 @@ export default function VideoPlayer({ src, poster, autoPlay = false, subtitles }
   };
 
   const progress = duration ? (current / duration) * 100 : 0;
-  // AI 自動生成的字幕（見 lib/generateSubtitles.js）——純燒錄式疊字，沒有
-  // CC 開關，跟著 current 播放時間找目前該顯示哪一段。
-  const activeCaption = subtitles?.length
+  // AI 自動生成的字幕（見 lib/generateSubtitles.js）——純燒錄式疊字，跟著
+  // current 播放時間找目前該顯示哪一段；subtitlesOn 是使用者自己按 CC 鈕
+  // 開關的，只有真的有字幕資料時才會顯示這顆按鈕。
+  const hasSubtitles = subtitles?.length > 0;
+  const activeCaption = hasSubtitles && subtitlesOn
     ? subtitles.find(s => current >= s.start && current < s.end)?.text || ""
     : "";
 
@@ -182,6 +185,13 @@ export default function VideoPlayer({ src, poster, autoPlay = false, subtitles }
             {formatTime(current)} / {formatTime(duration)}
           </span>
           <div style={{ flex: 1 }} />
+          {hasSubtitles && (
+            <button onClick={(e) => { e.stopPropagation(); setSubtitlesOn(v => !v); }} aria-label={subtitlesOn ? "關閉字幕" : "開啟字幕"}
+              style={{ background: subtitlesOn ? "rgba(255,255,255,0.2)" : "none", border: "1px solid rgba(255,255,255,0.5)", borderRadius: 4,
+                color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "2px 5px", lineHeight: 1.3 }}>
+              CC
+            </button>
+          )}
           <button onClick={toggleFullscreen} aria-label={isFullscreen ? "退出全螢幕" : "全螢幕"} style={{ background: "none", border: "none", color: "#fff", fontSize: 16, cursor: "pointer", padding: 0 }}>
             {isFullscreen ? "⤢" : "⛶"}
           </button>

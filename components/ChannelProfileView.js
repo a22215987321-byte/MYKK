@@ -27,6 +27,63 @@ const SORTS = [
   { id: "oldest", label: "最早" },
 ];
 
+const SUBTITLE_PROGRESS_LABEL = { model: "下載語音辨識模型中", decode: "讀取影片聲音中", transcribe: "辨識字幕中" };
+
+// 頻道主自己補生成字幕——之前上傳影片時如果沒按過「自動生成字幕」（或者
+// 影片是這個功能上線前貼的），字幕欄位就是空的，這裡讓頻道主可以回頭幫
+// 已經發布的影片補一份，不用刪掉重貼。做法跟發文時的生成按鈕一樣（見
+// lib/generateSubtitles.js），差別只在來源是先 fetch 已上傳的影片網址回來
+// 當 Blob，而不是使用者剛選的本機檔案。
+function GenerateSubtitlesButton({ video, onDone }) {
+  const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState(null);
+
+  const run = async () => {
+    setGenerating(true);
+    setProgress({ stage: "decode" });
+    try {
+      const [{ generateSubtitles }, res] = await Promise.all([
+        import("../lib/generateSubtitles"),
+        fetch(video.videoUrl),
+      ]);
+      const blob = await res.blob();
+      const result = await generateSubtitles(blob, (p) => setProgress(p));
+      if (!result.length) {
+        toast("沒有辨識到可用的語音內容");
+      } else {
+        await updateDoc(doc(db, "posts", video.id), { subtitles: result });
+        onDone(result);
+        toast(`已生成 ${result.length} 段字幕`, "success");
+      }
+    } catch (e) {
+      console.error("[GenerateSubtitlesButton] generate failed", e);
+      toast(e?.message || "字幕生成失敗，請重試");
+    } finally {
+      setGenerating(false);
+      setProgress(null);
+    }
+  };
+
+  if (generating) {
+    const label = SUBTITLE_PROGRESS_LABEL[progress?.stage] || "處理中";
+    const pct = progress?.stage === "model" && typeof progress.progress === "number" ? `${Math.round(progress.progress)}%` : "";
+    return (
+      <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-faint)" }}>
+        <span style={{ width: 12, height: 12, border: "2px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", display: "inline-block", animation: "cpv-spin 0.8s linear infinite" }} />
+        {label}{pct && ` ${pct}`}...
+        <style>{"@keyframes cpv-spin { to { transform: rotate(360deg); } }"}</style>
+      </span>
+    );
+  }
+
+  return (
+    <button onClick={run}
+      style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 14px", color: "var(--text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+      🤖 生成字幕
+    </button>
+  );
+}
+
 // 從「影片」入口點進某個人的頻道——刻意不沿用一般個人頁（ProfileView）的
 // 版面：YouTube 頻道那種橫幅+大頭貼+訂閱／管理按鈕+分頁+排序過的影片格網，
 // 跟原本社群導向的個人頁在版面上要能一眼分辨是「來看影片」還是「來看動態」。
@@ -194,6 +251,10 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel }) {
                 style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 14px", color: "var(--text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 🔗 分享
               </button>
+              {isOwner && !watchVideo.subtitles?.length && (
+                <GenerateSubtitlesButton video={watchVideo}
+                  onDone={(subtitles) => setVideos(prev => prev.map(v => v.id === watchVideo.id ? { ...v, subtitles } : v))} />
+              )}
             </div>
           </div>
 

@@ -12,6 +12,7 @@ import { formatDate, formatFullDate } from "../lib/format";
 import { toast } from "../lib/toast";
 import { useMediaAttachments } from "../lib/useMediaAttachments";
 import MediaAttachPreview from "./media-editor/MediaAttachPreview";
+import VideoPlayer from "./VideoPlayer";
 import { Avatar, CommentSection } from "./PostComments";
 import SharePostModal from "./SharePostModal";
 
@@ -247,11 +248,7 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
       {/* Video */}
       {post.videoUrl && (
         <div className="feed-media" style={{ width: "100%", background: "#000" }}>
-          <video
-            src={post.videoUrl}
-            controls
-            style={{ width: "100%", maxHeight: 480, display: "block" }}
-          />
+          <VideoPlayer src={post.videoUrl} subtitles={post.subtitles} />
         </div>
       )}
 

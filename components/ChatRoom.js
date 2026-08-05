@@ -1320,9 +1320,14 @@ function DonateModal({ myProfile, onClose }) {
 
 // Main ChatApp
 
+// AI 助手暫時只給這個帳號用（避免其他人用掉額度導致 OpenRouter/DeepSeek
+// 費用或觸發濫用限制）——先做前端擋，NavItem 保留可見但鎖住，不是整個藏起來。
+const AI_CHAT_OWNER_EMAIL = "a22215987321@gmail.com";
+
 export default function ChatApp({ user }) {
   const router = useRouter();
   const uid = user.uid;
+  const aiChatAllowed = user.email === AI_CHAT_OWNER_EMAIL;
 
   const [myProfile,      setMyProfile]      = useState(null);
   const [myProfileError, setMyProfileError] = useState('');
@@ -2387,7 +2392,7 @@ export default function ChatApp({ user }) {
         active={showImageEditor} onClick={() => { resetAllViews(); setShowImageEditor(true); }} />
     ),
     aiChat: (
-      <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel="有問題都可以問我"
+      <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel={aiChatAllowed ? "有問題都可以問我" : "🔒 已鎖定"}
         active={showAiChat} onClick={() => { resetAllViews(); setShowAiChat(true); }} />
     ),
     docConvert: (
@@ -3493,7 +3498,13 @@ export default function ChatApp({ user }) {
 
           {/* AI chat view */}
           {showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
-            <AiChatRoom user={user} db={db} />
+            aiChatAllowed ? <AiChatRoom user={user} db={db} /> : (
+              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, color: "var(--text-muted)" }}>
+                <div style={{ fontSize: 40 }}>🔒</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>AI 助手目前已鎖定</div>
+                <div style={{ fontSize: 13, color: "var(--text-faint)" }}>此功能暫時僅限管理員帳號使用</div>
+              </div>
+            )
           )}
 
           {/* Doc convert view */}
