@@ -466,7 +466,7 @@ function NewPostForm({ myProfile, onPosted }) {
   const canPost = (text.trim() || media.hasMedia) && !posting;
 
   return (
-    <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", padding: 16, marginBottom: 20 }}>
+    <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", padding: 16, marginBottom: 24 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         <Avatar avatar={myProfile.avatar} avatarImage={myProfile.avatarImage} color={myProfile.color} size={40} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -520,36 +520,6 @@ function NewPostForm({ myProfile, onPosted }) {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-// Single deduplicated row of topic tags — horizontally scrollable so an
-// overflowing list never needs a second row. Each tag toggles as a filter:
-// selected = filled, unselected = outline only.
-function TopicTagsBar({ topics, selected, onToggle }) {
-  const unique = useMemo(() => [...new Set(topics)], [topics]);
-  return (
-    <div className="feed-tags-row" style={{ display: "flex", gap: 8, overflowX: "auto", padding: "2px 2px 8px", marginBottom: 20 }}>
-      {unique.map(topic => {
-        const isSelected = selected === topic;
-        return (
-          <button
-            key={topic}
-            onClick={() => onToggle(topic)}
-            className="feed-tag-chip"
-            aria-pressed={isSelected}
-            style={{
-              flexShrink: 0, padding: "7px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer",
-              background: isSelected ? "var(--accent)" : "transparent",
-              color: isSelected ? "#fff" : "var(--text-muted)",
-              border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
-            }}
-          >
-            #{topic}
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -645,7 +615,6 @@ export default function FeedApp({ user, embedded = false, onOpenProfile }) {
   const [myProfile, setMyProfile] = useState(null);
   const [myProfileError, setMyProfileError] = useState('');
   const [posts, setPosts] = useState([]);
-  const [selectedTopic, setSelectedTopic] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortMode, setSortMode] = useState("latest");
   const topRef = useRef();
@@ -680,16 +649,11 @@ export default function FeedApp({ user, embedded = false, onOpenProfile }) {
   const filteredPosts = useMemo(() => {
     if (!myProfile) return [];
     let list = posts;
-    if (selectedTopic) list = list.filter(p => (p.text || "").includes(`#${selectedTopic}`));
     const q = searchQuery.trim().toLowerCase();
     if (q) list = list.filter(p => (p.text || "").toLowerCase().includes(q) || (p.userNickname || "").toLowerCase().includes(q));
     if (sortMode === "hot") list = [...list].sort((a, b) => (b.likes?.length || 0) - (a.likes?.length || 0));
     return list;
-  }, [posts, myProfile, selectedTopic, searchQuery, sortMode]);
-
-  const toggleTopic = useCallback((topic) => {
-    setSelectedTopic(prev => (prev === topic ? null : topic));
-  }, []);
+  }, [posts, myProfile, searchQuery, sortMode]);
 
   if (!myProfile) {
     return (
@@ -736,8 +700,6 @@ export default function FeedApp({ user, embedded = false, onOpenProfile }) {
       </div>
 
       <NewPostForm myProfile={myProfile} />
-
-      <TopicTagsBar topics={QUICK_TOPICS} selected={selectedTopic} onToggle={toggleTopic} />
 
       {filteredPosts.length === 0 && (
         <div style={{ textAlign: "center", padding: "60px 20px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16 }}>

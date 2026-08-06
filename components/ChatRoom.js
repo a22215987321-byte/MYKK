@@ -2871,7 +2871,7 @@ export default function ChatApp({ user }) {
         {!isMobile && (
           <div className="cr-folder-rail" style={{
             width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center",
-            gap: 10, padding: "12px 4px", overflowY: "auto", overflowX: "hidden",
+            gap: 16, padding: "14px 4px", overflowY: "auto", overflowX: "hidden",
             margin: "12px 6px", borderRadius: "var(--radius-lg, 18px)",
             background: "var(--panel)", border: "1px solid var(--border)", boxShadow: "var(--card-shadow)",
           }}>
@@ -3449,10 +3449,15 @@ export default function ChatApp({ user }) {
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><SpanishVerbConjugator onNav={() => { setShowSpanishVerbs(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
-          {/* Spanish MCQ practice view */}
-          {showSpanishMcq && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
-            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishMcqPractice onNav={() => { setShowSpanishMcq(false); if (isMobile) setMobileView('more'); }} /></div>
-          )}
+          {/* Spanish MCQ practice view — 故意保持掛載（display:none 而不是條件式
+              整個卸載），使用者切去別的功能頁再切回來時，正在作答的章節/進度
+              不會被重置，跟「影片」功能保留播放進度是同一個做法。 */}
+          <div style={{
+            flex: 1, minHeight: 0, overflow: "hidden",
+            display: (showSpanishMcq && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub) ? "flex" : "none",
+          }}>
+            <SpanishMcqPractice onNav={() => { setShowSpanishMcq(false); if (isMobile) setMobileView('more'); }} />
+          </div>
 
           {/* English Pronunciation view */}
           {showEnglishPron && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
@@ -3475,10 +3480,14 @@ export default function ChatApp({ user }) {
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><IeltsBand4 onNav={() => { setShowIeltsBand4(false); if (isMobile) setMobileView('more'); }} /></div>
           )}
 
-          {/* English MCQ practice view */}
-          {showEnglishMcq && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
-            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishMcqPractice onNav={() => { setShowEnglishMcq(false); if (isMobile) setMobileView('more'); }} /></div>
-          )}
+          {/* English MCQ practice view — 同樣故意保持掛載，理由見上面西語選擇
+              題那段註解。 */}
+          <div style={{
+            flex: 1, minHeight: 0, overflow: "hidden",
+            display: (showEnglishMcq && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub) ? "flex" : "none",
+          }}>
+            <EnglishMcqPractice onNav={() => { setShowEnglishMcq(false); if (isMobile) setMobileView('more'); }} />
+          </div>
 
           {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
             isMobile && mobileHomeSubview === 'list' ? (

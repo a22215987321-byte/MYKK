@@ -19,15 +19,6 @@ function channelHandle(c) {
   return "@" + (slug || (c.uid || "").slice(0, 8));
 }
 
-const TABS = [
-  { id: "hot", label: "🔥 熱門推薦" },
-  { id: "all", label: "全部" },
-  { id: "english", label: "學習英文" },
-  { id: "life", label: "生活娛樂" },
-  { id: "tech", label: "科技新知" },
-  { id: "exam", label: "考試進修" },
-];
-
 function ChannelAvatar({ c, size }) {
   return c.avatarImage
     ? <img src={c.avatarImage} alt={c.nickname} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
@@ -118,7 +109,6 @@ export default function VideoHub({ onOpenChannel, onOpenVideo, viewerUid }) {
   const [loadingPopular, setLoadingPopular] = useState(true);
   const [recentVideos, setRecentVideos] = useState([]);
   const [loadingVideos, setLoadingVideos] = useState(true);
-  const [tab, setTab] = useState("hot");
 
   useEffect(() => {
     let cancelled = false;
@@ -243,7 +233,7 @@ export default function VideoHub({ onOpenChannel, onOpenVideo, viewerUid }) {
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
       <div style={{ padding: "20px 24px 0", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
           <input
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
@@ -258,22 +248,6 @@ export default function VideoHub({ onOpenChannel, onOpenVideo, viewerUid }) {
             ▽ 篩選
           </button>
         </div>
-
-        {!isSearching && (
-          <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 2 }}>
-            {TABS.map(t => {
-              const active = t.id === tab;
-              return (
-                <button key={t.id} onClick={() => setTab(t.id)}
-                  style={{ padding: "8px 16px", borderRadius: 20, border: `1px solid ${active ? "transparent" : "var(--border)"}`,
-                    background: active ? "var(--accent)" : "var(--panel)", color: active ? "var(--accent-text)" : "var(--text-muted)",
-                    fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       <div style={{ padding: "0 24px 32px", maxWidth: 1100, margin: "0 auto" }}>
@@ -301,7 +275,7 @@ export default function VideoHub({ onOpenChannel, onOpenVideo, viewerUid }) {
               ))}
             </div>
           </>
-        ) : tab === "hot" ? (
+        ) : (
           (loadingPopular || loadingVideos) ? (
             <div style={{ textAlign: "center", color: "var(--text-faint)", padding: "60px 0" }}>載入中...</div>
           ) : !heroChannel ? (
@@ -368,26 +342,6 @@ export default function VideoHub({ onOpenChannel, onOpenVideo, viewerUid }) {
               )}
             </>
           )
-        ) : tab === "all" ? (
-          loadingVideos ? (
-            <div style={{ textAlign: "center", color: "var(--text-faint)", padding: "60px 0" }}>載入中...</div>
-          ) : postedChannels.length === 0 ? (
-            <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "60px 20px" }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🎬</div>
-              目前還沒有頻道發布過影片
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-              {postedChannels.map(c => (
-                <ChannelCard key={c.uid} channel={c} viewerUid={viewerUid} onOpen={openChannel} onToggleSubscribe={toggleSubscribe} />
-              ))}
-            </div>
-          )
-        ) : (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-dim)" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🚧</div>
-            此分類即將推出
-          </div>
         )}
       </div>
     </div>
