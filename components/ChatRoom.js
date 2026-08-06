@@ -559,28 +559,30 @@ function LayoutDragGhost({ controller, topItems }) {
   );
 }
 
-// 資料夾圖示——放在側欄最左邊那條窄 rail 裡（跟 Discord 伺服器欄同樣概念），
-// 一個資料夾就是一個小圓角方塊圖示 + 底下一行極小的名字，不再是一整條
-// 「名字＋副標＋箭頭」的列。active 時角變方（跟 Discord 選中伺服器變成
-// squircle 一樣的視覺語言）。isDropTarget 為 true 時外框亮起來提示放這裡。
+// 資料夾圖示——放在側欄最左邊那條窄 rail 裡，一個資料夾就是一個方塊圖示 +
+// 底下一行極小的名字。整個按鈕（不是裡面的圖示）填滿 rail 扣掉 padding 後
+// 的寬度、高度固定 54px，跟左側功能方塊（NavItem 非 compact 版）的行高
+// 對齊——之前是置中飄著的一個 40px 小圓圈，寬度/高度都跟功能方塊對不起來。
+// isDropTarget 為 true 時外框亮起來提示放這裡。
 function FolderRailIcon({ name, count, active, isDropTarget, onClick }) {
   return (
     <button onClick={onClick} title={`${name}（${count} 個功能）`}
       style={{
-        width: 44, display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-        background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0,
+        width: "100%", height: 54, boxSizing: "border-box",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+        background: active ? "var(--navcard-bg, rgba(255,255,255,0.06))" : "none",
+        border: isDropTarget ? "2px solid var(--accent)" : "2px solid transparent",
+        borderRadius: "var(--radius-md)", cursor: "pointer", padding: 0, flexShrink: 0,
+        boxShadow: isDropTarget ? "0 0 0 2px var(--accent-active)" : "none",
       }}>
       <div style={{
-        width: 40, height: 40, borderRadius: active ? "30%" : "50%",
+        width: 30, height: 30, borderRadius: "var(--radius-sm, 8px)",
         background: active ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "linear-gradient(135deg,#475569,#1e293b)",
-        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, color: "#fff", position: "relative",
-        border: isDropTarget ? "2px solid var(--accent)" : "2px solid transparent",
-        boxShadow: isDropTarget ? "0 0 0 2px var(--accent-active)" : "none",
-        transition: "border-radius 0.15s",
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: "#fff", flexShrink: 0,
       }}>
         📁
       </div>
-      <span style={{ fontSize: 9, color: active ? "var(--text)" : "var(--text-faint)", maxWidth: 44, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <span style={{ fontSize: 9, color: active ? "var(--text)" : "var(--text-faint)", maxWidth: 48, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {name}
       </span>
     </button>
@@ -601,10 +603,10 @@ function AddFolderRailButton({ onAdd }) {
   };
 
   return (
-    <div style={{ position: "relative", flexShrink: 0 }}>
+    <div style={{ position: "relative", flexShrink: 0, width: "100%" }}>
       <button ref={btnRef} onClick={() => setOpen(v => !v)} title="新增資料夾"
         style={{
-          width: 40, height: 40, borderRadius: "50%", border: "1px dashed var(--border)",
+          width: "100%", height: 54, boxSizing: "border-box", borderRadius: "var(--radius-md)", border: "1px dashed var(--border)",
           background: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
@@ -2885,22 +2887,25 @@ export default function ChatApp({ user }) {
             零散飄在側欄外面的圖示。 */}
         {!isMobile && (
           <div className="cr-folder-rail" style={{
-            width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center",
-            gap: 16, padding: "14px 4px", overflowY: "auto", overflowX: "hidden",
+            width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "stretch",
+            gap: 10, padding: "14px 4px", overflowY: "auto", overflowX: "hidden",
             margin: "12px 6px", borderRadius: "var(--radius-lg, 18px)",
             background: "var(--panel)", border: "1px solid var(--border)", boxShadow: "var(--card-shadow)",
           }}>
+            {/* RAIL_ITEM_HEIGHT (54px) 跟左側功能方塊（NavItem 非 compact 版：
+                9px 上下 padding + 34px 圖示 + 2px 邊框 = 54px）對齊，寬度也
+                改成填滿這條窄欄扣掉左右 padding 後的寬度，不再是置中飄著的
+                一個小圓圈——資料夾方塊跟左側功能方塊高度、寬度感覺要一致。 */}
             <button
               ref={sidebarLayout.registerTop("__home__")}
               onClick={() => sidebarLayout.setActiveFolder(null)}
               title="全部功能"
               style={{
-                width: 40, height: 40, borderRadius: sidebarLayout.activeFolderId ? "50%" : "30%",
-                border: "none", cursor: "pointer", fontSize: 17, flexShrink: 0,
+                width: "100%", height: 54, borderRadius: "var(--radius-md)",
+                border: "none", cursor: "pointer", fontSize: 17, flexShrink: 0, boxSizing: "border-box",
                 background: sidebarLayout.activeFolderId ? "var(--navcard-bg, transparent)" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
                 color: sidebarLayout.activeFolderId ? "var(--text-muted)" : "#fff",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "border-radius 0.15s",
               }}>
               🏠
             </button>

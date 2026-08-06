@@ -15,6 +15,8 @@ import MediaAttachPreview from "./media-editor/MediaAttachPreview";
 import VideoPlayer from "./VideoPlayer";
 import { Avatar, CommentSection } from "./PostComments";
 import SharePostModal from "./SharePostModal";
+import PortalPopover from "./PortalPopover";
+import { VISIBILITY_OPTIONS, visibilityMeta, canViewPost } from "../lib/postVisibility";
 
 const HASHTAG_RE = /#[\p{L}\p{N}_]+/gu;
 function extractHashtags(text) {
@@ -170,7 +172,12 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
             <Avatar avatar={post.userAvatar} avatarImage={post.userAvatarImage} color={post.userColor} size={40} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.userNickname}</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }} title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5 }}>
+                <span title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</span>
+                {isMine && post.visibility && post.visibility !== "public" && (
+                  <span>{visibilityMeta(post.visibility).icon} {visibilityMeta(post.visibility).label}</span>
+                )}
+              </div>
             </div>
           </button>
         ) : (
@@ -178,7 +185,12 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
             <Avatar avatar={post.userAvatar} avatarImage={post.userAvatarImage} color={post.userColor} size={40} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{post.userNickname}</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }} title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5 }}>
+                <span title={formatFullDate(post.createdAt)}>{formatDate(post.createdAt)}</span>
+                {isMine && post.visibility && post.visibility !== "public" && (
+                  <span>{visibilityMeta(post.visibility).icon} {visibilityMeta(post.visibility).label}</span>
+                )}
+              </div>
             </div>
           </Link>
         )}
@@ -336,6 +348,9 @@ function NewPostForm({ myProfile, onPosted }) {
   const [text, setText] = useState("");
   const media = useMediaAttachments();
   const [posting, setPosting] = useState(false);
+  const [visibility, setVisibility] = useState("public");
+  const [visOpen, setVisOpen] = useState(false);
+  const visBtnRef = useRef(null);
   const textareaRef = useRef();
   const manualHeightRef = useRef(0);
   const pendingCursorRef = useRef(null);
@@ -422,6 +437,7 @@ function NewPostForm({ myProfile, onPosted }) {
       subtitles: null,
       likes: [],
       bookmarks: [],
+      visibility,
       createdAt: serverTimestamp(),
     };
     try {
@@ -441,6 +457,7 @@ function NewPostForm({ myProfile, onPosted }) {
       const ref = await addDoc(collection(db, "posts"), payload);
       console.log("[Feed.NewPostForm] post created", { id: ref.id });
       setText("");
+      setVisibility("public");
       media.removeAll();
       setExpanded(false);
       onPosted?.();
@@ -485,13 +502,34 @@ function NewPostForm({ myProfile, onPosted }) {
                 minHeight: TEXTAREA_MIN_HEIGHT, maxHeight: `${TEXTAREA_MAX_HEIGHT_RATIO * 100}vh`, overflowY: "auto", resize: "vertical",
               }}
             />
-            <button
-              onClick={submit}
-              disabled={!canPost}
-              style={{ flexShrink: 0, background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel-alt)", border: canPost ? "none" : "1px solid var(--border)", borderRadius: 10, padding: "10px 18px", color: canPost ? "var(--accent-text)" : "var(--text-dim)", cursor: canPost ? "pointer" : "not-allowed", fontSize: 14, fontWeight: 700 }}
-            >
-              {posting ? "發佈中..." : "發佈"}
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+              <button ref={visBtnRef} type="button" onClick={() => setVisOpen(v => !v)} title="誰可以看到這篇貼文"
+                style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "4px 10px", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", cursor: "pointer", whiteSpace: "nowrap" }}>
+                {visibilityMeta(visibility).icon} {visibilityMeta(visibility).label} <span style={{ fontSize: 9 }}>▾</span>
+              </button>
+              <PortalPopover anchorRef={visBtnRef} open={visOpen} onClose={() => setVisOpen(false)} placement="bottom-right" minWidth={190}>
+                <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "var(--card-shadow)", overflow: "hidden" }}>
+                  {VISIBILITY_OPTIONS.map(opt => (
+                    <button key={opt.id} onClick={() => { setVisibility(opt.id); setVisOpen(false); }}
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 12px", background: opt.id === visibility ? "var(--panel-hover)" : "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                      <span style={{ fontSize: 15 }}>{opt.icon}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{opt.label}</div>
+                        <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{opt.hint}</div>
+                      </div>
+                      {opt.id === visibility && <span style={{ color: "var(--accent)" }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </PortalPopover>
+              <button
+                onClick={submit}
+                disabled={!canPost}
+                style={{ flexShrink: 0, background: canPost ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel-alt)", border: canPost ? "none" : "1px solid var(--border)", borderRadius: 10, padding: "10px 18px", color: canPost ? "var(--accent-text)" : "var(--text-dim)", cursor: canPost ? "pointer" : "not-allowed", fontSize: 14, fontWeight: 700 }}
+              >
+                {posting ? "發佈中..." : "發佈"}
+              </button>
+            </div>
           </div>
 
           {expanded && (
@@ -648,12 +686,12 @@ export default function FeedApp({ user, embedded = false, onOpenProfile }) {
 
   const filteredPosts = useMemo(() => {
     if (!myProfile) return [];
-    let list = posts;
+    let list = posts.filter(p => canViewPost(p, user.uid, myProfile.friends));
     const q = searchQuery.trim().toLowerCase();
     if (q) list = list.filter(p => (p.text || "").toLowerCase().includes(q) || (p.userNickname || "").toLowerCase().includes(q));
     if (sortMode === "hot") list = [...list].sort((a, b) => (b.likes?.length || 0) - (a.likes?.length || 0));
     return list;
-  }, [posts, myProfile, searchQuery, sortMode]);
+  }, [posts, myProfile, searchQuery, sortMode, user.uid]);
 
   if (!myProfile) {
     return (

@@ -20,6 +20,8 @@ export default function VideoPlayer({ src, poster, autoPlay = false, subtitles }
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [subtitlesOn, setSubtitlesOn] = useState(true);
 
   const togglePlay = useCallback((e) => {
@@ -108,6 +110,22 @@ export default function VideoPlayer({ src, poster, autoPlay = false, subtitles }
     setMuted(v.muted);
   };
 
+  // 音量拉桿——之前只有靜音開關（點一下全靜音/取消靜音），沒有真的能調整
+  // 音量大小的地方。滑鼠移到喇叭圖示上會展開一條拉桿，拖曳調整 0-100%；
+  // 拉到 0 順便當靜音，從 0 往上拉、或本來是靜音狀態時調整音量，都會自動
+  // 取消靜音（不然拉桿拉起來音量沒變的錯覺）。
+  const onVolumeChange = (e) => {
+    e.stopPropagation();
+    const v = videoRef.current;
+    if (!v) return;
+    const val = Number(e.target.value);
+    v.volume = val;
+    setVolume(val);
+    const shouldMute = val === 0;
+    v.muted = shouldMute;
+    setMuted(shouldMute);
+  };
+
   const progress = duration ? (current / duration) * 100 : 0;
   // AI 自動生成的字幕（見 lib/generateSubtitles.js）——純燒錄式疊字，跟著
   // current 播放時間找目前該顯示哪一段；subtitlesOn 是使用者自己按 CC 鈕
@@ -178,9 +196,19 @@ export default function VideoPlayer({ src, poster, autoPlay = false, subtitles }
           <button onClick={togglePlay} aria-label={playing ? "暫停" : "播放"} style={{ background: "none", border: "none", color: "#fff", fontSize: 18, cursor: "pointer", padding: 0 }}>
             {playing ? "⏸" : "▶"}
           </button>
-          <button onClick={toggleMute} aria-label={muted ? "取消靜音" : "靜音"} style={{ background: "none", border: "none", color: "#fff", fontSize: 16, cursor: "pointer", padding: 0 }}>
-            {muted ? "🔇" : "🔊"}
-          </button>
+          <div onMouseEnter={() => setShowVolumeSlider(true)} onMouseLeave={() => setShowVolumeSlider(false)}
+            style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={toggleMute} aria-label={muted ? "取消靜音" : "靜音"} style={{ background: "none", border: "none", color: "#fff", fontSize: 16, cursor: "pointer", padding: 0, flexShrink: 0 }}>
+              {muted || volume === 0 ? "🔇" : volume < 0.5 ? "🔉" : "🔊"}
+            </button>
+            <input type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume}
+              onChange={onVolumeChange} onClick={e => e.stopPropagation()} aria-label="音量"
+              style={{
+                width: showVolumeSlider ? 64 : 0, opacity: showVolumeSlider ? 1 : 0,
+                transition: "width 0.2s ease, opacity 0.2s ease", accentColor: "var(--accent, #7C5CFF)",
+                cursor: "pointer", height: 4,
+              }} />
+          </div>
           <span style={{ color: "#fff", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
             {formatTime(current)} / {formatTime(duration)}
           </span>
