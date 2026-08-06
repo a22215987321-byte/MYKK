@@ -467,7 +467,7 @@ export default function Home() {
     <main style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ width: '100%', maxWidth: 400 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div aria-hidden="true" style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
+          <img src="/logo.png" alt="" aria-hidden="true" width={64} height={64} style={{ borderRadius: 16, marginBottom: 12 }} />
           <h1 style={{ color: 'var(--text)', fontSize: 24, fontWeight: 700, margin: 0 }}>聊天社交平台</h1>
           <p style={{ color: 'var(--text-faint)', fontSize: 14, marginTop: 6 }}>與朋友保持聯繫</p>
         </div>
