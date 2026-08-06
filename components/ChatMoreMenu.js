@@ -72,9 +72,13 @@ export default function ChatMoreMenu({ state, setters, onOpen }) {
         <NavItem icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="西語文法" sublabel="ser/estar · 代詞 · 動詞" mobileTouch
           active={state.showSpanishGrammar} onClick={() => onOpen(setters.setShowSpanishGrammar)} />
       </div>
-      <div style={{ padding: "0 10px 10px" }}>
+      <div style={{ padding: "0 10px 6px" }}>
         <NavItem icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢" mobileTouch
           active={state.showSpanishVerbs} onClick={() => onOpen(setters.setShowSpanishVerbs)} />
+      </div>
+      <div style={{ padding: "0 10px 10px" }}>
+        <NavItem icon="📝" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西語選擇題練習" sublabel="短文理解・動詞變位填空" mobileTouch
+          active={state.showSpanishMcq} onClick={() => onOpen(setters.setShowSpanishMcq)} />
       </div>
 
       <div style={{ padding: "0 10px 6px" }}>
