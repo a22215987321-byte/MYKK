@@ -5,6 +5,7 @@ import {
 } from "firebase/firestore";
 import { toast } from "../lib/toast";
 import MarkdownMessage, { MarkdownMessageStyles } from "./MarkdownMessage";
+import PortalPopover from "./PortalPopover";
 
 const MODELS = [
   { id: "claude-sonnet", label: "Claude Sonnet 5" },
@@ -107,16 +108,38 @@ export default function AiChatRoom({ user, db }) {
   // Once the conversation list has loaded and nothing's been picked yet,
   // open the most recently updated one automatically (same "pick up where
   // you left off" behavior the old single-slot version had).
+  //
+  // messages.length===0 guard: without this, a user who types and sends a
+  // message before the (async) conversation list finishes loading would get
+  // their just-sent message silently overwritten the moment the list
+  // resolves — this is exactly the "my question just disappeared" bug.
+  // autoOpenedRef makes this run at most once per mount too, so it can never
+  // fire again later and stomp on an active conversation for any other
+  // reason (e.g. the conversations array reference changing).
+  const autoOpenedRef = useRef(false);
   useEffect(() => {
-    if (!convListReady || activeConvId || conversations.length === 0) return;
+    if (!convListReady || autoOpenedRef.current || activeConvId || messages.length > 0 || conversations.length === 0) return;
+    autoOpenedRef.current = true;
     skipNextSaveRef.current = true;
     setActiveConvId(conversations[0].id);
     setMessages(conversations[0].messages || []);
-  }, [convListReady, conversations, activeConvId]);
+  }, [convListReady, conversations, activeConvId, messages.length]);
 
   // Autosave — creates a new conversation doc on this user's first message,
   // then keeps updating that same doc. Surfaces a toast on failure instead
   // of only logging, so a broken save is never silent.
+  //
+  // creatingConvRef guards against a real race: send() updates `messages`
+  // twice per turn (the user's message immediately, then the assistant's
+  // reply once the API responds) — if the reply arrives before the first
+  // addDoc() has resolved, activeConvId is still null on the second run, so
+  // without this guard it would fire a second addDoc() and create a
+  // duplicate, incomplete conversation doc instead of updating the first
+  // one. activeConvId is also now a dependency, so the moment the first
+  // addDoc resolves and sets it, this effect re-runs and saves whatever
+  // `messages` currently holds (including a reply that arrived mid-race)
+  // via updateDoc — nothing sent during the race window is silently lost.
+  const creatingConvRef = useRef(false);
   useEffect(() => {
     if (!uid || messages.length === 0) return;
     if (skipNextSaveRef.current) { skipNextSaveRef.current = false; return; }
@@ -124,27 +147,22 @@ export default function AiChatRoom({ user, db }) {
     if (activeConvId) {
       updateDoc(doc(db, "aiChats", uid, "conversations", activeConvId), payload)
         .catch(err => { console.error("AiChatRoom save error:", err); toast("對話儲存失敗，請檢查網路連線"); });
-    } else {
+    } else if (!creatingConvRef.current) {
+      creatingConvRef.current = true;
       addDoc(collection(db, "aiChats", uid, "conversations"), { ...payload, createdAt: serverTimestamp() })
-        .then(ref => setActiveConvId(ref.id))
-        .catch(err => { console.error("AiChatRoom save error:", err); toast("對話儲存失敗，請檢查網路連線"); });
+        .then(ref => { creatingConvRef.current = false; setActiveConvId(ref.id); })
+        .catch(err => {
+          creatingConvRef.current = false;
+          console.error("AiChatRoom save error:", err);
+          toast("對話儲存失敗，請檢查網路連線");
+        });
     }
-  }, [messages, uid, db]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [messages, activeConvId, uid, db]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, sending, images, generating]);
 
-  // Click-outside-to-close, same pattern as ThemeToggle's dropdown.
-  useEffect(() => {
-    if (!modelMenuOpen && !historyOpen) return;
-    const onClickOutside = e => {
-      if (modelMenuOpen && modelMenuRef.current && !modelMenuRef.current.contains(e.target)) setModelMenuOpen(false);
-      if (historyOpen && historyRef.current && !historyRef.current.contains(e.target)) setHistoryOpen(false);
-    };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [modelMenuOpen, historyOpen]);
 
   const send = async () => {
     const text = input.trim();
@@ -253,16 +271,18 @@ export default function AiChatRoom({ user, db }) {
 
         {mode === "chat" && (
         <>
-        <div ref={historyRef} style={{ position: "relative" }}>
-          <button onClick={() => setHistoryOpen(v => !v)}
+        <div style={{ position: "relative" }}>
+          <button ref={historyRef} onClick={() => setHistoryOpen(v => !v)}
             style={{ height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", padding: "6px 14px", color: "var(--text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
             🕘 歷史對話{conversations.length > 0 ? ` (${conversations.length})` : ""}
           </button>
-          {historyOpen && (
+          {/* 之前是疊在自己父層裡的 position:absolute，會被別的浮動面板蓋住
+              （使用者反映「點擊歷史對話顯示的也會被擋」）——改成 PortalPopover
+              直接掛到 document.body，一定在最前面。 */}
+          <PortalPopover anchorRef={historyRef} open={historyOpen} onClose={() => setHistoryOpen(false)} placement="bottom-right" minWidth={240}>
             <div style={{
-              position: "absolute", top: "100%", right: 0, marginTop: 6, background: "var(--panel)",
-              border: "1px solid var(--border)", borderRadius: "var(--radius-md)", boxShadow: "var(--card-shadow)",
-              overflow: "hidden", zIndex: 20, minWidth: 240, maxHeight: 320, overflowY: "auto",
+              background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", boxShadow: "var(--card-shadow)",
+              overflow: "hidden", maxHeight: 320, overflowY: "auto",
             }}>
               {conversations.length === 0 && (
                 <div style={{ padding: "14px", fontSize: 12, color: "var(--text-dim)", textAlign: "center" }}>還沒有過去的對話</div>
@@ -287,7 +307,7 @@ export default function AiChatRoom({ user, db }) {
                 </div>
               ))}
             </div>
-          )}
+          </PortalPopover>
         </div>
 
         <button onClick={newConversation} disabled={sending || messages.length === 0}
@@ -397,8 +417,8 @@ export default function AiChatRoom({ user, db }) {
           placeholder="輸入訊息..." disabled={sending}
           style={{ flex: 1, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
 
-        <div ref={modelMenuRef} style={{ position: "relative", flexShrink: 0, width: "var(--modelpicker-w, auto)" }}>
-          <button onClick={() => setModelMenuOpen(v => !v)}
+        <div style={{ position: "relative", flexShrink: 0, width: "var(--modelpicker-w, auto)" }}>
+          <button ref={modelMenuRef} onClick={() => setModelMenuOpen(v => !v)}
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "var(--modelpicker-justify, flex-start)", gap: 6,
               width: "100%", height: "var(--inputbar-field-h, 100%)", boxSizing: "border-box",
@@ -408,11 +428,10 @@ export default function AiChatRoom({ user, db }) {
             {MODELS.find(m => m.id === model)?.label || model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
           </button>
 
-          {modelMenuOpen && (
+          <PortalPopover anchorRef={modelMenuRef} open={modelMenuOpen} onClose={() => setModelMenuOpen(false)} placement="top-right" minWidth={210}>
             <div style={{
-              position: "absolute", bottom: "calc(100% + 6px)", right: 0,
               background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
-              boxShadow: "var(--card-shadow)", overflow: "hidden", zIndex: 20, minWidth: 210,
+              boxShadow: "var(--card-shadow)", overflow: "hidden",
             }}>
               {MODELS.map(m => (
                 <button key={m.id} onClick={() => { setModel(m.id); setModelMenuOpen(false); }}
@@ -428,7 +447,7 @@ export default function AiChatRoom({ user, db }) {
                 </button>
               ))}
             </div>
-          )}
+          </PortalPopover>
         </div>
 
         <button onClick={send} disabled={sending || !input.trim()}

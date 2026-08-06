@@ -55,6 +55,7 @@ import AiCompanionCreator from "./AiCompanionCreator";
 import UpgradeMembership, { UpgradeHighlights } from "./UpgradeMembership";
 import EmojiStickerPicker from "./EmojiStickerPicker";
 import LoadingState from "./LoadingState";
+import PortalPopover from "./PortalPopover";
 import useIsMobile from "../lib/useIsMobile";
 import { QUICK_REACTIONS, STICKER_SRC_BY_ID } from "../data/chat/gesturePacks";
 import { ChevronLeft, ChevronRight, CalendarDays, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
@@ -591,14 +592,7 @@ function FolderRailIcon({ name, count, active, isDropTarget, onClick }) {
 function AddFolderRailButton({ onAdd }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const wrapRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClickOutside = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [open]);
+  const btnRef = useRef(null);
 
   const commit = () => {
     const trimmed = name.trim();
@@ -607,8 +601,8 @@ function AddFolderRailButton({ onAdd }) {
   };
 
   return (
-    <div ref={wrapRef} style={{ position: "relative", flexShrink: 0 }}>
-      <button onClick={() => setOpen(v => !v)} title="新增資料夾"
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <button ref={btnRef} onClick={() => setOpen(v => !v)} title="新增資料夾"
         style={{
           width: 40, height: 40, borderRadius: "50%", border: "1px dashed var(--border)",
           background: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18,
@@ -616,8 +610,11 @@ function AddFolderRailButton({ onAdd }) {
         }}>
         ➕
       </button>
-      {open && (
-        <div style={{ position: "absolute", left: "100%", top: 0, marginLeft: 8, zIndex: 60, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "var(--card-shadow)", padding: 8, width: 170 }}>
+      {/* 這個彈出框曾經被 rail 自己的 overflowX:hidden（為了不要出現橫向捲軸）
+          裁掉一半，只剩窄窄一條看不清楚——改用 PortalPopover 直接掛到
+          document.body，就不會再被任何父層的 overflow 或 z-index 卡住。 */}
+      <PortalPopover anchorRef={btnRef} open={open} onClose={() => setOpen(false)} placement="right" minWidth={170}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "var(--card-shadow)", padding: 8 }}>
           <input
             autoFocus value={name} onChange={e => setName(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setOpen(false); }}
@@ -628,7 +625,7 @@ function AddFolderRailButton({ onAdd }) {
             新增
           </button>
         </div>
-      )}
+      </PortalPopover>
     </div>
   );
 }
@@ -1406,6 +1403,13 @@ export default function ChatApp({ user }) {
   const [showAiChat,         setShowAiChat]         = useState(false);
   const [showDocConvert,     setShowDocConvert]     = useState(false);
   const [showAiCompanion,    setShowAiCompanion]    = useState(false);
+  // AiCompanionRoom is lazy-loaded (see the dynamic() import below — it
+  // pulls in react-markdown) and is a paid feature most users never open,
+  // so it shouldn't eagerly mount for everyone the moment ChatRoom loads.
+  // Only start keeping it persistently mounted (see the display:none
+  // wrapper below) once the user has actually opened it at least once.
+  const [hasOpenedAiCompanion, setHasOpenedAiCompanion] = useState(false);
+  useEffect(() => { if (showAiCompanion) setHasOpenedAiCompanion(true); }, [showAiCompanion]);
   const [showCompanionCreator, setShowCompanionCreator] = useState(false);
   const [showUpgrade,        setShowUpgrade]        = useState(false);
   // 日曆現在是左側的一個獨立功能（跟排行榜等其他功能同一種切換方式），
@@ -3404,15 +3408,26 @@ export default function ChatApp({ user }) {
             <ImageEditorRoom />
           )}
 
-          {/* AI chat view */}
-          {showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
-            aiChatAllowed ? <AiChatRoom user={user} db={db} /> : (
-              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, color: "var(--text-muted)" }}>
-                <div style={{ fontSize: 40 }}>🔒</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>AI 助手目前已鎖定</div>
-                <div style={{ fontSize: 13, color: "var(--text-faint)" }}>此功能暫時僅限管理員帳號使用</div>
-              </div>
-            )
+          {/* AI chat view — 保持掛載（display:none 而不是條件式整個卸載），
+              理由同「影片」「西語/英語選擇題練習」：使用者反映切去別的功能頁
+              再切回來，AI助手的對話會不見——本來對話有存進 Firestore，理論上
+              重新掛載時應該會自動撈回來，但撈回來要等 Firestore 監聽器回應，
+              中間有個空檔會先顯示空狀態；乾脆連這個空檔都省掉，切換不再重新
+              掛載，訊息就一直留在畫面上，不用等任何非同步載入。 */}
+          {aiChatAllowed && (
+            <div style={{
+              flex: 1, minHeight: 0, display: (showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub) ? "flex" : "none",
+              flexDirection: "column",
+            }}>
+              <AiChatRoom user={user} db={db} />
+            </div>
+          )}
+          {!aiChatAllowed && showAiChat && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, color: "var(--text-muted)" }}>
+              <div style={{ fontSize: 40 }}>🔒</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>AI 助手目前已鎖定</div>
+              <div style={{ fontSize: 13, color: "var(--text-faint)" }}>此功能暫時僅限管理員帳號使用</div>
+            </div>
           )}
 
           {/* Doc convert view */}
@@ -3420,9 +3435,17 @@ export default function ChatApp({ user }) {
             <DocConvertRoomLazy />
           )}
 
-          {/* AI 夥伴 view */}
-          {showAiCompanion && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showUpgrade && !showCalendar && !showVideoHub && (
-            <AiCompanionRoom user={user} db={db} myProfile={myProfile} onOpenCreator={() => setShowCompanionCreator(true)} />
+          {/* AI 夥伴 view — 同樣故意保持掛載，理由見上面 AI 助手那段註解，但
+              只有「使用者已經打開過至少一次」才開始保持掛載（hasOpenedAiCompanion）
+              ——這是要付費解鎖的功能，多數人整個 session 都不會點開，不應該
+              一開網站就把它跟著載入/掛載。 */}
+          {hasOpenedAiCompanion && (
+            <div style={{
+              flex: 1, minHeight: 0, display: (showAiCompanion && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showUpgrade && !showCalendar && !showVideoHub) ? "flex" : "none",
+              flexDirection: "column",
+            }}>
+              <AiCompanionRoom user={user} db={db} myProfile={myProfile} onOpenCreator={() => setShowCompanionCreator(true)} />
+            </div>
           )}
 
           {/* Upgrade membership view — layout only, no real Stripe wiring yet */}
