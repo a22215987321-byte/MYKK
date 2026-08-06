@@ -1443,11 +1443,9 @@ export default function ChatApp({ user }) {
     "customVocab", "dict",
   ]);
 
-  useEffect(() => {
-    try {
-      if (localStorage.getItem("cr-sidebar-collapsed") === "1") setSidebarCollapsed(true);
-    } catch {}
-  }, []);
+  // 收合側欄的按鈕先隱藏（見下面 !isMobile 那顆按鈕），所以這裡故意不再從
+  // localStorage 還原成「已收合」——不然之前收合過的人下次登入會卡在收合
+  // 狀態，卻沒有按鈕能展開回來。
 
   useEffect(() => {
     try { localStorage.setItem("cr-sidebar-collapsed", sidebarCollapsed ? "1" : "0"); } catch {}
@@ -3114,12 +3112,11 @@ export default function ChatApp({ user }) {
           />
         )}
 
-        {/* 桌面版收合/展開開關：故意當 cr-sidebar 的 sibling（不是它的子元素），
-            這樣 nav 收合到寬度 0、overflow:hidden 裁掉內部內容時，這顆按鈕不會被
-            一起裁掉——收合後它剛好貼著畫面左邊界，同一顆鈕兼作「展開入口」，
-            不用再另外做一個 edge 按鈕。手機版有自己的抽屜開關（cr-mobile-topbar
-            的漢堡鈕），這裡不重複顯示。 */}
-        {!isMobile && (
+        {/* 桌面版收合/展開開關：先隱藏（使用者覺得這顆按鈕影響觀感、位置也
+            一直喬不好），暫時整個不渲染。sidebarCollapsed 還是留著（預設
+            false 不會有影響），之後想要恢復這顆按鈕，把下面這行 false &&
+            改回 !isMobile 就好，不用重新刻一次。 */}
+        {false && !isMobile && (
           <button
             onClick={() => setSidebarCollapsed(v => !v)}
             title={sidebarCollapsed ? "展開導覽列" : "收合導覽列"}
