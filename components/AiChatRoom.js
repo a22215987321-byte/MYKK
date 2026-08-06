@@ -10,7 +10,7 @@ const MODELS = [
   { id: "claude-haiku", label: "Claude Haiku 4.5" },
   { id: "gpt-5", label: "GPT-5" },
   { id: "gpt-5-mini", label: "GPT-5.2 Mini" },
-  { id: "deepseek-v4-flash", label: "DeepSeek-V4-Flash 正式版" },
+  { id: "deepseek-v4-flash", label: "DeepSeek-V4-Flash" },
   { id: "deepseek-v4-pro", label: "DeepSeek-V4-Pro" },
 ];
 
@@ -407,19 +407,6 @@ export default function AiChatRoom({ user, db }) {
           </button>
 
           {modelMenuOpen && (
-            <>
-              {/* 小惡魔吉祥物——扒著模型選單頂端往下看，不是單獨的裝飾，只有
-                  選單開著才出現。用 mask-image 羽化邊緣蓋掉裁圖留下的深色
-                  背景矩形；transform 往下推一點讓爪子疊進選單卡片頂端，做出
-                  「抓住卡片上緣」的感覺，跟參考圖一樣。 */}
-              <img src="/images/ai-devil-mascot.png" alt="" aria-hidden="true"
-                style={{
-                  position: "absolute", bottom: "calc(100% + 6px)", right: 60,
-                  width: 90, height: "auto", transform: "translateY(22px)",
-                  zIndex: 21, pointerEvents: "none",
-                  maskImage: "radial-gradient(ellipse 58% 62% at 50% 38%, #000 48%, transparent 82%)",
-                  WebkitMaskImage: "radial-gradient(ellipse 58% 62% at 50% 38%, #000 48%, transparent 82%)",
-                }} />
             <div style={{
               position: "absolute", bottom: "calc(100% + 6px)", right: 0,
               background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
@@ -439,7 +426,6 @@ export default function AiChatRoom({ user, db }) {
                 </button>
               ))}
             </div>
-            </>
           )}
         </div>
 
