@@ -3112,10 +3112,11 @@ export default function ChatApp({ user }) {
             title={sidebarCollapsed ? "展開導覽列" : "收合導覽列"}
             aria-label={sidebarCollapsed ? "展開導覽列" : "收合導覽列"}
             style={{
-              // top:74 落在「大頭貼/名字/設定齒輪」那一列下方——原本 top:16 跟
-              // 設定齒輪（在同一列右側、y 範圍差不多）幾乎疊在一起，往下移到
-              // 可捲動導覽區塊剛開始的地方，兩顆按鈕才不會擠在同一個角落。
-              position: "absolute", top: 74,
+              // 垂直置中在側欄高度上（不是貼著頂部的 top:74）——之前跟大頭貼/
+              // 名字/設定齒輪那一列擠在同一個角落，看起來很擁擠。置中是常見的
+              // 側欄收合鈕擺法（像 VSCode 那種），跟頂部的功能列完全分開，不會
+              // 再互相干擾。
+              position: "absolute", top: "50%", transform: "translateY(-50%)",
               left: FOLDER_RAIL_WIDTH + (sidebarCollapsed ? 4 : sidebarWidth - 12),
               zIndex: 40,
               width: 28, height: 28, borderRadius: "50%",
