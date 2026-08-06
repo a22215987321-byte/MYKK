@@ -3,6 +3,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "../lib/toast";
 import { buildCompanionSystemPrompt } from "../lib/aiCompanionPrompt";
 import { isAdminEmail } from "../lib/admin";
+import MarkdownMessage, { MarkdownMessageStyles } from "./MarkdownMessage";
 
 const MAX_STORED_MESSAGES = 20; // mirrors chat.js's MAX_MESSAGES — keeps the
 // single aiCompanionChats/{uid} doc from growing past Firestore's 1MiB cap.
@@ -292,15 +293,16 @@ export default function AiCompanionRoom({ user, db, myProfile, onOpenCreator }) 
             <div style={{ fontSize: 12, marginTop: 6 }}>建議戴耳機，避免喇叭聲被誤判成你在說話</div>
           </div>
         )}
+        <MarkdownMessageStyles />
         {messages.map((m, i) => (
           <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
             <div style={{
               maxWidth: "70%", padding: "10px 14px", borderRadius: "var(--radius-lg)",
               background: m.role === "user" ? "var(--accent)" : "var(--panel-alt)",
               color: m.role === "user" ? "var(--accent-text)" : "var(--text)",
-              fontSize: 14, whiteSpace: "pre-wrap", wordBreak: "break-word",
+              fontSize: 14, wordBreak: "break-word",
             }}>
-              {m.content}
+              {m.role === "user" ? <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div> : <MarkdownMessage content={m.content} />}
             </div>
           </div>
         ))}

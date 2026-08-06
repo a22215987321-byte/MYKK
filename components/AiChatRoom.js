@@ -4,6 +4,7 @@ import {
   onSnapshot, query, orderBy, limit, serverTimestamp,
 } from "firebase/firestore";
 import { toast } from "../lib/toast";
+import MarkdownMessage, { MarkdownMessageStyles } from "./MarkdownMessage";
 
 const MODELS = [
   { id: "claude-sonnet", label: "Claude Sonnet 5" },
@@ -322,15 +323,16 @@ export default function AiChatRoom({ user, db }) {
                 </div>
               </div>
             )}
+            <MarkdownMessageStyles />
             {messages.map((m, i) => (
               <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
                 <div style={{
                   maxWidth: "70%", padding: "10px 14px", borderRadius: "var(--radius-lg)",
                   background: m.role === "user" ? "var(--accent)" : "var(--bubble-assistant-bg, var(--panel-alt))",
                   color: m.role === "user" ? "var(--accent-text)" : "var(--text)",
-                  fontSize: 14, whiteSpace: "pre-wrap", wordBreak: "break-word",
+                  fontSize: 14, wordBreak: "break-word",
                 }}>
-                  {m.content}
+                  {m.role === "user" ? <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div> : <MarkdownMessage content={m.content} />}
                 </div>
               </div>
             ))}

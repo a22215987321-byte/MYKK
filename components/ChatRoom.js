@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import { auth, db } from "../lib/firebase";
 import { uploadToR2 } from "../lib/uploadToR2";
@@ -35,9 +36,21 @@ import EnglishPronunciation from "./EnglishPronunciation";
 import EnglishMcqPractice from "./EnglishMcqPractice";
 import IeltsBand4 from "./IeltsBand4";
 import ImageEditorRoom from "./ImageEditorRoom";
-import AiChatRoom from "./AiChatRoom";
+// react-markdown/remark-gfm (used to render AI 回覆的 markdown 格式) 加了
+// ~40KB 到打包後的 JS——大部分使用者一次 session 不一定會點開「AI 助手」，
+// 跟 DocConvertRoomLazy 用一樣的手法延遲載入，不要讓每個人一開網站就先背
+// 這包大小。
+const AiChatRoom = dynamic(() => import("./AiChatRoom"), {
+  ssr: false,
+  loading: () => <LoadingState label="載入 AI 助手..." minHeight="100%" />,
+});
 import { DocConvertRoomLazy } from "./doc-convert";
-import AiCompanionRoom from "./AiCompanionRoom";
+// 跟上面 AiChatRoom 同理：也吃到 react-markdown，而且是付費解鎖功能，多數
+// 使用者根本不會打開，一起延遲載入。
+const AiCompanionRoom = dynamic(() => import("./AiCompanionRoom"), {
+  ssr: false,
+  loading: () => <LoadingState label="載入 AI 夥伴..." minHeight="100%" />,
+});
 import AiCompanionCreator from "./AiCompanionCreator";
 import UpgradeMembership, { UpgradeHighlights } from "./UpgradeMembership";
 import EmojiStickerPicker from "./EmojiStickerPicker";
