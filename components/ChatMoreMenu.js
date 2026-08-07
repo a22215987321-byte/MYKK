@@ -85,9 +85,13 @@ export default function ChatMoreMenu({ state, setters, onOpen }) {
         <NavItem icon="✏️" iconBg="linear-gradient(135deg,var(--accent-hover),#7c3aed)" label="自定詞彙" sublabel="建立個人單字本" mobileTouch
           active={state.showCustomVocab} onClick={() => onOpen(setters.setShowCustomVocab)} />
       </div>
-      <div style={{ padding: "0 10px 16px" }}>
+      <div style={{ padding: "0 10px 6px" }}>
         <NavItem icon="📖" iconBg="linear-gradient(135deg,#0f2e1c,#166534)" label="字典" sublabel="英・西・法 A-Z" mobileTouch
           active={state.showDict} onClick={() => onOpen(setters.setShowDict)} />
+      </div>
+      <div style={{ padding: "0 10px 16px" }}>
+        <NavItem icon="🔥" iconBg="linear-gradient(135deg,#1f2937,#111827)" label="GitHub 熱門" sublabel="每日新專案 Top 10" mobileTouch
+          active={state.showGithubTrending} onClick={() => onOpen(setters.setShowGithubTrending)} />
       </div>
     </div>
   );

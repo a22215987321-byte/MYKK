@@ -18,6 +18,7 @@ import SpanishRoom from "./SpanishRoom";
 import SpanishCourseRoom from "./SpanishCourseRoom";
 import CustomVocabRoom from "./CustomVocabRoom";
 import DictionaryRoom from "./DictionaryRoom";
+import GithubTrendingRoom from "./GithubTrendingRoom";
 import FeedApp from "./Feed";
 import ProfileView from "./ProfileView";
 import VideoHub from "./VideoHub";
@@ -1387,6 +1388,7 @@ export default function ChatApp({ user }) {
   const [showSpanishCourse,  setShowSpanishCourse]  = useState(false);
   const [showCustomVocab,    setShowCustomVocab]    = useState(false);
   const [showDict,           setShowDict]           = useState(false);
+  const [showGithubTrending, setShowGithubTrending] = useState(false);
   const [frenchView,         setFrenchView]         = useState(null); // null | 'pron' | 'a1' | 'grammar' | 'a1exam'
   const [showSpanishPron,    setShowSpanishPron]    = useState(false);
   const [showSpanishGrammar, setShowSpanishGrammar] = useState(false);
@@ -1448,7 +1450,7 @@ export default function ChatApp({ user }) {
     "upgrade", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion",
     "englishPron", "ieltsBand4", "englishMcq", "vocab",
     "spanish", "spanishCourse", "spanishPron", "spanishGrammar", "spanishVerbs", "spanishMcq",
-    "customVocab", "dict",
+    "customVocab", "dict", "githubTrending",
   ]);
 
   // 收合側欄的按鈕先隱藏（見下面 !isMobile 那顆按鈕），所以這裡故意不再從
@@ -1558,7 +1560,7 @@ export default function ChatApp({ user }) {
     setActiveFriendId(null); setActiveGroupId(null);
     setShowLeaderboard(false); setShowCinema(false);
     setShowVocab(false); setShowSpanish(false); setShowSpanishCourse(false);
-    setShowCustomVocab(false); setShowDict(false); setFrenchView(null);
+    setShowCustomVocab(false); setShowDict(false); setShowGithubTrending(false); setFrenchView(null);
     setShowSpanishPron(false); setShowSpanishGrammar(false); setShowSpanishVerbs(false); setShowSpanishMcq(false);
     setShowEnglishPron(false); setShowIeltsBand4(false); setShowEnglishMcq(false);
     setShowFeed(false); setShowImageEditor(false); setShowAiChat(false); setShowDocConvert(false);
@@ -2481,6 +2483,10 @@ export default function ChatApp({ user }) {
       <NavItem icon="📖" iconBg="linear-gradient(135deg,#0f2e1c,#166534)" label="字典" sublabel="英・西・法 A-Z"
         active={showDict} onClick={() => { resetAllViews(); setShowDict(true); }} />
     ),
+    githubTrending: (
+      <NavItem icon="🔥" iconBg="linear-gradient(135deg,#1f2937,#111827)" label="GitHub 熱門" sublabel="每日新專案 Top 10"
+        active={showGithubTrending} onClick={() => { resetAllViews(); setShowGithubTrending(true); }} />
+    ),
   };
   const sidebarItemPadding = { padding: "0 10px 6px" };
 
@@ -3033,8 +3039,8 @@ export default function ChatApp({ user }) {
                這個抽屜本身的開關機制（sidebarOpen／向右滑手勢）完全沒動，只是
                換了裡面裝的東西。 */
             <ChatMoreMenu
-              state={{ showLeaderboard, showCinema, showImageEditor, showAiChat, showDocConvert, showAiCompanion, showUpgrade, showEnglishPron, showIeltsBand4, showEnglishMcq, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showSpanishMcq, showCustomVocab, showDict }}
-              setters={{ setShowLeaderboard, setShowCinema, setShowImageEditor, setShowAiChat, setShowDocConvert, setShowAiCompanion, setShowUpgrade, setShowEnglishPron, setShowIeltsBand4, setShowEnglishMcq, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowSpanishMcq, setShowCustomVocab, setShowDict }}
+              state={{ showLeaderboard, showCinema, showImageEditor, showAiChat, showDocConvert, showAiCompanion, showUpgrade, showEnglishPron, showIeltsBand4, showEnglishMcq, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showSpanishMcq, showCustomVocab, showDict, showGithubTrending }}
+              setters={{ setShowLeaderboard, setShowCinema, setShowImageEditor, setShowAiChat, setShowDocConvert, setShowAiCompanion, setShowUpgrade, setShowEnglishPron, setShowIeltsBand4, setShowEnglishMcq, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowSpanishMcq, setShowCustomVocab, setShowDict, setShowGithubTrending }}
               onOpen={(setter) => { resetAllViews(); setter(true); settleDrawer(false); }}
             />
           ) : (
@@ -3173,7 +3179,7 @@ export default function ChatApp({ user }) {
           {/* Calendar view — 原本是右欄永遠顯示的東西，現在改成左側可切換的
               一般功能，跟排行榜等其他頁面同一套 showX 模式；右欄（.cr-cal）
               改放群組跟好友。 */}
-          {showCalendar && !activeFriendId && !activeGroupId && !showFeed && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showVideoHub && (
+          {showCalendar && !activeFriendId && !activeGroupId && !showFeed && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !showGithubTrending && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showVideoHub && (
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
               <div style={{ maxWidth: 480, margin: "0 auto", width: "100%" }}>
                 <CalendarMemo uid={uid} />
@@ -3509,6 +3515,11 @@ export default function ChatApp({ user }) {
             <DictionaryRoom />
           )}
 
+          {/* GitHub trending view */}
+          {showGithubTrending && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><GithubTrendingRoom onNav={() => { setShowGithubTrending(false); if (isMobile) setMobileView('more'); }} /></div>
+          )}
+
           {/* Public hall */}
           {/* IELTS Band 4 view */}
           {showIeltsBand4 && !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
@@ -3524,7 +3535,7 @@ export default function ChatApp({ user }) {
             <EnglishMcqPractice onNav={() => { setShowEnglishMcq(false); if (isMobile) setMobileView('more'); }} />
           </div>
 
-          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
+          {!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showSpanishCourse && !showCustomVocab && !showDict && !showGithubTrending && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub && (
             isMobile && mobileHomeSubview === 'list' ? (
               /* 手機版「首頁」分頁的預設內容：群組＋好友清單（＋置頂的
                  # 公共大廳 入口），點群組/好友進去看對話，點公共大廳
@@ -3860,8 +3871,8 @@ export default function ChatApp({ user }) {
         {/* 更多選單（手機版「更多」分頁） */}
         {isMobile && mobileView === 'more' && (
           <ChatMoreMenu
-            state={{ showLeaderboard, showCinema, showImageEditor, showAiChat, showDocConvert, showAiCompanion, showUpgrade, showEnglishPron, showIeltsBand4, showEnglishMcq, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showSpanishMcq, showCustomVocab, showDict }}
-            setters={{ setShowLeaderboard, setShowCinema, setShowImageEditor, setShowAiChat, setShowDocConvert, setShowAiCompanion, setShowUpgrade, setShowEnglishPron, setShowIeltsBand4, setShowEnglishMcq, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowSpanishMcq, setShowCustomVocab, setShowDict }}
+            state={{ showLeaderboard, showCinema, showImageEditor, showAiChat, showDocConvert, showAiCompanion, showUpgrade, showEnglishPron, showIeltsBand4, showEnglishMcq, showVocab, showSpanish, showSpanishCourse, showSpanishPron, showSpanishGrammar, showSpanishVerbs, showSpanishMcq, showCustomVocab, showDict, showGithubTrending }}
+            setters={{ setShowLeaderboard, setShowCinema, setShowImageEditor, setShowAiChat, setShowDocConvert, setShowAiCompanion, setShowUpgrade, setShowEnglishPron, setShowIeltsBand4, setShowEnglishMcq, setShowVocab, setShowSpanish, setShowSpanishCourse, setShowSpanishPron, setShowSpanishGrammar, setShowSpanishVerbs, setShowSpanishMcq, setShowCustomVocab, setShowDict, setShowGithubTrending }}
             onOpen={(setter) => { resetAllViews(); setter(true); setMobileView(null); }}
           />
         )}
@@ -3917,7 +3928,7 @@ export default function ChatApp({ user }) {
             // 移過來這裡、釘在群組上面。
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
               {(() => {
-                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub;
+                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !showGithubTrending && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub;
                 return (
                   <div style={{ padding: "8px 8px 4px" }}>
                     <button onClick={() => resetAllViews()} className={`fb ${hallActive ? "act" : ""}`}>
