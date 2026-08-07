@@ -568,7 +568,7 @@ function FolderRailIcon({ name, count, active, isDropTarget, onClick }) {
   return (
     <button onClick={onClick} title={`${name}（${count} 個功能）`}
       style={{
-        width: "100%", height: 54, boxSizing: "border-box",
+        width: "100%", height: "var(--railitem-h, 54px)", boxSizing: "border-box",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
         background: active ? "var(--navcard-bg, rgba(255,255,255,0.06))" : "none",
         border: isDropTarget ? "2px solid var(--accent)" : "2px solid transparent",
@@ -606,7 +606,7 @@ function AddFolderRailButton({ onAdd }) {
     <div style={{ position: "relative", flexShrink: 0, width: "100%" }}>
       <button ref={btnRef} onClick={() => setOpen(v => !v)} title="新增資料夾"
         style={{
-          width: "100%", height: 54, boxSizing: "border-box", borderRadius: "var(--radius-md)", border: "1px dashed var(--border)",
+          width: "100%", height: "var(--railitem-h, 54px)", boxSizing: "border-box", borderRadius: "var(--radius-md)", border: "1px dashed var(--border)",
           background: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
@@ -1396,7 +1396,9 @@ export default function ChatApp({ user }) {
   const [showEnglishPron,    setShowEnglishPron]    = useState(false);
   const [showIeltsBand4,     setShowIeltsBand4]     = useState(false);
   const [showEnglishMcq,     setShowEnglishMcq]     = useState(false);
-  const [showFeed,           setShowFeed]           = useState(false);
+  // 登入後第一個看到的頁面改成動態消息（不是公共大廳）——預設就是 true，
+  // 不用等使用者自己點。
+  const [showFeed,           setShowFeed]           = useState(true);
   // 動態消息裡點擊貼文作者頭像/名字要看的個人頁面 uid（null = 沒有開啟）——
   // 用這個狀態把 ProfileView 換進 Feed 的位置，而不是像以前那樣用
   // <Link href="/profile/[uid]"> 整個離開聊天室 SPA。
@@ -2901,7 +2903,7 @@ export default function ChatApp({ user }) {
               onClick={() => sidebarLayout.setActiveFolder(null)}
               title="全部功能"
               style={{
-                width: "100%", height: 54, borderRadius: "var(--radius-md)",
+                width: "100%", height: "var(--railitem-h, 54px)", borderRadius: "var(--radius-md)",
                 border: "none", cursor: "pointer", fontSize: 17, flexShrink: 0, boxSizing: "border-box",
                 background: sidebarLayout.activeFolderId ? "var(--navcard-bg, transparent)" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
                 color: sidebarLayout.activeFolderId ? "var(--text-muted)" : "#fff",
@@ -3074,12 +3076,6 @@ export default function ChatApp({ user }) {
               onClick={() => { resetAllViews(); setShowFeed(true); }} />
           </div>
 
-          {/* Hall button */}
-          <div style={{ padding: "4px 10px 0" }}>
-            <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="# 公共大廳" sublabel="和大家聊天吧"
-              active={!activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub}
-              onClick={() => { resetAllViews(); }} />
-          </div>
 
           {(() => {
             // 資料夾內容現在是側欄外面獨立的浮動面板（.cr-folder-panel，見下面），
@@ -3916,8 +3912,24 @@ export default function ChatApp({ user }) {
             </>
           ) : (
             // 桌面版右欄改放群組 + 好友（日曆改成左側 showCalendar 那個可切換
-            // 的一般功能，見上面 .cr-main 裡的 Calendar view）。
+            // 的一般功能，見上面 .cr-main 裡的 Calendar view）。公共大廳原本在
+            // 左側功能清單，跟群組/好友放在一起比較合理（都是「聊天對象」），
+            // 移過來這裡、釘在群組上面。
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+              {(() => {
+                const hallActive = !activeFriendId && !activeGroupId && !showLeaderboard && !showCinema && !showVocab && !showSpanish && !showCustomVocab && !showDict && !frenchView && !showSpanishPron && !showSpanishGrammar && !showSpanishVerbs && !showSpanishMcq && !showEnglishPron && !showIeltsBand4 && !showEnglishMcq && !showFeed && !showImageEditor && !showAiChat && !showDocConvert && !showAiCompanion && !showUpgrade && !showCalendar && !showVideoHub;
+                return (
+                  <div style={{ padding: "8px 8px 4px" }}>
+                    <button onClick={() => resetAllViews()} className={`fb ${hallActive ? "act" : ""}`}>
+                      <div className="cr-fb-icon" style={{ width: 44, height: 44, fontSize: 20, background: "linear-gradient(135deg,var(--accent-2),#a855f7)" }}>💬</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="cr-fb-name" style={{ fontSize: 14 }}># 公共大廳</div>
+                        <div className="cr-fb-sub">和大家聊天吧</div>
+                      </div>
+                    </button>
+                  </div>
+                );
+              })()}
               {/* Groups */}
               <div className="cr-nav-hdr">
                 <span className="cr-nav-hdr-label">群組 {myGroups.length}</span>

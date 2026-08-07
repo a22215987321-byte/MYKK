@@ -94,6 +94,13 @@ input, textarea {
   --navcard-radius: var(--radius-md);
   --navcard-height: auto;
   --navcard-active-glow: none;
+  /* 資料夾 rail 方塊高度——故意不直接用 --navcard-height，因為那個在這個
+     預設主題是 "auto"（NavItem 靠內距+圖示自然撐開，文字可以換行不會被
+     裁掉），資料夾方塊拿 "auto" 沒有一個實際可以拿來對齊的數字。這裡另外
+     訂一個固定數字，跟 NavItem 目前算出來的高度（9px 上下內距 + 34px
+     圖示 + 2px 邊框 = 54px）對齊，之後 NavItem 的內距/圖示尺寸如果改了，
+     這裡也要跟著手動改。 */
+  --railitem-h: 54px;
 
   --search-radius: var(--radius-md);
   --search-height: auto;
@@ -167,6 +174,7 @@ html[data-theme="shadow-window"] {
   --navcard-border: rgba(255, 255, 255, 0.08);
   --navcard-radius: 14px;
   --navcard-height: 58px;
+  --railitem-h: 58px;
   --navcard-hover-bg: rgba(255, 255, 255, 0.09);
   --navcard-icon-size: 40px;
   --navcard-icon-radius: 10px;
@@ -318,6 +326,7 @@ html[data-theme="glass"] {
   --navcard-border: rgba(255, 255, 255, 0.5);
   --navcard-radius: 14px;
   --navcard-height: 58px;
+  --railitem-h: 58px;
   --navcard-hover-bg: rgba(255, 255, 255, 0.6);
   --navcard-icon-size: 40px;
   --navcard-icon-radius: 10px;

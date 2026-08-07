@@ -111,6 +111,33 @@ function Icon({ name, size = 18, style }) {
 
 const LONG_POST_THRESHOLD = 260;
 
+// 貼文右上角的媒體收藏鈕——只有真的有影片/MP3的貼文才會出現，跟原本貼文
+// 下方那顆泛用的📑收藏鈕（收藏整篇貼文，任何類型都能收）不衝突，這顆是
+// 「明確標出你收藏的是這支影片/這首歌」，收藏的東西最後會出現在個人頁
+// 「收藏」分頁的對應分類裡。底層還是同一個 bookmarks 欄位，只是這裡入口
+// 更清楚、放在更顯眼的位置。
+function MediaBookmarkMenu({ post, bookmarked, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const label = post.audioUrl ? "收藏 MP3" : "收藏影片";
+  return (
+    <div style={{ position: "relative" }}>
+      <button ref={btnRef} onClick={() => setOpen(v => !v)} aria-label="收藏選項"
+        style={{ background: "none", border: "none", color: bookmarked ? "var(--accent)" : "var(--text-faint)", cursor: "pointer", fontSize: 16, padding: 6 }}>
+        {bookmarked ? "🔖" : "🔗"}
+      </button>
+      <PortalPopover anchorRef={btnRef} open={open} onClose={() => setOpen(false)} placement="bottom-right" minWidth={150}>
+        <div style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", overflow: "hidden" }}>
+          <button onClick={() => { onToggle(); setOpen(false); }}
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", padding: "10px 14px", color: "var(--text)", cursor: "pointer", fontSize: 13 }}>
+            <span>{bookmarked ? "🔖" : "📑"}</span> {bookmarked ? `取消${label}` : label}
+          </button>
+        </div>
+      </PortalPopover>
+    </div>
+  );
+}
+
 function PostCard({ post, myUid, myProfile, onOpenProfile }) {
   const [showComments, setShowComments] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -194,24 +221,29 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
             </div>
           </Link>
         )}
-        {isMine && (
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setMenuOpen(v => !v)}
-              style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 6 }}>
-              ⋯
-            </button>
-            {menuOpen && (
-              <>
-                <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
-                <div style={{ position: "absolute", top: "100%", right: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 61, minWidth: 120, overflow: "hidden" }}>
-                  <button onClick={handleDelete} style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "10px 14px", color: "#ef4444", cursor: "pointer", fontSize: 13 }}>
-                    🗑️ 刪除貼文
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {(post.videoUrl || post.audioUrl) && (
+            <MediaBookmarkMenu post={post} bookmarked={bookmarked} onToggle={toggleBookmark} />
+          )}
+          {isMine && (
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setMenuOpen(v => !v)}
+                style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 6 }}>
+                ⋯
+              </button>
+              {menuOpen && (
+                <>
+                  <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+                  <div style={{ position: "absolute", top: "100%", right: 0, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 61, minWidth: 120, overflow: "hidden" }}>
+                    <button onClick={handleDelete} style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "10px 14px", color: "#ef4444", cursor: "pointer", fontSize: 13 }}>
+                      🗑️ 刪除貼文
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tags */}

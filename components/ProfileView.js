@@ -16,6 +16,7 @@ import { toast } from "../lib/toast";
 import { useMediaAttachments } from "../lib/useMediaAttachments";
 import MediaAttachPreview from "./media-editor/MediaAttachPreview";
 import { getNotificationVolume, setNotificationVolume, playNotificationSound } from "../lib/notificationSound";
+import PortalPopover from "./PortalPopover";
 import {
   doc, onSnapshot, collection, query, where, orderBy, getDocs, addDoc,
   updateDoc, serverTimestamp, arrayUnion, arrayRemove,
@@ -522,19 +523,36 @@ function AudioQueuePlayer({ tracks }) {
 
   return (
     <div>
+      <style>{"@keyframes audioSpin { to { transform: rotate(360deg); } }"}</style>
       <audio ref={audioRef} style={{ display: "none" }} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {tracks.map((t, i) => {
           const isCurrent = currentIndex === i;
+          const isPlayingThis = isCurrent && playing;
           return (
             <button key={t.id} onClick={() => (isCurrent ? togglePlay() : setCurrentIndex(i))}
-              style={{ display: "flex", alignItems: "center", gap: 10, background: isCurrent ? "var(--panel-hover)" : "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", cursor: "pointer", textAlign: "left" }}>
-              <span style={{ fontSize: 16, width: 20, textAlign: "center", flexShrink: 0 }}>{isCurrent && playing ? "⏸" : "▶"}</span>
+              style={{ display: "flex", alignItems: "center", gap: 12, background: isCurrent ? "var(--panel-hover)" : "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}>
+              {t.userAvatarImage
+                ? <img src={t.userAvatarImage} alt={t.userNickname} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                : <div style={{ width: 36, height: 36, borderRadius: "50%", background: t.userColor || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#fff", flexShrink: 0 }}>{t.userAvatar || "🎵"}</div>
+              }
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: isCurrent ? "var(--accent)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {t.text?.trim() || "（未命名音樂）"}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{t.userNickname}</div>
+              </div>
+              {/* 音頻自己的圓形圖示——播放中會順時針轉動（跟黑膠唱片一樣的視覺
+                  語言），圖示本身在播放/暫停之間切換，不是「用戶頭像」那顆。 */}
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                background: isCurrent ? "var(--accent)" : "var(--panel-alt)",
+                border: isCurrent ? "none" : "1px solid var(--border)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 14, color: isCurrent ? "var(--accent-text)" : "var(--text-muted)",
+                animation: isPlayingThis ? "audioSpin 3s linear infinite" : "none",
+              }}>
+                {isPlayingThis ? "⏸" : "▶"}
               </div>
             </button>
           );
@@ -566,11 +584,48 @@ function AudioQueuePlayer({ tracks }) {
   );
 }
 
+// 播放順序選單——目前只有「順序播放」是真的做出來的模式（AudioQueuePlayer
+// 本來就是這樣播的：按完一首自動接下一首），隨機播放/單曲循環清單這些
+// 之後再做，先做版面讓使用者知道以後這裡會有更多選項可選。
+const PLAYBACK_MODES = [
+  { id: "sequence", label: "順序播放", icon: "➡️", ready: true },
+  { id: "shuffle", label: "隨機播放", icon: "🔀", ready: false },
+  { id: "repeatAll", label: "整份收藏循環", icon: "🔁", ready: false },
+];
+function PlaybackModeMenu({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const current = PLAYBACK_MODES.find(m => m.id === value) || PLAYBACK_MODES[0];
+  return (
+    <div style={{ position: "relative" }}>
+      <button ref={btnRef} onClick={() => setOpen(v => !v)} type="button"
+        style={{ display: "flex", alignItems: "center", gap: 5, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "5px 12px", color: "var(--text-muted)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+        {current.icon} {current.label} <span style={{ fontSize: 9 }}>▾</span>
+      </button>
+      <PortalPopover anchorRef={btnRef} open={open} onClose={() => setOpen(false)} placement="bottom-right" minWidth={170}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "var(--card-shadow)", overflow: "hidden" }}>
+          {PLAYBACK_MODES.map(m => (
+            <button key={m.id} disabled={!m.ready}
+              onClick={() => { if (m.ready) { onChange(m.id); setOpen(false); } }}
+              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", background: m.id === value ? "var(--panel-hover)" : "none", border: "none", padding: "9px 12px", color: m.ready ? "var(--text)" : "var(--text-dim)", cursor: m.ready ? "pointer" : "default", fontSize: 13 }}>
+              <span>{m.icon}</span>
+              <span style={{ flex: 1 }}>{m.label}</span>
+              {!m.ready && <span style={{ fontSize: 10, color: "var(--text-faint)" }}>即將推出</span>}
+              {m.id === value && <span style={{ color: "var(--accent)" }}>✓</span>}
+            </button>
+          ))}
+        </div>
+      </PortalPopover>
+    </div>
+  );
+}
+
 // 收藏分頁：影片收藏、音頻收藏都是真資料（收藏貼文裡分別帶 videoUrl／
 // audioUrl 的），影片縮圖沿用 VideosTab 的 VideoThumb，音頻是上面那個
 // AudioQueuePlayer（順序播放＋單曲循環）。
 function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen }) {
   const [saving, setSaving] = useState(false);
+  const [playbackMode, setPlaybackMode] = useState("sequence");
   const isPublic = profile.favoritesPublic !== false; // 沒設過欄位 = 預設公開
 
   const togglePublic = async () => {
@@ -621,7 +676,10 @@ function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen
         </div>
       )}
 
-      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: "24px 0 10px" }}>音頻收藏</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "24px 0 10px" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>音頻收藏</div>
+        <PlaybackModeMenu value={playbackMode} onChange={setPlaybackMode} />
+      </div>
       {!favoritesLoaded ? (
         <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-dim)", fontSize: 13 }}>載入中...</div>
       ) : audioFavorites.length === 0 ? (
