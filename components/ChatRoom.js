@@ -57,6 +57,7 @@ import UpgradeMembership, { UpgradeHighlights } from "./UpgradeMembership";
 import EmojiStickerPicker from "./EmojiStickerPicker";
 import LoadingState from "./LoadingState";
 import PortalPopover from "./PortalPopover";
+import FloatingAiChat from "./FloatingAiChat";
 import useIsMobile from "../lib/useIsMobile";
 import { QUICK_REACTIONS, STICKER_SRC_BY_ID } from "../data/chat/gesturePacks";
 import { ChevronLeft, ChevronRight, CalendarDays, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
@@ -1439,8 +1440,6 @@ export default function ChatApp({ user }) {
   // 桌面版群組/好友/大廳各自都有獨立入口，不需要這層切換。
   const [mobileHomeSubview, setMobileHomeSubview] = useState('list');
   const [sidebarOpen,    setSidebarOpen]    = useState(false); // 手機版側邊抽屜的「已定案」開關狀態（拖曳中的即時位置不經過這個 state，見 dragStateRef）
-  // 桌面版導覽欄收合狀態（跟手機版的抽屜 sidebarOpen 是兩套機制，互不影響）。
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // 側欄功能方塊按住拖曳調整順序——桌面版限定（手機版側欄是完全不同的簡化排法）。
   // 動態消息／公共大廳固定在最上面當錨點，其餘全部（原本分在三個資料夾裡的
@@ -1452,14 +1451,6 @@ export default function ChatApp({ user }) {
     "spanish", "spanishCourse", "spanishPron", "spanishGrammar", "spanishVerbs", "spanishMcq",
     "customVocab", "dict", "githubTrending",
   ]);
-
-  // 收合側欄的按鈕先隱藏（見下面 !isMobile 那顆按鈕），所以這裡故意不再從
-  // localStorage 還原成「已收合」——不然之前收合過的人下次登入會卡在收合
-  // 狀態，卻沒有按鈕能展開回來。
-
-  useEffect(() => {
-    try { localStorage.setItem("cr-sidebar-collapsed", sidebarCollapsed ? "1" : "0"); } catch {}
-  }, [sidebarCollapsed]);
 
   // 桌面版可拖曳調整寬度：側欄跟日曆欄各自的寬度、拖完存 localStorage，
   // 中間 <main> 本來就是 flex:1，兩邊寬度一變它自動跟著縮放，不用另外處理。
@@ -2976,15 +2967,16 @@ export default function ChatApp({ user }) {
 
         {/* 側邊欄：桌面版＝常駐側欄（一般 flex 排列）；手機版＝position:fixed 抽屜，
             由 sidebarOpen 狀態＋拖曳時的即時 transform 控制（見 applyDrawerTransform）。
-            桌面版另外還有 sidebarCollapsed（收合成寬度 0，跟手機抽屜是兩套獨立機制）。 */}
-        <nav ref={sidebarElRef} className="cr-sidebar" aria-label="聊天導覽" aria-hidden={!isMobile && sidebarCollapsed} style={{
-          width: (!isMobile && sidebarCollapsed) ? 0 : `var(--sidebar-w-override, ${sidebarWidth}px)`,
-          border: (!isMobile && sidebarCollapsed) ? "none" : "var(--col-border, none)",
-          borderRight: (!isMobile && sidebarCollapsed) ? "none" : "var(--col-border-right, 1px solid var(--panel))",
+            桌面版的收合功能已經整個拿掉（使用者反映那顆收合鈕位置一直喬不好，
+            乾脆刪掉，不只是隱藏）。 */}
+        <nav ref={sidebarElRef} className="cr-sidebar" aria-label="聊天導覽" style={{
+          width: `var(--sidebar-w-override, ${sidebarWidth}px)`,
+          border: "var(--col-border, none)",
+          borderRight: "var(--col-border-right, 1px solid var(--panel))",
           borderRadius: "var(--col-radius, 0px)",
           boxShadow: "var(--col-shadow, none)",
           backdropFilter: "var(--col-blur, none)", WebkitBackdropFilter: "var(--col-blur, none)",
-          margin: (!isMobile && sidebarCollapsed) ? 0 : "var(--col-margin, 0px)",
+          margin: "var(--col-margin, 0px)",
           display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden",
           transition: (isMobile || resizingPanel === "sidebar") ? undefined : "width 0.25s ease, border-color 0.25s ease",
         }}>
@@ -3105,8 +3097,8 @@ export default function ChatApp({ user }) {
           </div>
         </nav>
 
-        {/* 側欄寬度拖曳把手：只在展開狀態顯示，雙擊復原成預設寬度。 */}
-        {!isMobile && !sidebarCollapsed && (
+        {/* 側欄寬度拖曳把手：雙擊復原成預設寬度。 */}
+        {!isMobile && (
           <div
             onMouseDown={e => startPanelResize(e, "sidebar")}
             onDoubleClick={() => resetPanelWidth("sidebar")}
@@ -3121,34 +3113,6 @@ export default function ChatApp({ user }) {
               marginLeft: -3, marginRight: -3, zIndex: 30, position: "relative",
             }}
           />
-        )}
-
-        {/* 桌面版收合/展開開關：先隱藏（使用者覺得這顆按鈕影響觀感、位置也
-            一直喬不好），暫時整個不渲染。sidebarCollapsed 還是留著（預設
-            false 不會有影響），之後想要恢復這顆按鈕，把下面這行 false &&
-            改回 !isMobile 就好，不用重新刻一次。 */}
-        {false && !isMobile && (
-          <button
-            onClick={() => setSidebarCollapsed(v => !v)}
-            title={sidebarCollapsed ? "展開導覽列" : "收合導覽列"}
-            aria-label={sidebarCollapsed ? "展開導覽列" : "收合導覽列"}
-            style={{
-              // 垂直置中在側欄高度上（不是貼著頂部的 top:74）——之前跟大頭貼/
-              // 名字/設定齒輪那一列擠在同一個角落，看起來很擁擠。置中是常見的
-              // 側欄收合鈕擺法（像 VSCode 那種），跟頂部的功能列完全分開，不會
-              // 再互相干擾。
-              position: "absolute", top: "50%", transform: "translateY(-50%)",
-              left: FOLDER_RAIL_WIDTH + (sidebarCollapsed ? 4 : sidebarWidth - 12),
-              zIndex: 40,
-              width: 28, height: 28, borderRadius: "50%",
-              background: "var(--panel)", border: "1px solid var(--border)",
-              color: "var(--text-muted)", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "var(--card-shadow)",
-              transition: resizingPanel === "sidebar" ? undefined : "left 0.25s ease",
-            }}>
-            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
         )}
 
         {/* 主要區域：一般文件流佈局；手機版拖曳抽屜時用 ref 直接位移（applyDrawerTransform），
@@ -4030,6 +3994,11 @@ export default function ChatApp({ user }) {
           />
         )}
       </div>
+
+      {/* 浮動 AI 對話小工具——跟側欄「AI 助手」共用同一支鎖（aiChatAllowed），
+          不然這裡會變成繞過鎖定的後門。掛在 .cr-shell 外面，不管切到哪個
+          功能頁都一直浮在畫面上。 */}
+      {aiChatAllowed && <FloatingAiChat user={user} db={db} />}
     </>
   );
 }
