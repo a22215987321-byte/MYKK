@@ -176,18 +176,23 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
       await updateDoc(ref, { bookmarks: bookmarked ? arrayRemove(myUid) : arrayUnion(myUid) });
     } catch (err) {
       console.error("[Feed.PostCard] toggleBookmark failed", { code: err?.code, message: err?.message, postId: post.id });
+      toast("收藏失敗，請重試");
     }
   };
 
   // 影片貼文專用——「收藏 MP3」點的是這個而不是上面的 toggleBookmark，
   // 存到 audioBookmarks（不是 bookmarks），這樣才不會讓這支影片同時跑去
-  // 「影片收藏」分頁（除非使用者是用貼文下方那顆泛用📑鈕另外收藏的）。
+  // 「影片收藏」分頁（除非使用者是用貼文下方那顆泛用📑鈕另外收藏的）。之前
+  // 失敗只有 console.error、畫面上完全沒反應——使用者收藏別人的影片貼文時
+  // 如果 Firestore 規則還沒加 audioBookmarks 欄位會直接權限不足失敗，加個
+  // toast 至少讓使用者看得到「收藏失敗」而不是誤以為按鈕壞了沒反應。
   const toggleAudioBookmark = async () => {
     const ref = doc(db, "posts", post.id);
     try {
       await updateDoc(ref, { audioBookmarks: audioBookmarked ? arrayRemove(myUid) : arrayUnion(myUid) });
     } catch (err) {
       console.error("[Feed.PostCard] toggleAudioBookmark failed", { code: err?.code, message: err?.message, postId: post.id });
+      toast("收藏失敗，請重試");
     }
   };
 
