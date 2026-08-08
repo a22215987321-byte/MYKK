@@ -29,6 +29,26 @@ function formatConvTime(ts) {
   return d.toLocaleDateString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+// 深度思考（DeepThink）開啟時，DeepSeek 回傳的 reasoning_content——收合
+// 顯示在正式回覆上方，預設收起來（思考過程通常很長，不想佔掉主要對話的
+// 版面），點一下展開看完整推理過程。
+function ReasoningBlock({ text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ maxWidth: "70%" }}>
+      <button onClick={() => setOpen(v => !v)}
+        style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 11, padding: "2px 4px" }}>
+        🤔 思考過程 <span style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>▾</span>
+      </button>
+      {open && (
+        <div style={{ fontSize: 12, color: "var(--text-faint)", lineHeight: 1.6, whiteSpace: "pre-wrap", padding: "6px 10px", borderLeft: "2px solid var(--border)", marginTop: 2 }}>
+          {text}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Standalone "AI 助手" room — a simple chat UI backed by pages/api/ai/chat.js
 // (DeepSeek, server-side only).
 //
@@ -51,6 +71,12 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
   // 不要因為上面 MODELS 陣列的排序（OpenRouter 排前面方便選）跟著變動。
   const [model, setModel] = useState("deepseek-v4-flash");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  // 深度思考（DeepThink）——只有 DeepSeek 的兩個模型支援，切換會讓後端
+  // （pages/api/ai/chat.js）帶 extra_body.thinking.type 給 DeepSeek。回覆
+  // 裡如果有 reasoning_content，會存在該則訊息的 reasoning 欄位，顯示成
+  // 收合的「思考過程」區塊，不佔用主要回覆的版面。
+  const [deepThink, setDeepThink] = useState(false);
+  const isDeepseekModel = model.startsWith("deepseek");
   const [historyOpen, setHistoryOpen] = useState(false);
   // 聊天模式／圖片生成模式切換。圖片生成目前是純前端暫存（images），不會存進
   // aiChats 對話紀錄——先讓功能能用，之後真的要留存再另外接 Firestore。
@@ -175,11 +201,11 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next, model }),
+        body: JSON.stringify({ messages: next, model, thinking: isDeepseekModel && deepThink }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "AI 服務發生錯誤");
-      setMessages(m => [...m, { role: "assistant", content: data.reply }]);
+      setMessages(m => [...m, { role: "assistant", content: data.reply, reasoning: data.reasoning || "" }]);
     } catch (err) {
       toast(err.message || "傳送失敗，請重試");
     } finally {
@@ -338,6 +364,19 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
 
         {mode === "chat" && (
         <>
+        {/* 深度思考——只有 DeepSeek 的兩個模型支援，切到 Claude／GPT 就整顆
+            拿掉（送了也沒用，藏起來比留著按下去沒反應清楚）。 */}
+        {isDeepseekModel && (
+          <button onClick={() => setDeepThink(v => !v)} title="深度思考模式，回覆前會先顯示推理過程"
+            style={{
+              height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box",
+              background: deepThink ? "var(--accent)" : "var(--toolbar-btn-bg, none)",
+              border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))",
+              padding: "6px 14px", color: deepThink ? "var(--accent-text)" : "var(--text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}>
+            💭 深度思考
+          </button>
+        )}
         <div style={{ position: "relative" }}>
           <button ref={historyRef} onClick={() => setHistoryOpen(v => !v)}
             style={{ height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", padding: "6px 14px", color: "var(--text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -387,7 +426,8 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
             )}
             <MarkdownMessageStyles />
             {messages.map((m, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start", gap: 6 }}>
+                {m.role === "assistant" && m.reasoning && <ReasoningBlock text={m.reasoning} />}
                 <div style={{
                   maxWidth: "70%", padding: "10px 14px", borderRadius: "var(--radius-lg)",
                   background: m.role === "user" ? "var(--accent)" : "var(--bubble-assistant-bg, var(--panel-alt))",

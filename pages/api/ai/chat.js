@@ -38,7 +38,7 @@ const DEFAULT_MODEL_ID = "deepseek-v4-flash";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { messages, model, systemPrompt } = req.body || {};
+  const { messages, model, systemPrompt, thinking } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "invalid messages" });
   }
@@ -66,6 +66,22 @@ export default async function handler(req, res) {
     content: String(m.content || "").slice(0, MAX_CONTENT_LENGTH),
   }));
 
+  // 深度思考（DeepThink）——只有 DeepSeek 的 v4-flash／v4-pro 支援，開/關
+  // 直接對應 DeepSeek 官方的 extra_body.thinking.type，開啟時額外把
+  // reasoning_effort 拉到 high（官方預設值，這裡明講出來而不是依賴預設，
+  // 避免之後官方改預設值就悄悄變了行為）。OpenRouter 那幾個模型（Claude／
+  // GPT）目前不支援這組參數，送了也只是被忽略，不特別處理。
+  const wantsThinking = providerId === "deepseek" && !!thinking;
+  const body = {
+    model: upstreamModel,
+    messages: [{ role: "system", content: customSystemPrompt || "你是 EVONCHAT 裡的 AI 助手，用繁體中文回覆，語氣自然親切。" }, ...cleaned],
+    stream: false,
+  };
+  if (providerId === "deepseek") {
+    body.extra_body = { thinking: { type: wantsThinking ? "enabled" : "disabled" } };
+    if (wantsThinking) body.reasoning_effort = "high";
+  }
+
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30000);
   try {
@@ -76,11 +92,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
         ...(provider.extraHeaders || {}),
       },
-      body: JSON.stringify({
-        model: upstreamModel,
-        messages: [{ role: "system", content: customSystemPrompt || "你是 EVONCHAT 裡的 AI 助手，用繁體中文回覆，語氣自然親切。" }, ...cleaned],
-        stream: false,
-      }),
+      body: JSON.stringify(body),
       signal: ctrl.signal,
     });
     clearTimeout(timer);
@@ -91,8 +103,9 @@ export default async function handler(req, res) {
     }
     const data = await r.json();
     const reply = data.choices?.[0]?.message?.content;
+    const reasoning = data.choices?.[0]?.message?.reasoning_content || "";
     if (!reply) return res.status(502).json({ error: "AI 沒有回覆內容" });
-    return res.json({ reply });
+    return res.json({ reply, reasoning });
   } catch (e) {
     clearTimeout(timer);
     if (e.name === "AbortError") return res.status(504).json({ error: "AI 回覆逾時" });
