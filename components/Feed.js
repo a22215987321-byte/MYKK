@@ -113,13 +113,18 @@ const LONG_POST_THRESHOLD = 260;
 
 // 貼文右上角的媒體收藏鈕——只有真的有影片/MP3的貼文才會出現，跟原本貼文
 // 下方那顆泛用的📑收藏鈕（收藏整篇貼文，任何類型都能收）不衝突，這顆是
-// 「明確標出你收藏的是這支影片/這首歌」，收藏的東西最後會出現在個人頁
-// 「收藏」分頁的對應分類裡。底層還是同一個 bookmarks 欄位，只是這裡入口
-// 更清楚、放在更顯眼的位置。
+// 「明確標出你要把這個收進音頻收藏」。真的有 audioUrl 的貼文（MP3貼文）
+// 底層還是用原本的 bookmarks 欄位——那條路本來就對，個人頁的「音頻收藏」
+// 本來就是靠 post.audioUrl 抓的。影片貼文則是另一個獨立欄位
+// audioBookmarks（見 PostCard 的 toggleAudioBookmark）——影片本身還是影片
+// （不會被轉檔成真的 .mp3 檔案，那需要在瀏覽器端做音訊擷取＋重新編碼＋
+// 再上傳一次，成本高很多），但會被個人頁的「音頻收藏」用 <audio> 直接播放
+// videoUrl（瀏覽器本來就支援用 <audio> 播放影片檔案裡的聲音軌，只是不顯示
+// 畫面），使用者聽起來就是一首可以在音頻收藏清單播放的歌，不需要真的存在
+// 一個額外的 mp3 檔案才能達到「收藏影片的音頻」這個實際效果。
 function MediaBookmarkMenu({ post, bookmarked, onToggle }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
-  const label = post.audioUrl ? "收藏 MP3" : "收藏影片";
   return (
     <div style={{ position: "relative" }}>
       <button ref={btnRef} onClick={() => setOpen(v => !v)} aria-label="收藏選項"
@@ -130,7 +135,7 @@ function MediaBookmarkMenu({ post, bookmarked, onToggle }) {
         <div style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", overflow: "hidden" }}>
           <button onClick={() => { onToggle(); setOpen(false); }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", padding: "10px 14px", color: "var(--text)", cursor: "pointer", fontSize: 13 }}>
-            <span>{bookmarked ? "🔖" : "📑"}</span> {bookmarked ? `取消${label}` : label}
+            <span>{bookmarked ? "🔖" : "📑"}</span> {bookmarked ? "取消收藏 MP3" : "收藏 MP3"}
           </button>
         </div>
       </PortalPopover>
@@ -146,6 +151,7 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
   const [showShare, setShowShare] = useState(false);
   const liked = (post.likes || []).includes(myUid);
   const bookmarked = (post.bookmarks || []).includes(myUid);
+  const audioBookmarked = (post.audioBookmarks || []).includes(myUid);
   const isMine = post.userId === myUid;
   const tags = useMemo(() => extractHashtags(post.text), [post.text]);
   const isLong = (post.text || "").length > LONG_POST_THRESHOLD;
@@ -170,6 +176,18 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
       await updateDoc(ref, { bookmarks: bookmarked ? arrayRemove(myUid) : arrayUnion(myUid) });
     } catch (err) {
       console.error("[Feed.PostCard] toggleBookmark failed", { code: err?.code, message: err?.message, postId: post.id });
+    }
+  };
+
+  // 影片貼文專用——「收藏 MP3」點的是這個而不是上面的 toggleBookmark，
+  // 存到 audioBookmarks（不是 bookmarks），這樣才不會讓這支影片同時跑去
+  // 「影片收藏」分頁（除非使用者是用貼文下方那顆泛用📑鈕另外收藏的）。
+  const toggleAudioBookmark = async () => {
+    const ref = doc(db, "posts", post.id);
+    try {
+      await updateDoc(ref, { audioBookmarks: audioBookmarked ? arrayRemove(myUid) : arrayUnion(myUid) });
+    } catch (err) {
+      console.error("[Feed.PostCard] toggleAudioBookmark failed", { code: err?.code, message: err?.message, postId: post.id });
     }
   };
 
@@ -223,7 +241,9 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
           {(post.videoUrl || post.audioUrl) && (
-            <MediaBookmarkMenu post={post} bookmarked={bookmarked} onToggle={toggleBookmark} />
+            <MediaBookmarkMenu post={post}
+              bookmarked={post.audioUrl ? bookmarked : audioBookmarked}
+              onToggle={post.audioUrl ? toggleBookmark : toggleAudioBookmark} />
           )}
           {isMine && (
             <div style={{ position: "relative" }}>
@@ -469,6 +489,7 @@ function NewPostForm({ myProfile, onPosted }) {
       subtitles: null,
       likes: [],
       bookmarks: [],
+      audioBookmarks: [],
       visibility,
       createdAt: serverTimestamp(),
     };

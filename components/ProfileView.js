@@ -475,7 +475,9 @@ function AudioQueuePlayer({ tracks }) {
   useEffect(() => {
     const a = audioRef.current;
     if (!a || currentIndex == null) return;
-    a.src = tracks[currentIndex]?.audioUrl;
+    // 影片來源的音頻收藏沒有 audioUrl，直接把 videoUrl 餵給 <audio> 元素——
+    // 瀏覽器本來就支援用 <audio> 播放影片檔案，只拿聲音軌、不理會畫面。
+    a.src = tracks[currentIndex]?.audioUrl || tracks[currentIndex]?.videoUrl;
     a.play().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex]);
@@ -650,8 +652,14 @@ function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen
     );
   }
 
-  const videoFavorites = favoritePosts.filter(p => p.videoUrl);
-  const audioFavorites = favoritePosts.filter(p => p.audioUrl);
+  // 影片貼文如果是透過「收藏 MP3」收的（audioBookmarks 裡有這個人），是要
+  // 進音頻收藏、不是影片收藏——只有透過貼文下方那顆泛用📑鈕收的（一般
+  // bookmarks），才算是「影片收藏」。
+  const videoFavorites = favoritePosts.filter(p => p.videoUrl && (p.bookmarks || []).includes(profile.uid));
+  const audioFavorites = favoritePosts.filter(p =>
+    (p.audioUrl && (p.bookmarks || []).includes(profile.uid)) ||
+    (p.videoUrl && (p.audioBookmarks || []).includes(profile.uid))
+  );
 
   return (
     <div style={{ padding: 16 }}>
@@ -1089,20 +1097,29 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
   // 收藏過的貼文」——不限發文者是誰，靠 posts.bookmarks array-contains 這個
   // uid 查。公開/不公開只影響「非本人能不能看到這個分頁的內容」，資料本身
   // 一律都抓（isOwner 分頁一定要看得到自己收藏了什麼）。
+  // 另外查一次 audioBookmarks——這是「把影片的聲音收進音頻收藏」用的獨立
+  // 欄位（見 Feed.js 的 toggleAudioBookmark），影片貼文本身不會出現在
+  // bookmarks 查詢結果裡，要另外查才抓得到。兩批結果依 id 去重後合併。
   useEffect(() => {
     if (!uid) return;
     let cancelled = false;
     (async () => {
       try {
-        const snap = await getDocs(query(collection(db, "posts"), where("bookmarks", "array-contains", uid)));
+        const [bookmarkSnap, audioBookmarkSnap] = await Promise.all([
+          getDocs(query(collection(db, "posts"), where("bookmarks", "array-contains", uid))),
+          getDocs(query(collection(db, "posts"), where("audioBookmarks", "array-contains", uid))),
+        ]);
         if (cancelled) return;
-        const sorted = snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => {
-            const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-            const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-            return tb - ta;
-          });
+        const byId = new Map();
+        for (const d of bookmarkSnap.docs) byId.set(d.id, { id: d.id, ...d.data() });
+        for (const d of audioBookmarkSnap.docs) {
+          if (!byId.has(d.id)) byId.set(d.id, { id: d.id, ...d.data() });
+        }
+        const sorted = [...byId.values()].sort((a, b) => {
+          const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+          const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+          return tb - ta;
+        });
         setFavoritePosts(sorted);
       } catch (e) {
         console.error("[ProfileView] failed to load favorite posts", e);
