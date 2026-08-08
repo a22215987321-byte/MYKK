@@ -13,45 +13,35 @@ const AiChatRoom = dynamic(() => import("./AiChatRoom"), {
 
 const EDGE_MARGIN = 16;
 const COLLAPSED_SIZE = 56;
-const DEFAULT_W = 360;
-const DEFAULT_H = 480;
-const EXPANDED_W = 480;
-const EXPANDED_H = 660;
+const WIN_WIDTH = 380;
 
-// 隨處可見的浮動 AI 對話小工具——跟側欄裡完整的「AI 助手」功能頁是兩個
-// 不同的入口，這個不管使用者切到哪個功能頁面都一直浮在畫面上（掛在
-// ChatApp 最外層，不是 .cr-main 裡面），預設收合成一顆貼在左下角的圓形
-// 按鈕。展開後可以按住頂部標題列拖到畫面任何地方（跟手指/滑鼠即時同步），
-// 放開手之後視窗會自己滑回畫面「底部」，但保留放開當下的水平位置——
-// 不是回到原本的左下角，是「回到你放開的那個位置正下方的底部」。
-export default function FloatingAiChat({ user, db }) {
-  const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+// 隨處可見的浮動 AI 對話小工具。開關狀態是受控的（open/onOpenChange，由
+// ChatRoom.js 管理）：桌面版的觸發鈕是資料夾 rail 上方那顆小圖示，這裡只
+// 負責「開啟後長什麼樣子」；showTrigger 為 true 時（目前只有手機版會傳，
+// 手機沒有資料夾 rail 可以掛觸發鈕）才會自己再多畫一顆貼在左下角的圓形鈕。
+//
+// 開啟時視窗一律「高度拉滿到頂部」——跟 .cr-shell 用同一組 CSS 變數
+// （--shell-margin／--viewport-h／safe-area-inset）算出一模一樣的上下邊界，
+// 視覺上就是貼著資料夾 rail 那條窄欄往上長成一整條到底的面板。因為高度已經
+// 固定頂到底，拖曳只剩水平方向有意義——按住頂部（EVON AI 那條 header，見
+// AiChatRoom.js 的 compact 版）左右拖，放開就停在放開的位置，不再需要「滑回
+// 底部」那段動畫（以前是小視窗才需要，現在整個視窗本來就是頂到底）。
+export default function FloatingAiChat({ user, db, open, onOpenChange, showTrigger = false }) {
   const [left, setLeft] = useState(EDGE_MARGIN);
   const winRef = useRef(null);
   const dragRef = useRef({ dragging: false });
 
-  const width = Math.min(expanded ? EXPANDED_W : DEFAULT_W, typeof window !== "undefined" ? window.innerWidth - EDGE_MARGIN * 2 : DEFAULT_W);
-  const height = Math.min(expanded ? EXPANDED_H : DEFAULT_H, typeof window !== "undefined" ? window.innerHeight - EDGE_MARGIN * 2 : DEFAULT_H);
-
-  // 放大/縮小之後視窗寬度變了，原本的 left 可能會讓視窗跑出畫面右邊——
-  // 開合當下重新夾一次範圍。
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setLeft(l => Math.max(EDGE_MARGIN, Math.min(l, window.innerWidth - width - EDGE_MARGIN)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expanded, open]);
+    if (typeof window === "undefined" || !open) return;
+    setLeft(l => Math.max(EDGE_MARGIN, Math.min(l, window.innerWidth - WIN_WIDTH - EDGE_MARGIN)));
+  }, [open]);
 
   const onHeaderPointerDown = (e) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const el = winRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    dragRef.current = {
-      dragging: true, pointerId: e.pointerId,
-      grabX: e.clientX - rect.left, grabY: e.clientY - rect.top,
-    };
-    el.style.transition = "none";
+    dragRef.current = { dragging: true, pointerId: e.pointerId, grabX: e.clientX - rect.left };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
   };
 
@@ -61,35 +51,24 @@ export default function FloatingAiChat({ user, db }) {
     e.preventDefault();
     const el = winRef.current;
     if (!el) return;
-    const w = el.offsetWidth, h = el.offsetHeight;
+    const w = el.offsetWidth;
     const x = Math.max(4, Math.min(e.clientX - st.grabX, window.innerWidth - w - 4));
-    const y = Math.max(4, Math.min(e.clientY - st.grabY, window.innerHeight - h - 4));
     el.style.left = `${x}px`;
-    el.style.top = `${y}px`;
-    el.style.bottom = "auto";
   };
 
-  const endDrag = (e) => {
+  const endDrag = () => {
     const st = dragRef.current;
     if (!st.dragging) return;
     dragRef.current = { dragging: false };
     const el = winRef.current;
     if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const finalLeft = Math.max(EDGE_MARGIN, Math.min(rect.left, window.innerWidth - rect.width - EDGE_MARGIN));
-    setLeft(finalLeft);
-    // 放開手的瞬間，用 CSS transition 滑回底部——水平位置維持在放開當下
-    // 的地方，只有垂直方向「掉」回底部，跟前面拖曳時的即時跟手是分開的
-    // 兩段動畫，拖曳中完全不做 transition（不然會延遲跟手感覺卡卡的）。
-    el.style.transition = "left 0.28s cubic-bezier(0.22,1,0.36,1), top 0.28s cubic-bezier(0.22,1,0.36,1), bottom 0.28s cubic-bezier(0.22,1,0.36,1)";
-    el.style.left = `${finalLeft}px`;
-    el.style.top = "auto";
-    el.style.bottom = `${EDGE_MARGIN}px`;
+    setLeft(el.getBoundingClientRect().left);
   };
 
   if (!open) {
+    if (!showTrigger) return null;
     return (
-      <button onClick={() => setOpen(true)} aria-label="開啟 AI 對話"
+      <button onClick={() => onOpenChange(true)} aria-label="開啟 AI 對話"
         style={{
           position: "fixed", left: EDGE_MARGIN, bottom: EDGE_MARGIN, zIndex: 2500,
           width: COLLAPSED_SIZE, height: COLLAPSED_SIZE, borderRadius: "50%",
@@ -105,37 +84,24 @@ export default function FloatingAiChat({ user, db }) {
 
   return (
     <div ref={winRef} style={{
-      position: "fixed", left, bottom: EDGE_MARGIN, width, height,
+      position: "fixed", left, width: WIN_WIDTH,
+      top: "calc(var(--shell-margin, 0px) + env(safe-area-inset-top))",
+      height: "calc(var(--viewport-h, 100vh) - var(--shell-margin, 0px) * 2 - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+      maxWidth: `calc(100vw - ${EDGE_MARGIN * 2}px)`,
       zIndex: 2500, display: "flex", flexDirection: "column",
-      background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16,
+      background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg, 18px)",
       boxShadow: "0 16px 48px rgba(0,0,0,0.4)", overflow: "hidden",
     }}>
-      <div
-        onPointerDown={onHeaderPointerDown}
-        onPointerMove={onHeaderPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        style={{
-          height: 40, flexShrink: 0, display: "flex", alignItems: "center", gap: 8, padding: "0 8px 0 12px",
-          background: "var(--panel-alt)", borderBottom: "1px solid var(--border)",
-          cursor: "grab", touchAction: "none", userSelect: "none",
-        }}>
-        <span style={{ fontSize: 14 }}>🤖</span>
-        <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: "var(--text)" }}>AI 對話</span>
-        <button onClick={() => setExpanded(v => !v)} aria-label={expanded ? "縮小視窗" : "放大視窗"}
-          onPointerDown={e => e.stopPropagation()}
-          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: 6, lineHeight: 1 }}>
-          {expanded ? "⤡" : "⤢"}
-        </button>
-        <button onClick={() => setOpen(false)} aria-label="關閉"
-          onPointerDown={e => e.stopPropagation()}
-          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: 6, lineHeight: 1 }}>
-          ✕
-        </button>
-      </div>
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <AiChatRoom user={user} db={db} />
-      </div>
+      <AiChatRoom
+        user={user} db={db} compact
+        onClose={() => onOpenChange(false)}
+        headerDragProps={{
+          onPointerDown: onHeaderPointerDown,
+          onPointerMove: onHeaderPointerMove,
+          onPointerUp: endDrag,
+          onPointerCancel: endDrag,
+        }}
+      />
     </div>
   );
 }

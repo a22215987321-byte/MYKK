@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../lib/firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, serverTimestamp, onSnapshot, collection, query, orderBy } from "firebase/firestore";
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -36,16 +36,24 @@ const LANG_COLORS = {
 // 排程那邊 pages/api/cron/github-trending.js 生成，這裡純顯示），總結區塊
 // 自己還有一顆「放大」鈕，開一個全螢幕疊層把總結文字放大顯示，方便看長一點
 // 的總結。
-function RepoCard({ repo, rank }) {
+//
+// 卡片主體點下去不再直接跳轉 GitHub（怕手滑誤觸就跳走），改成彈一個小方塊
+// 預覽（名稱＋網址），真的要去 GitHub 要在方塊裡再點一次連結。右鍵點卡片
+// 會彈出「收藏」選單，左鍵點裡面那顆按鈕才會真的收藏/取消收藏。
+function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
   const [open, setOpen] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const [menuPos, setMenuPos] = useState(null);
 
   return (
-    <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+    <div
+      onContextMenu={e => { e.preventDefault(); setMenuPos({ x: e.clientX, y: e.clientY }); }}
+      style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-faint)", width: 22, flexShrink: 0, textAlign: "center" }}>{rank}</div>
-        <a href={repo.url} target="_blank" rel="noopener noreferrer"
-          style={{ display: "flex", gap: 12, flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
+        <div onClick={() => setPreview(true)}
+          style={{ display: "flex", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}>
           {repo.ownerAvatar
             ? <img src={repo.ownerAvatar} alt={repo.owner} style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
             : <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--panel-alt)", flexShrink: 0 }} />
@@ -53,6 +61,7 @@ function RepoCard({ repo, rank }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {repo.fullName}
+              {bookmarked && <span style={{ marginLeft: 6, fontSize: 11 }} title="已收藏">⭐</span>}
             </div>
             {repo.description && (
               <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
@@ -70,7 +79,7 @@ function RepoCard({ repo, rank }) {
               <span>{timeAgo(repo.createdAt)}</span>
             </div>
           </div>
-        </a>
+        </div>
         <button onClick={() => setOpen(v => !v)} aria-label={open ? "收合AI總結" : "展開AI總結"}
           style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, width: 28, height: 28, flexShrink: 0, color: "var(--text-muted)", cursor: "pointer", fontSize: 12, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
           ▾
@@ -110,6 +119,45 @@ function RepoCard({ repo, rank }) {
           </div>
         </div>
       )}
+
+      {/* 點卡片主體彈出的預覽方塊：上面名稱、下面網址，網址本身才是真的
+          可以點去 GitHub 的連結——不再是點卡片就整個跳走。 */}
+      {preview && (
+        <div role="dialog" aria-modal="true" onClick={() => setPreview(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ maxWidth: 420, width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
+              <button onClick={() => setPreview(false)} aria-label="關閉"
+                style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
+            </div>
+            <a href={repo.url} target="_blank" rel="noopener noreferrer"
+              style={{ display: "block", fontSize: 13, color: "var(--accent)", wordBreak: "break-all", textDecoration: "none", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px" }}>
+              {repo.url} →
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* 右鍵收藏選單：貼在滑鼠點下去的座標，點外面關掉。 */}
+      {menuPos && (
+        <>
+          <div onClick={() => setMenuPos(null)} style={{ position: "fixed", inset: 0, zIndex: 3099 }} />
+          <div style={{
+            position: "fixed", left: menuPos.x, top: menuPos.y, zIndex: 3100,
+            background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10,
+            boxShadow: "var(--card-shadow)", overflow: "hidden", minWidth: 120,
+          }}>
+            <button onClick={() => { onToggleBookmark(repo); setMenuPos(null); }}
+              style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "10px 14px", background: "none", border: "none", color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer" }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+              onMouseLeave={e => e.currentTarget.style.background = "none"}>
+              {bookmarked ? "❌ 取消收藏" : "⭐ 收藏"}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -118,9 +166,17 @@ function RepoCard({ repo, rank }) {
 // 資料是 pages/api/cron/github-trending.js 這支排程每天抓一次寫進 Firestore
 // 的快取，這裡單純讀，不會自己去打GitHub API（一堆使用者同時看這頁的話，
 // 沒登入的GitHub API一分鐘只能打10次，馬上就會被擋）。
-export default function GithubTrendingRoom() {
+//
+// 收藏是每個使用者自己的，存在 githubBookmarks/{uid}/items/{repoId}——存的
+// 是收藏當下的完整 repo 內容（不是只存個 id 回頭查 siteData），因為熱門榜
+// 每天會被排程整批覆蓋，被收藏的專案隔天可能就掉出前10名，這樣收藏頁才
+// 還看得到完整資料。
+export default function GithubTrendingRoom({ uid }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("hot"); // "hot" | "bookmarks"
+  const [bookmarks, setBookmarks] = useState([]);
+  const [bookmarksReady, setBookmarksReady] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "siteData", "githubTrending"), snap => {
@@ -133,10 +189,44 @@ export default function GithubTrendingRoom() {
     return unsub;
   }, []);
 
+  useEffect(() => {
+    if (!uid) { setBookmarksReady(true); return; }
+    const q = query(collection(db, "githubBookmarks", uid, "items"), orderBy("bookmarkedAt", "desc"));
+    const unsub = onSnapshot(q, snap => {
+      setBookmarks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setBookmarksReady(true);
+    }, err => {
+      console.error("[GithubTrendingRoom] bookmarks snapshot failed", err);
+      setBookmarksReady(true);
+    });
+    return unsub;
+  }, [uid]);
+
+  const bookmarkedIds = new Set(bookmarks.map(b => String(b.id)));
+
+  const toggleBookmark = async (repo) => {
+    if (!uid) return;
+    const repoId = String(repo.id);
+    try {
+      if (bookmarkedIds.has(repoId)) {
+        await deleteDoc(doc(db, "githubBookmarks", uid, "items", repoId));
+      } else {
+        const { id, name, fullName, owner, ownerAvatar, description, url, stars, language, createdAt, summary } = repo;
+        await setDoc(doc(db, "githubBookmarks", uid, "items", repoId), {
+          id, name, fullName, owner, ownerAvatar, description: description || "", url, stars, language: language || "",
+          createdAt: createdAt || "", summary: summary || "", bookmarkedAt: serverTimestamp(),
+        });
+      }
+    } catch (err) {
+      console.error("[GithubTrendingRoom] toggleBookmark failed", err);
+    }
+  };
+
   const repos = data?.repos || [];
   const rangeLabel = data?.since && data?.updatedAt
     ? `${formatShortDate(data.since)}-${formatShortDate(data.updatedAt)}`
     : "";
+  const list = tab === "hot" ? repos : bookmarks;
 
   return (
     <div style={{ minHeight: "100%", background: "var(--bg)", color: "var(--text)" }}>
@@ -144,21 +234,35 @@ export default function GithubTrendingRoom() {
         <h1 style={{ margin: "4px 0 4px", fontSize: 22, fontWeight: 800 }}>
           🔥 GitHub 每週熱門專案{rangeLabel && ` ${rangeLabel}`}
         </h1>
-        <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 14 }}>
           {data?.updatedAt && <span>上次更新：{formatUpdatedAt(data.updatedAt)}</span>}
         </div>
 
-        {loading ? (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          {[["hot", "🔥 熱門"], ["bookmarks", "⭐ 收藏"]].map(([key, label]) => (
+            <button key={key} onClick={() => setTab(key)}
+              style={{
+                border: "1px solid var(--border)", borderRadius: 999, padding: "6px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                background: tab === key ? "var(--accent)" : "var(--panel)",
+                color: tab === key ? "var(--accent-text)" : "var(--text-muted)",
+              }}>
+              {label}{key === "bookmarks" && bookmarks.length > 0 ? ` (${bookmarks.length})` : ""}
+            </button>
+          ))}
+        </div>
+
+        {(tab === "hot" ? loading : !bookmarksReady) ? (
           <div style={{ textAlign: "center", color: "var(--text-faint)", padding: "60px 0" }}>載入中...</div>
-        ) : repos.length === 0 ? (
+        ) : list.length === 0 ? (
           <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "60px 20px" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🕐</div>
-            還沒有資料，等下一次自動更新（每天一次）
+            <div style={{ fontSize: 40, marginBottom: 12 }}>{tab === "hot" ? "🕐" : "⭐"}</div>
+            {tab === "hot" ? "還沒有資料，等下一次自動更新（每天一次）" : "還沒有收藏任何專案——右鍵點專案卡片就能收藏"}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {repos.map((repo, i) => (
-              <RepoCard key={repo.id} repo={repo} rank={i + 1} />
+            {list.map((repo, i) => (
+              <RepoCard key={repo.id} repo={repo} rank={i + 1}
+                bookmarked={bookmarkedIds.has(String(repo.id))} onToggleBookmark={toggleBookmark} />
             ))}
           </div>
         )}

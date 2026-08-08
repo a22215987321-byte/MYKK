@@ -39,7 +39,7 @@ function formatConvTime(ts) {
 // design where 新對話 destructively wiped the one saved conversation with no
 // way to get it back — exactly the "important conversation just disappeared"
 // failure this is meant to fix.
-export default function AiChatRoom({ user, db }) {
+export default function AiChatRoom({ user, db, compact = false, onClose, headerDragProps }) {
   const uid = user?.uid;
   const [conversations, setConversations] = useState([]);
   const [convListReady, setConvListReady] = useState(false);
@@ -240,12 +240,79 @@ export default function AiChatRoom({ user, db }) {
     }
   };
 
+  // 歷史對話清單內容——完整版跟浮動小視窗（compact）共用同一份，compact 版
+  // 只是額外在最上面加一條「新對話」（完整版有自己獨立的「新對話」按鈕，不需要
+  // 塞進清單裡）。
+  const historyList = (
+    <div style={{
+      background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", boxShadow: "var(--card-shadow)",
+      overflow: "hidden", maxHeight: 320, overflowY: "auto",
+    }}>
+      {compact && (
+        <div onClick={() => { newConversation(); setHistoryOpen(false); }}
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border-soft)", fontSize: 13, color: "var(--text)", fontWeight: 600 }}
+          onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+          onMouseLeave={e => e.currentTarget.style.background = "none"}>
+          🆕 新對話
+        </div>
+      )}
+      {conversations.length === 0 && (
+        <div style={{ padding: "14px", fontSize: 12, color: "var(--text-dim)", textAlign: "center" }}>還沒有過去的對話</div>
+      )}
+      {conversations.map(c => (
+        <div key={c.id} onClick={() => openConversation(c)}
+          style={{
+            display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 14px",
+            background: c.id === activeConvId ? "var(--panel-hover)" : "none", cursor: "pointer",
+            borderBottom: "1px solid var(--border-soft)",
+          }}
+          onMouseEnter={e => { if (c.id !== activeConvId) e.currentTarget.style.background = "var(--panel-hover)"; }}
+          onMouseLeave={e => { if (c.id !== activeConvId) e.currentTarget.style.background = "none"; }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "新對話"}</div>
+            <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{formatConvTime(c.updatedAt)}</div>
+          </div>
+          <button onClick={e => removeConversation(e, c)} aria-label="刪除此對話" title="刪除此對話"
+            style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: 13, padding: 4, flexShrink: 0 }}>
+            🗑️
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <>
       {/* Header — className shares the .cr-chat-header rule defined in
           ChatRoom.js's <style> block (this component always renders inside
           ChatRoom's tree), so it gets the same "世界" background translucency
-          as 大廳/私訊/群組 for free. */}
+          as 大廳/私訊/群組 for free. compact 版（浮動小視窗用）只留「EVON AI」
+          標題＋歷史對話＋關閉，其他（圖片生成模式切換、新對話獨立按鈕、副標題）
+          全部拿掉保持簡潔；headerDragProps 是 FloatingAiChat 傳進來的拖曳
+          事件（onPointerDown/Move/Up/Cancel），整條 header 就是它的拖曳把手。 */}
+      {compact ? (
+        <div className="cr-chat-header" {...headerDragProps}
+          style={{ height: 44, borderBottom: "var(--toolbar-inner-divider, 1px solid var(--panel))", display: "flex", alignItems: "center", padding: "0 10px 0 14px", gap: 8, flexShrink: 0, boxSizing: "border-box", cursor: headerDragProps ? "grab" : "default", touchAction: "none", userSelect: "none" }}>
+          <span style={{ fontSize: 15 }}>🤖</span>
+          <div style={{ flex: 1, fontWeight: 700, fontSize: 13, color: "var(--text)" }}>EVON AI</div>
+          <div style={{ position: "relative" }}>
+            <button ref={historyRef} onClick={() => setHistoryOpen(v => !v)} onPointerDown={e => e.stopPropagation()}
+              aria-label="開啟以往的對話" title="以往的對話"
+              style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: 6, lineHeight: 1 }}>
+              🕘
+            </button>
+            <PortalPopover anchorRef={historyRef} open={historyOpen} onClose={() => setHistoryOpen(false)} placement="bottom-right" minWidth={220}>
+              {historyList}
+            </PortalPopover>
+          </div>
+          {onClose && (
+            <button onClick={onClose} onPointerDown={e => e.stopPropagation()} aria-label="關閉"
+              style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: 6, lineHeight: 1 }}>
+              ✕
+            </button>
+          )}
+        </div>
+      ) : (
       <div className="cr-chat-header" style={{ height: "var(--toolbar-height, 56px)", borderBottom: "var(--toolbar-inner-divider, 1px solid var(--panel))", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0, boxSizing: "border-box" }}>
         <img src="/ai-avatar.jpg" alt="EVON AI" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
         <div>
@@ -280,33 +347,7 @@ export default function AiChatRoom({ user, db }) {
               （使用者反映「點擊歷史對話顯示的也會被擋」）——改成 PortalPopover
               直接掛到 document.body，一定在最前面。 */}
           <PortalPopover anchorRef={historyRef} open={historyOpen} onClose={() => setHistoryOpen(false)} placement="bottom-right" minWidth={240}>
-            <div style={{
-              background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", boxShadow: "var(--card-shadow)",
-              overflow: "hidden", maxHeight: 320, overflowY: "auto",
-            }}>
-              {conversations.length === 0 && (
-                <div style={{ padding: "14px", fontSize: 12, color: "var(--text-dim)", textAlign: "center" }}>還沒有過去的對話</div>
-              )}
-              {conversations.map(c => (
-                <div key={c.id} onClick={() => openConversation(c)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 14px",
-                    background: c.id === activeConvId ? "var(--panel-hover)" : "none", cursor: "pointer",
-                    borderBottom: "1px solid var(--border-soft)",
-                  }}
-                  onMouseEnter={e => { if (c.id !== activeConvId) e.currentTarget.style.background = "var(--panel-hover)"; }}
-                  onMouseLeave={e => { if (c.id !== activeConvId) e.currentTarget.style.background = "none"; }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "新對話"}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{formatConvTime(c.updatedAt)}</div>
-                  </div>
-                  <button onClick={e => removeConversation(e, c)} aria-label="刪除此對話" title="刪除此對話"
-                    style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: 13, padding: 4, flexShrink: 0 }}>
-                    🗑️
-                  </button>
-                </div>
-              ))}
-            </div>
+            {historyList}
           </PortalPopover>
         </div>
 
@@ -323,6 +364,7 @@ export default function AiChatRoom({ user, db }) {
         </>
         )}
       </div>
+      )}
 
       {/* Messages — className="cr-chat-panel" gives this its own floating
           "window" treatment under 幽影深窗 (background/border/radius/glow —
@@ -401,7 +443,9 @@ export default function AiChatRoom({ user, db }) {
           <>
         {/* Decorative under 幽影深窗 only (--plusbtn-display defaults to
             none everywhere else) — DeepSeek's text-only API has nowhere to
-            send an attachment yet, so this doesn't wire up a real upload. */}
+            send an attachment yet, so this doesn't wire up a real upload.
+            compact（浮動小視窗）版直接不畫這顆，維持「下方只有傳送訊息」。 */}
+        {!compact && (
         <button type="button" onClick={() => toast("附加檔案功能即將推出")}
           style={{
             display: "var(--plusbtn-display, none)", width: "var(--plusbtn-size, 0px)", height: "var(--plusbtn-size, 0px)",
@@ -411,12 +455,17 @@ export default function AiChatRoom({ user, db }) {
           }}>
           +
         </button>
+        )}
 
         <input type="text" value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && send()}
           placeholder="輸入訊息..." disabled={sending}
           style={{ flex: 1, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
 
+        {/* 模型選擇——compact 版拿掉，固定用預設模型（DeepSeek），對話紀錄跟
+            完整版共用同一份 Firestore 資料，之後在完整版「AI 助手」頁還是能
+            切換模型繼續聊。 */}
+        {!compact && (
         <div style={{ position: "relative", flexShrink: 0, width: "var(--modelpicker-w, auto)" }}>
           <button ref={modelMenuRef} onClick={() => setModelMenuOpen(v => !v)}
             style={{
@@ -449,6 +498,7 @@ export default function AiChatRoom({ user, db }) {
             </div>
           </PortalPopover>
         </div>
+        )}
 
         <button onClick={send} disabled={sending || !input.trim()}
           style={{
