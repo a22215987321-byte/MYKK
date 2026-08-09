@@ -99,7 +99,7 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
                 </button>
               )}
             </div>
-            <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.7 }}>
+            <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.7, whiteSpace: "pre-wrap", maxHeight: 260, overflowY: "auto" }}>
               {repo.summary || "還沒有總結（等下一次每日更新自動生成）"}
             </div>
           </div>
@@ -110,33 +110,39 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
         <div role="dialog" aria-modal="true" onClick={() => setZoomed(false)}
           style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 520, width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            style={{ maxWidth: 520, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
               <button onClick={() => setZoomed(false)} aria-label="關閉"
                 style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
             </div>
-            <div style={{ fontSize: 16, color: "var(--text)", lineHeight: 1.9 }}>{repo.summary}</div>
+            <div style={{ fontSize: 16, color: "var(--text)", lineHeight: 1.9, whiteSpace: "pre-wrap", overflowY: "auto", minHeight: 0 }}>{repo.summary}</div>
           </div>
         </div>
       )}
 
-      {/* 點卡片主體彈出的預覽方塊：上面名稱、下面網址，網址本身才是真的
-          可以點去 GitHub 的連結——不再是點卡片就整個跳走。 */}
+      {/* 點卡片主體彈出的預覽方塊：上面名稱、網址（真的可以點去 GitHub 的
+          連結，不再是點卡片就整個跳走），下面是 AI 總結——內容可能很長
+          （DEEPTHINK 生成的回答通常比之前的短總結長很多），用固定高度
+          +overflowY:auto 讓它自己捲動，不要把整個方塊撐爆。 */}
       {preview && (
         <div role="dialog" aria-modal="true" onClick={() => setPreview(false)}
           style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 420, width: "100%", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            style={{ maxWidth: 460, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexShrink: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
               <button onClick={() => setPreview(false)} aria-label="關閉"
                 style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
             </div>
             <a href={repo.url} target="_blank" rel="noopener noreferrer"
-              style={{ display: "block", fontSize: 13, color: "var(--accent)", wordBreak: "break-all", textDecoration: "none", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px" }}>
+              style={{ display: "block", flexShrink: 0, fontSize: 13, color: "var(--accent)", wordBreak: "break-all", textDecoration: "none", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px" }}>
               {repo.url} →
             </a>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", margin: "14px 0 6px", flexShrink: 0 }}>🤖 AI 總結</div>
+            <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.7, whiteSpace: "pre-wrap", overflowY: "auto", minHeight: 0 }}>
+              {repo.summary || "還沒有總結（等下一次每日更新自動生成）"}
+            </div>
           </div>
         </div>
       )}
@@ -233,11 +239,13 @@ export default function GithubTrendingRoom({ uid }) {
   return (
     <div style={{ minHeight: "100%", background: "var(--bg)", color: "var(--text)" }}>
       <div style={{ maxWidth: 720, padding: "20px 24px 80px" }}>
-        <h1 style={{ margin: "4px 0 4px", fontSize: 22, fontWeight: 800 }}>
-          🔥 GitHub 每週熱門專案{rangeLabel && ` ${rangeLabel}`}
-        </h1>
-        <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 14 }}>
-          {data?.updatedAt && <span>上次更新：{formatUpdatedAt(data.updatedAt)}</span>}
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+          <h1 style={{ margin: "4px 0", fontSize: 22, fontWeight: 800 }}>
+            🔥 GitHub 每週熱門專案{rangeLabel && ` ${rangeLabel}`}
+          </h1>
+          {data?.updatedAt && (
+            <div style={{ fontSize: 13, color: "var(--text-muted)", whiteSpace: "nowrap" }}>上次更新：{formatUpdatedAt(data.updatedAt)}</div>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>

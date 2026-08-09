@@ -10,11 +10,18 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 // 建立」的話幾乎不會有星星（太新，還沒被發現），7天給它一點時間累積關注度，
 // 同時還算「新」。since 這個日期也存起來，前端拿來顯示「本週範圍」用。
 //
-// 每個repo額外用 DeepSeek 生成一段繁體中文總結（AI每天總結每個專案在做
-// 什麼），存在 repo.summary——只根據 GitHub API 現成的名稱/描述/語言生成，
-// 沒有另外去抓 README 全文（抓 README 要另一個API呼叫+處理Markdown，這裡
-// 先用GitHub本來就有的簡介欄位就夠寫出一段有用的總結了）。10個repo平行
-// 呼叫，其中任何一個失敗都不會讓整支排程掛掉，只是那個repo沒有總結。
+// 每個repo額外請 DeepSeek 回答「這個專案是做什麼的」，存在 repo.summary——
+// 只根據 GitHub API 現成的名稱/描述/語言生成，沒有另外去抓 README 全文
+// （抓 README 要另一個API呼叫+處理Markdown，這裡先用GitHub本來就有的簡介
+// 欄位就夠寫出有用的答案了）。10個repo平行呼叫，其中任何一個失敗都不會讓
+// 整支排程掛掉，只是那個repo沒有總結。
+//
+// 原本用 deepseek-v4-flash + 「寫2到3句話總結」的固定格式指令，使用者反映
+// 內容很差、太籠統——改成用 deepseek-v4-pro 開深度思考（DEEPTHINK），直接
+// 問「這個專案是做什麼的」讓模型自己決定要寫多長、怎麼寫，不再用死板的
+// 句數限制綁住它。deep think 通常會比 flash 慢不少，per-call timeout 從
+// 25s 拉到 50s（10個repo平行跑，總時間取決於最慢的那個，不是全部加總，
+// 所以還在 maxDuration=60s 的預算內）。
 //
 // 排程設定見專案根目錄 vercel.json 的 crons 區塊（Vercel Cron，每天觸發
 // 一次）。CRON_SECRET 是選填的——如果之後想鎖住這個網址不讓外人亂打，去
@@ -26,20 +33,22 @@ export const config = { maxDuration: 60 };
 async function summarize(repo) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) return "";
-  const prompt = `專案名稱：${repo.fullName}\n描述：${repo.description || "（作者沒有寫描述）"}\n主要語言：${repo.language || "未標示"}\n星星數：${repo.stars}`;
+  const prompt = `專案名稱：${repo.fullName}\n描述：${repo.description || "（作者沒有寫描述）"}\n主要語言：${repo.language || "未標示"}\n星星數：${repo.stars}\n\n這個開源專案是做什麼的？講清楚它實際的功能、解決什麼問題、適合什麼人用。`;
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 25000);
+    const timer = setTimeout(() => ctrl.abort(), 50000);
     const r = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "deepseek-v4-flash",
+        model: "deepseek-v4-pro",
         messages: [
-          { role: "system", content: "你是幫忙介紹GitHub開源專案的助手。根據使用者提供的專案資訊，用繁體中文寫2到3句話的總結：這個專案在做什麼、可能適合什麼人用。不要用「這是一個」開頭，不要條列，語氣自然像在跟朋友介紹，不要出現英文以外的其他語言。" },
+          { role: "system", content: "你是幫忙介紹GitHub開源專案的助手，回答只用繁體中文，不要出現英文以外的其他語言，不要用「這是一個」開頭。" },
           { role: "user", content: prompt },
         ],
         stream: false,
+        reasoning_effort: "high",
+        extra_body: { thinking: { type: "enabled" } },
       }),
       signal: ctrl.signal,
     });
