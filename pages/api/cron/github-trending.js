@@ -10,18 +10,25 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 // 建立」的話幾乎不會有星星（太新，還沒被發現），7天給它一點時間累積關注度，
 // 同時還算「新」。since 這個日期也存起來，前端拿來顯示「本週範圍」用。
 //
-// 每個repo額外請 DeepSeek 回答「這個專案是做什麼的」，存在 repo.summary——
-// 只根據 GitHub API 現成的名稱/描述/語言生成，沒有另外去抓 README 全文
-// （抓 README 要另一個API呼叫+處理Markdown，這裡先用GitHub本來就有的簡介
-// 欄位就夠寫出有用的答案了）。10個repo平行呼叫，其中任何一個失敗都不會讓
-// 整支排程掛掉，只是那個repo沒有總結。
+// 每個repo額外請 DeepSeek 回答「這個專案是做什麼的」，存在 repo.summary。
 //
-// 原本用 deepseek-v4-flash + 「寫2到3句話總結」的固定格式指令，使用者反映
-// 內容很差、太籠統——改成用 deepseek-v4-pro 開深度思考（DEEPTHINK），直接
-// 問「這個專案是做什麼的」讓模型自己決定要寫多長、怎麼寫，不再用死板的
-// 句數限制綁住它。deep think 通常會比 flash 慢不少，per-call timeout 從
-// 25s 拉到 50s（10個repo平行跑，總時間取決於最慢的那個，不是全部加總，
-// 所以還在 maxDuration=60s 的預算內）。
+// 第一版只給 DeepSeek repo 的名稱/一行描述/語言/星星數，完全沒有 README
+// 內容——使用者實測發現這樣 DeepSeek 幾乎是憑專案名稱「猜」內容，猜錯了
+// 也講得煞有介事（例如 asm-hall-of-shame 被猜成「故意寫爛程式碼的教材」，
+// 但這個專案實際上是在找「最慢的單一 x86 指令」排行榜，完全是另一回事）。
+// 使用者拿同樣的專案去 DeepSeek 官網問，因為官網那邊有網頁瀏覽能力能真的
+// 讀到 README，答案完全正確又詳細——這裡補上同樣的資訊來源：多打一次
+// GitHub API 抓 README 全文（純文字，不用另一個key，GitHub REST API 一般
+// 端點沒登入也有 60次/小時額度，10個repo一次用不完），truncate 到 6000字
+// 塞進 prompt，DeepSeek 才有真正的專案內容可以總結，不是憑名稱腦補。
+//
+// 10個repo平行呼叫，其中任何一個失敗（README抓不到、DeepSeek逾時等）都
+// 不會讓整支排程掛掉，只是那個repo沒有總結或總結只根據簡介生成。
+//
+// 用 deepseek-v4-pro 開深度思考（DEEPTHINK）而不是 flash——deep think
+// 通常會比 flash 慢不少，README fetch(≤10s) + DeepSeek(≤42s) 兩段加起來
+// 抓在 60s 以內。10個repo平行跑，總時間取決於最慢的那個，不是全部加總，
+// 所以還在 maxDuration=60s 的預算內。
 //
 // 排程設定見專案根目錄 vercel.json 的 crons 區塊（Vercel Cron，每天觸發
 // 一次）。CRON_SECRET 是選填的——如果之後想鎖住這個網址不讓外人亂打，去
@@ -30,20 +37,42 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 // API額度，不會洩漏任何使用者資料）。
 export const config = { maxDuration: 60 };
 
+const README_MAX_CHARS = 6000;
+
+async function fetchReadme(fullName) {
+  try {
+    const headers = { Accept: "application/vnd.github.raw+json" };
+    if (process.env.GITHUB_TOKEN) headers.Authorization = `token ${process.env.GITHUB_TOKEN}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    const r = await fetch(`https://api.github.com/repos/${fullName}/readme`, { headers, signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!r.ok) return ""; // 沒有 README 或抓不到——不當成致命錯誤，回退用簡介
+    const text = await r.text();
+    return text.slice(0, README_MAX_CHARS);
+  } catch (err) {
+    console.error("[cron/github-trending] fetchReadme error", fullName, err.message);
+    return "";
+  }
+}
+
 async function summarize(repo) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) return "";
-  const prompt = `專案名稱：${repo.fullName}\n描述：${repo.description || "（作者沒有寫描述）"}\n主要語言：${repo.language || "未標示"}\n星星數：${repo.stars}\n\n這個開源專案是做什麼的？講清楚它實際的功能、解決什麼問題、適合什麼人用。`;
+  const readme = await fetchReadme(repo.fullName);
+  const prompt = `專案名稱：${repo.fullName}\n描述：${repo.description || "（作者沒有寫描述）"}\n主要語言：${repo.language || "未標示"}\n星星數：${repo.stars}\n${readme ? `\nREADME 內容：\n${readme}\n` : "\n（這個專案抓不到 README，只能根據上面的名稱／描述／語言判斷）\n"}\n這個開源專案是做什麼的？講清楚它實際的功能、解決什麼問題、適合什麼人用——根據上面的 README 內容回答，不要只看專案名稱瞎猜。`;
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 50000);
+    // fetchReadme 上面已經用掉最多 10s，這裡壓到 42s——兩段加起來還在
+    // maxDuration=60s 的預算內留一點餘裕給 Firestore 寫入跟其他開銷。
+    const timer = setTimeout(() => ctrl.abort(), 42000);
     const r = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "deepseek-v4-pro",
         messages: [
-          { role: "system", content: "你是幫忙介紹GitHub開源專案的助手，回答只用繁體中文，不要出現英文以外的其他語言，不要用「這是一個」開頭。" },
+          { role: "system", content: "你是幫忙介紹GitHub開源專案的助手，回答只用繁體中文，不要出現英文以外的其他語言，不要用「這是一個」開頭。根據使用者提供的README內容回答，不要自己憑專案名稱猜測，README沒提到的事不要編。" },
           { role: "user", content: prompt },
         ],
         stream: false,
