@@ -17,6 +17,7 @@ import { useMediaAttachments } from "../lib/useMediaAttachments";
 import MediaAttachPreview from "./media-editor/MediaAttachPreview";
 import { getNotificationVolume, setNotificationVolume, playNotificationSound } from "../lib/notificationSound";
 import PortalPopover from "./PortalPopover";
+import { MediaBookmarkMenu } from "./Feed";
 import {
   doc, onSnapshot, collection, query, where, orderBy, getDocs, addDoc,
   updateDoc, serverTimestamp, arrayUnion, arrayRemove,
@@ -462,7 +463,12 @@ function formatAudioTime(sec) {
 // 音頻收藏的播放器——收藏清單裡任一首開始播放後，播完自動接下一首（順序
 // 播放），可以切「單曲循環」讓目前這首重複播放。只用一個共用的 <audio>
 // 元素切換 src，不是每首歌各自一個 <audio>。
-function AudioQueuePlayer({ tracks }) {
+// onPlayAudioQueue 有傳進來的時候（嵌在 ChatRoom 裡的情境），點清單裡任何
+// 一首直接交給 ChatRoom.js 的全域浮動播放器（FloatingAudioPlayer，貼右邊、
+// 高度拉滿、切功能頁不中斷），這個元件自己底下那顆 <audio> 跟播放列完全不
+// 啟用，避免兩邊同時出聲音。沒有傳進來（/profile/[uid] 那個獨立頁面，沒有
+// ChatRoom 可以掛全域播放器）才會走本來就有的內建播放邏輯當 fallback。
+function AudioQueuePlayer({ tracks, onPlayAudioQueue }) {
   const audioRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(null);
   const [playing, setPlaying] = useState(false);
@@ -532,7 +538,10 @@ function AudioQueuePlayer({ tracks }) {
           const isCurrent = currentIndex === i;
           const isPlayingThis = isCurrent && playing;
           return (
-            <button key={t.id} onClick={() => (isCurrent ? togglePlay() : setCurrentIndex(i))}
+            <button key={t.id} onClick={() => {
+              if (onPlayAudioQueue) { onPlayAudioQueue(tracks, i); return; }
+              isCurrent ? togglePlay() : setCurrentIndex(i);
+            }}
               style={{ display: "flex", alignItems: "center", gap: 12, background: isCurrent ? "var(--panel-hover)" : "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}>
               {t.userAvatarImage
                 ? <img src={t.userAvatarImage} alt={t.userNickname} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
@@ -625,7 +634,7 @@ function PlaybackModeMenu({ value, onChange }) {
 // 收藏分頁：影片收藏、音頻收藏都是真資料（收藏貼文裡分別帶 videoUrl／
 // audioUrl 的），影片縮圖沿用 VideosTab 的 VideoThumb，音頻是上面那個
 // AudioQueuePlayer（順序播放＋單曲循環）。
-function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen }) {
+function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen, onPlayAudioQueue }) {
   const [saving, setSaving] = useState(false);
   const [playbackMode, setPlaybackMode] = useState("sequence");
   const isPublic = profile.favoritesPublic !== false; // 沒設過欄位 = 預設公開
@@ -693,7 +702,7 @@ function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen
       ) : audioFavorites.length === 0 ? (
         <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-dim)", fontSize: 13 }}>還沒有收藏任何音樂</div>
       ) : (
-        <AudioQueuePlayer tracks={audioFavorites} />
+        <AudioQueuePlayer tracks={audioFavorites} onPlayAudioQueue={onPlayAudioQueue} />
       )}
     </div>
   );
@@ -832,6 +841,31 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
   }
 
   const liked = viewerUid ? (post.likes || []).includes(viewerUid) : false;
+  const bookmarked = viewerUid ? (post.bookmarks || []).includes(viewerUid) : false;
+  const audioBookmarked = viewerUid ? (post.audioBookmarks || []).includes(viewerUid) : false;
+
+  // 跟 Feed.js 的 PostCard 同一套邏輯——「收藏」是泛用收藏（任何類型貼文都能
+  // 收，影片收藏頁看的是這個），「收藏 MP3」另外存在 audioBookmarks，讓影片
+  // 貼文可以被收進音頻收藏而不跟影片收藏搶。個人頁／頻道頁點開的大圖檢視
+  // 之前完全沒有這兩顆按鈕，只能回去動態消息貼文本身才能收藏。
+  const toggleBookmark = async () => {
+    if (!viewerUid) { toast("請先登入後再收藏"); return; }
+    try {
+      await updateDoc(doc(db, "posts", post.id), { bookmarks: bookmarked ? arrayRemove(viewerUid) : arrayUnion(viewerUid) });
+    } catch (e) {
+      console.error("[ProfileView.MediaLightbox] toggleBookmark failed", e);
+      toast("收藏失敗，請重試");
+    }
+  };
+  const toggleAudioBookmark = async () => {
+    if (!viewerUid) { toast("請先登入後再收藏"); return; }
+    try {
+      await updateDoc(doc(db, "posts", post.id), { audioBookmarks: audioBookmarked ? arrayRemove(viewerUid) : arrayUnion(viewerUid) });
+    } catch (e) {
+      console.error("[ProfileView.MediaLightbox] toggleAudioBookmark failed", e);
+      toast("收藏失敗，請重試");
+    }
+  };
 
   const toggleLike = async () => {
     if (!viewerUid) { toast("請先登入後再按讚"); return; }
@@ -958,6 +992,15 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
                 style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 13, fontWeight: 600, padding: 0 }}>
                 <span style={{ fontSize: 17 }}>↗</span>
               </button>
+              {(post.videoUrl || post.audioUrl) && (
+                <MediaBookmarkMenu post={post}
+                  bookmarked={post.audioUrl ? bookmarked : audioBookmarked}
+                  onToggle={post.audioUrl ? toggleBookmark : toggleAudioBookmark} />
+              )}
+              <button onClick={toggleBookmark}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: bookmarked ? "var(--accent)" : "var(--text-faint)", fontSize: 13, fontWeight: 600, padding: 0, marginLeft: "auto" }}>
+                <span style={{ fontSize: 17 }}>{bookmarked ? "🔖" : "📑"}</span>
+              </button>
             </div>
             <button onClick={() => onViewOriginal(post.id)}
               style={{ marginTop: 12, marginBottom: 16, width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 0", color: "var(--text)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
@@ -1013,7 +1056,7 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
 // never leaves the chat SPA. `embedded`/`onClose` only affect page chrome
 // (header back-vs-close button, root sizing, global CSS resets, bottom tab
 // bar) — every Firebase query/write below is identical either way.
-export default function ProfileView({ uid, embedded = false, onClose, onOpenProfile, initialTab = "posts" }) {
+export default function ProfileView({ uid, embedded = false, onClose, onOpenProfile, initialTab = "posts", onPlayAudioQueue }) {
   const router = useRouter();
   const [viewerUid, setViewerUid] = useState(undefined); // undefined = auth not resolved yet, null = guest
   const [viewerProfile, setViewerProfile] = useState(null);
@@ -1811,6 +1854,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
             <FavoritesTab
               profile={profile} isOwner={isOwner} favoritePosts={favoritePosts} favoritesLoaded={favoritesLoaded}
               onOpen={post => openMediaFor(post, favoritePosts.filter(p => p.videoUrl || p.imageUrl))}
+              onPlayAudioQueue={onPlayAudioQueue}
             />
           )}
           {tab === "about" && (

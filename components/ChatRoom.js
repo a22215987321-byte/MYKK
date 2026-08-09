@@ -58,6 +58,7 @@ import EmojiStickerPicker from "./EmojiStickerPicker";
 import LoadingState from "./LoadingState";
 import PortalPopover from "./PortalPopover";
 import FloatingAiChat from "./FloatingAiChat";
+import FloatingAudioPlayer from "./FloatingAudioPlayer";
 import useIsMobile from "../lib/useIsMobile";
 import { QUICK_REACTIONS, STICKER_SRC_BY_ID } from "../data/chat/gesturePacks";
 import { ChevronLeft, ChevronRight, CalendarDays, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
@@ -1347,6 +1348,14 @@ export default function ChatApp({ user }) {
   // 上方那顆小圖示（在下面 .cr-folder-rail 那段 JSX 裡），FloatingAiChat 本身
   // 不再管理自己要不要顯示，改成純受控元件。
   const [aiFloatOpen, setAiFloatOpen] = useState(false);
+  // 浮動音頻播放器（右邊那塊，見 FloatingAudioPlayer.js）——跟 aiFloatOpen
+  // 同一種「掛在最外層、切功能頁不受影響」的做法。tracks/startIndex 由
+  // 誰觸發播放決定（目前只有 ProfileView 的「音頻收藏」會呼叫），不是
+  // 開關布林值而是「有沒有東西在播」，所以用 null 代表沒在播、關掉。
+  const [audioQueue, setAudioQueue] = useState(null); // { tracks, startIndex } | null
+  const playAudioQueue = useCallback((tracks, startIndex = 0) => {
+    setAudioQueue({ tracks, startIndex });
+  }, []);
   // 資料夾 rail 上「顯示/隱藏所有資料夾」開關——預設 true（跟改版之前一樣，
   // 每個資料夾都是隨時看得到的小圖示），關掉之後只留 🏠 全部功能，資料夾
   // 圖示跟「新增資料夾」都收起來，rail 看起來更乾淨。
@@ -3181,7 +3190,8 @@ export default function ChatApp({ user }) {
               {viewProfileUid ? (
                 <ProfileView uid={viewProfileUid} embedded
                   onClose={() => setViewProfileUid(null)}
-                  onOpenProfile={setViewProfileUid} />
+                  onOpenProfile={setViewProfileUid}
+                  onPlayAudioQueue={playAudioQueue} />
               ) : (
                 <FeedApp user={user} embedded onOpenProfile={setViewProfileUid} />
               )}
@@ -4051,6 +4061,14 @@ export default function ChatApp({ user }) {
           的圓形觸發鈕（showTrigger）。 */}
       {aiChatAllowed && (
         <FloatingAiChat user={user} db={db} open={aiFloatOpen} onOpenChange={setAiFloatOpen} showTrigger={isMobile} />
+      )}
+
+      {/* 浮動音頻播放器——貼右邊，一樣掛在 .cr-shell 外面，切到別的功能頁
+          播放不會中斷。audioQueue 是 null 就代表沒有東西在播，元件自己不
+          渲染任何東西（不像 FloatingAiChat 有一顆收合狀態的觸發鈕，這個
+          沒有東西在播的時候完全不需要佔任何畫面）。 */}
+      {audioQueue && (
+        <FloatingAudioPlayer tracks={audioQueue.tracks} startIndex={audioQueue.startIndex} onClose={() => setAudioQueue(null)} />
       )}
     </>
   );

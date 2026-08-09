@@ -122,7 +122,7 @@ const LONG_POST_THRESHOLD = 260;
 // videoUrl（瀏覽器本來就支援用 <audio> 播放影片檔案裡的聲音軌，只是不顯示
 // 畫面），使用者聽起來就是一首可以在音頻收藏清單播放的歌，不需要真的存在
 // 一個額外的 mp3 檔案才能達到「收藏影片的音頻」這個實際效果。
-function MediaBookmarkMenu({ post, bookmarked, onToggle }) {
+export function MediaBookmarkMenu({ post, bookmarked, onToggle }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   return (

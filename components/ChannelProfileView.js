@@ -11,6 +11,7 @@ import { formatDate, formatFullDate } from "../lib/format";
 import { toast } from "../lib/toast";
 import { Avatar, CommentSection } from "./PostComments";
 import SharePostModal from "./SharePostModal";
+import { MediaBookmarkMenu } from "./Feed";
 
 const TABS = [
   { id: "videos", label: "影片" },
@@ -188,6 +189,38 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel, initia
     }
   };
 
+  // 這裡的影片全部是 videoUrl 貼文，所以「收藏 MP3」（MediaBookmarkMenu）
+  // 一律走 audioBookmarks 那條路（跟 Feed.js 的 PostCard／ProfileView 的
+  // MediaLightbox 同一套邏輯），泛用「收藏」（📑，影片收藏頁看的是這個）
+  // 走 bookmarks。之前這個「觀看頁」完全沒有收藏功能，只能點左上角
+  // 「更多推薦」的縮圖跳去頻道主的動態消息貼文才能收藏。
+  const toggleBookmark = async (video) => {
+    if (!viewerUid) { toast("請先登入後再收藏"); return; }
+    const bookmarked = (video.bookmarks || []).includes(viewerUid);
+    try {
+      await updateDoc(doc(db, "posts", video.id), { bookmarks: bookmarked ? arrayRemove(viewerUid) : arrayUnion(viewerUid) });
+      setVideos(prev => prev.map(v => v.id === video.id
+        ? { ...v, bookmarks: bookmarked ? (v.bookmarks || []).filter(id => id !== viewerUid) : [...(v.bookmarks || []), viewerUid] }
+        : v));
+    } catch (e) {
+      console.error("[ChannelProfileView] toggleBookmark failed", e);
+      toast("收藏失敗，請重試");
+    }
+  };
+  const toggleAudioBookmark = async (video) => {
+    if (!viewerUid) { toast("請先登入後再收藏"); return; }
+    const audioBookmarked = (video.audioBookmarks || []).includes(viewerUid);
+    try {
+      await updateDoc(doc(db, "posts", video.id), { audioBookmarks: audioBookmarked ? arrayRemove(viewerUid) : arrayUnion(viewerUid) });
+      setVideos(prev => prev.map(v => v.id === video.id
+        ? { ...v, audioBookmarks: audioBookmarked ? (v.audioBookmarks || []).filter(id => id !== viewerUid) : [...(v.audioBookmarks || []), viewerUid] }
+        : v));
+    } catch (e) {
+      console.error("[ChannelProfileView] toggleAudioBookmark failed", e);
+      toast("收藏失敗，請重試");
+    }
+  };
+
   const openVideo = (video) => { setWatchVideoId(video.id); setDescExpanded(false); };
 
   if (loading) return <LoadingState label="載入頻道..." minHeight="100%" />;
@@ -206,6 +239,8 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel, initia
   // 說明＋更多推薦＋留言），關閉時回到剛剛那個頻道（不是整個離開）。
   if (watchVideo) {
     const liked = !!(viewerUid && (watchVideo.likes || []).includes(viewerUid));
+    const bookmarked = !!(viewerUid && (watchVideo.bookmarks || []).includes(viewerUid));
+    const audioBookmarked = !!(viewerUid && (watchVideo.audioBookmarks || []).includes(viewerUid));
     return (
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "var(--bg)" }}>
         <div style={{ padding: "10px 20px 0" }}>
@@ -250,6 +285,11 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel, initia
               <button onClick={() => setShowShare(true)}
                 style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 14px", color: "var(--text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 🔗 分享
+              </button>
+              <MediaBookmarkMenu post={watchVideo} bookmarked={audioBookmarked} onToggle={() => toggleAudioBookmark(watchVideo)} />
+              <button onClick={() => toggleBookmark(watchVideo)}
+                style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 14px", color: bookmarked ? "var(--accent)" : "var(--text-muted)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                {bookmarked ? "🔖 已收藏" : "📑 收藏"}
               </button>
               {isOwner && !watchVideo.subtitles?.length && (
                 <GenerateSubtitlesButton video={watchVideo}

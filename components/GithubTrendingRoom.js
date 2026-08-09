@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "../lib/firebase";
 import { doc, setDoc, deleteDoc, serverTimestamp, onSnapshot, collection, query, orderBy } from "firebase/firestore";
+import { toast } from "../lib/toast";
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -205,7 +206,7 @@ export default function GithubTrendingRoom({ uid }) {
   const bookmarkedIds = new Set(bookmarks.map(b => String(b.id)));
 
   const toggleBookmark = async (repo) => {
-    if (!uid) return;
+    if (!uid) { toast("請先登入後再收藏"); return; }
     const repoId = String(repo.id);
     try {
       if (bookmarkedIds.has(repoId)) {
@@ -219,6 +220,7 @@ export default function GithubTrendingRoom({ uid }) {
       }
     } catch (err) {
       console.error("[GithubTrendingRoom] toggleBookmark failed", err);
+      toast(err?.code === "permission-denied" ? "收藏失敗：Firestore 規則還沒加 githubBookmarks" : "收藏失敗，請重試");
     }
   };
 
