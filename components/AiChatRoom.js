@@ -59,7 +59,7 @@ function ReasoningBlock({ text }) {
 // design where 新對話 destructively wiped the one saved conversation with no
 // way to get it back — exactly the "important conversation just disappeared"
 // failure this is meant to fix.
-export default function AiChatRoom({ user, db, compact = false, onClose, headerDragProps }) {
+export default function AiChatRoom({ user, db, compact = false, onClose, headerDragProps, minimized = false, onMinimize }) {
   const uid = user?.uid;
   const [conversations, setConversations] = useState([]);
   const [convListReady, setConvListReady] = useState(false);
@@ -331,6 +331,12 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
               {historyList}
             </PortalPopover>
           </div>
+          {onMinimize && (
+            <button onClick={onMinimize} onPointerDown={e => e.stopPropagation()} aria-label={minimized ? "還原視窗" : "縮小視窗"}
+              style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: 6, lineHeight: 1 }}>
+              {minimized ? "⤢" : "─"}
+            </button>
+          )}
           {onClose && (
             <button onClick={onClose} onPointerDown={e => e.stopPropagation()} aria-label="關閉"
               style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: 6, lineHeight: 1 }}>
@@ -405,6 +411,12 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
       </div>
       )}
 
+      {/* 縮小狀態（compact 版才有）——只留上面那條 header，訊息區跟輸入列
+          整個不畫出來，但 AiChatRoom 本身沒有卸載，所有對話狀態、Firestore
+          監聽都還在，還原後訊息會接著原本的樣子，不會重新載入或掉輸入到
+          一半的草稿。 */}
+      {!(compact && minimized) && (
+      <>
       {/* Messages — className="cr-chat-panel" gives this its own floating
           "window" treatment under 幽影深窗 (background/border/radius/glow —
           see the .cr-chat-panel rule in ChatRoom.js's <style> block); every
@@ -569,6 +581,8 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           </>
         )}
       </div>
+      </>
+      )}
     </>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 
 const EDGE_MARGIN = 16;
 const WIN_WIDTH = 340;
+const MINI_HEIGHT = 44;
 const VOLUME_KEY = "cr-audio-player-volume";
 
 function formatTime(sec) {
@@ -19,6 +20,9 @@ function formatTime(sec) {
 // 只認眼前這份 tracks，不自己去 Firestore 查。
 export default function FloatingAudioPlayer({ tracks, startIndex, onClose }) {
   const audioRef = useRef(null);
+  // 縮小成底部一個小方塊——<audio> 元素照樣掛著、照樣播，只是清單跟控制列
+  // 不畫出來，縮小/還原不會打斷正在播的音樂。
+  const [minimized, setMinimized] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(startIndex || 0);
   const [playing, setPlaying] = useState(false);
   const [repeatOne, setRepeatOne] = useState(false);
@@ -104,8 +108,12 @@ export default function FloatingAudioPlayer({ tracks, startIndex, onClose }) {
   return (
     <div style={{
       position: "fixed", right: EDGE_MARGIN, width: WIN_WIDTH,
-      top: "calc(var(--shell-margin, 0px) + env(safe-area-inset-top))",
-      height: "calc(var(--viewport-h, 100vh) - var(--shell-margin, 0px) * 2 - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+      ...(minimized
+        ? { top: "auto", bottom: EDGE_MARGIN, height: MINI_HEIGHT }
+        : {
+            top: "calc(var(--shell-margin, 0px) + env(safe-area-inset-top))",
+            height: "calc(var(--viewport-h, 100vh) - var(--shell-margin, 0px) * 2 - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+          }),
       maxWidth: `calc(100vw - ${EDGE_MARGIN * 2}px)`,
       zIndex: 2500, display: "flex", flexDirection: "column",
       background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg, 18px)",
@@ -116,10 +124,18 @@ export default function FloatingAudioPlayer({ tracks, startIndex, onClose }) {
 
       <div style={{ height: 44, flexShrink: 0, display: "flex", alignItems: "center", gap: 8, padding: "0 10px 0 14px", background: "var(--panel-alt)", borderBottom: "1px solid var(--border)" }}>
         <span style={{ fontSize: 14 }}>🎵</span>
-        <div style={{ flex: 1, fontWeight: 700, fontSize: 13, color: "var(--text)" }}>音頻播放</div>
+        <div style={{ flex: 1, fontWeight: 700, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {minimized ? (currentTrack?.text?.trim() || "音頻播放") : "音頻播放"}
+        </div>
+        <button onClick={() => setMinimized(v => !v)} aria-label={minimized ? "還原視窗" : "縮小視窗"}
+          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: 6, lineHeight: 1 }}>
+          {minimized ? "⤢" : "─"}
+        </button>
         <button onClick={onClose} aria-label="關閉" style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: 6, lineHeight: 1 }}>✕</button>
       </div>
 
+      {!minimized && (
+      <>
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
         {tracks.map((t, i) => {
           const isCurrent = currentIndex === i;
@@ -179,6 +195,8 @@ export default function FloatingAudioPlayer({ tracks, startIndex, onClose }) {
               style={{ width: 70, accentColor: "var(--accent)", flexShrink: 0 }} />
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

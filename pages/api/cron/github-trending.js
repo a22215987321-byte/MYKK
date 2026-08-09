@@ -10,7 +10,9 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 // 建立」的話幾乎不會有星星（太新，還沒被發現），7天給它一點時間累積關注度，
 // 同時還算「新」。since 這個日期也存起來，前端拿來顯示「本週範圍」用。
 //
-// 每個repo額外請 DeepSeek 回答「這個專案是做什麼的」，存在 repo.summary。
+// 每個repo額外請 DeepSeek 回答「這個專案是做什麼的」，拆成三個欄位存起來
+// （repo.summaryDetail／summaryFeatures／summaryUsage——項目詳細／功能／
+// 運用，畫面上是左到右三個方塊，見 GithubTrendingRoom.js）。
 //
 // 第一版只給 DeepSeek repo 的名稱/一行描述/語言/星星數，完全沒有 README
 // 內容——使用者實測發現這樣 DeepSeek 幾乎是憑專案名稱「猜」內容，猜錯了
@@ -56,11 +58,35 @@ async function fetchReadme(fullName) {
   }
 }
 
+const EMPTY_SUMMARY = { detail: "", features: "", usage: "" };
+
+// 解析 DeepSeek 回傳的 JSON——大部分時候乖乖照 response_format 指定的格式
+// 回純 JSON，但保險起見也處理「包了一層 ```json 圍欄」的情況。三個欄位
+// 缺任何一個就補空字串，前端那三個方塊各自有「還沒有內容」的 placeholder。
+function parseSummaryJson(raw) {
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+  try {
+    const obj = JSON.parse(cleaned);
+    return {
+      detail: String(obj.detail || "").trim(),
+      features: String(obj.features || "").trim(),
+      usage: String(obj.usage || "").trim(),
+    };
+  } catch {
+    // 解析失敗就整段塞進「項目詳細」，好過整個丟掉——使用者至少看得到內容，
+    // 只是沒分成三塊。
+    return { detail: cleaned, features: "", usage: "" };
+  }
+}
+
+// 總結拆成三個方塊（項目詳細／功能／運用），左到右排在畫面上（見
+// components/GithubTrendingRoom.js 的 RepoCard）。用 response_format
+// json_object 讓 DeepSeek 直接吐結構化資料，不用自己再切字串。
 async function summarize(repo) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return "";
+  if (!apiKey) return EMPTY_SUMMARY;
   const readme = await fetchReadme(repo.fullName);
-  const prompt = `專案名稱：${repo.fullName}\n描述：${repo.description || "（作者沒有寫描述）"}\n主要語言：${repo.language || "未標示"}\n星星數：${repo.stars}\n${readme ? `\nREADME 內容：\n${readme}\n` : "\n（這個專案抓不到 README，只能根據上面的名稱／描述／語言判斷）\n"}\n這個開源專案是做什麼的？講清楚它實際的功能、解決什麼問題、適合什麼人用——根據上面的 README 內容回答，不要只看專案名稱瞎猜。`;
+  const prompt = `專案名稱：${repo.fullName}\n描述：${repo.description || "（作者沒有寫描述）"}\n主要語言：${repo.language || "未標示"}\n星星數：${repo.stars}\n${readme ? `\nREADME 內容：\n${readme}\n` : "\n（這個專案抓不到 README，只能根據上面的名稱／描述／語言判斷）\n"}\n請根據上面的 README 內容（不要只看專案名稱瞎猜），用 json 物件回答，格式範例：\n{"detail": "這個專案整體在做什麼、解決什麼問題（項目詳細）", "features": "主要功能特色（功能）", "usage": "適合什麼人用、實際使用情境（運用）"}\n只輸出 json，不要加 markdown 圍欄或其他文字。`;
   try {
     const ctrl = new AbortController();
     // fetchReadme 上面已經用掉最多 10s，這裡壓到 42s——兩段加起來還在
@@ -72,22 +98,25 @@ async function summarize(repo) {
       body: JSON.stringify({
         model: "deepseek-v4-pro",
         messages: [
-          { role: "system", content: "你是幫忙介紹GitHub開源專案的助手，回答只用繁體中文，不要出現英文以外的其他語言，不要用「這是一個」開頭。根據使用者提供的README內容回答，不要自己憑專案名稱猜測，README沒提到的事不要編。" },
+          { role: "system", content: "你是幫忙介紹GitHub開源專案的助手，回答只用繁體中文，不要出現英文以外的其他語言。根據使用者提供的README內容回答，不要自己憑專案名稱猜測，README沒提到的事不要編。永遠只回傳一個JSON物件，不要有多餘文字。" },
           { role: "user", content: prompt },
         ],
         stream: false,
         reasoning_effort: "high",
         extra_body: { thinking: { type: "enabled" } },
+        response_format: { type: "json_object" },
       }),
       signal: ctrl.signal,
     });
     clearTimeout(timer);
-    if (!r.ok) { console.error("[cron/github-trending] summarize failed", repo.fullName, r.status); return ""; }
+    if (!r.ok) { console.error("[cron/github-trending] summarize failed", repo.fullName, r.status); return EMPTY_SUMMARY; }
     const data = await r.json();
-    return (data.choices?.[0]?.message?.content || "").trim();
+    const content = (data.choices?.[0]?.message?.content || "").trim();
+    if (!content) return EMPTY_SUMMARY;
+    return parseSummaryJson(content);
   } catch (err) {
     console.error("[cron/github-trending] summarize error", repo.fullName, err.message);
-    return "";
+    return EMPTY_SUMMARY;
   }
 }
 
@@ -125,13 +154,18 @@ export default async function handler(req, res) {
     }));
 
     const summaries = await Promise.all(baseRepos.map(summarize));
-    const repos = baseRepos.map((repo, i) => ({ ...repo, summary: summaries[i] || "" }));
+    const repos = baseRepos.map((repo, i) => ({
+      ...repo,
+      summaryDetail: summaries[i]?.detail || "",
+      summaryFeatures: summaries[i]?.features || "",
+      summaryUsage: summaries[i]?.usage || "",
+    }));
 
     await setDoc(doc(db, "siteData", "githubTrending"), {
       repos, since, updatedAt: serverTimestamp(),
     });
 
-    return res.status(200).json({ ok: true, count: repos.length, summarized: summaries.filter(Boolean).length });
+    return res.status(200).json({ ok: true, count: repos.length, summarized: summaries.filter(s => s?.detail || s?.features || s?.usage).length });
   } catch (err) {
     console.error("[cron/github-trending] failed", err);
     return res.status(500).json({ error: err.message || "抓取失敗" });

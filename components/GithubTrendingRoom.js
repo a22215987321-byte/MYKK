@@ -33,6 +33,33 @@ const LANG_COLORS = {
   CSS: "#563d7c", Vue: "#41b883", Dart: "#00B4AB",
 };
 
+// AI 總結拆成三個方塊，左到右排：項目詳細／功能／運用（對應 Firestore 的
+// summaryDetail／summaryFeatures／summaryUsage，排程那邊生成時就已經是
+// 分開的三個欄位，這裡純排版）。每個方塊各自 maxHeight+overflowY:auto，
+// 免得某一塊特別長（deep think 生成的內容篇幅常常不平均）把整排撐爆。
+function SummaryBoxes({ detail, features, usage, maxBoxHeight = 200, fontSize = 13 }) {
+  const cols = [
+    { key: "detail", label: "項目詳細", text: detail },
+    { key: "features", label: "功能", text: features },
+    { key: "usage", label: "運用", text: usage },
+  ];
+  if (!detail && !features && !usage) {
+    return <div style={{ fontSize, color: "var(--text)", lineHeight: 1.7 }}>還沒有總結（等下一次每日更新自動生成）</div>;
+  }
+  return (
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      {cols.map(c => (
+        <div key={c.key} style={{ flex: "1 1 160px", minWidth: 150, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", marginBottom: 4 }}>{c.label}</div>
+          <div style={{ fontSize, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: maxBoxHeight, overflowY: "auto" }}>
+            {c.text || "（無）"}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // 單一 repo 卡片——右邊有個下拉鈕，展開會看到 AI 每天生成的總結（DeepSeek，
 // 排程那邊 pages/api/cron/github-trending.js 生成，這裡純顯示），總結區塊
 // 自己還有一顆「放大」鈕，開一個全螢幕疊層把總結文字放大顯示，方便看長一點
@@ -92,16 +119,14 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
           <div style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase" }}>🤖 AI 總結</span>
-              {repo.summary && (
+              {(repo.summaryDetail || repo.summaryFeatures || repo.summaryUsage) && (
                 <button onClick={() => setZoomed(true)} title="放大"
                   style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, padding: 2 }}>
                   🔍
                 </button>
               )}
             </div>
-            <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.7, whiteSpace: "pre-wrap", maxHeight: 260, overflowY: "auto" }}>
-              {repo.summary || "還沒有總結（等下一次每日更新自動生成）"}
-            </div>
+            <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} maxBoxHeight={160} fontSize={12} />
           </div>
         </div>
       )}
@@ -110,13 +135,15 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
         <div role="dialog" aria-modal="true" onClick={() => setZoomed(false)}
           style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 520, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+            style={{ maxWidth: 760, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
               <button onClick={() => setZoomed(false)} aria-label="關閉"
                 style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
             </div>
-            <div style={{ fontSize: 16, color: "var(--text)", lineHeight: 1.9, whiteSpace: "pre-wrap", overflowY: "auto", minHeight: 0 }}>{repo.summary}</div>
+            <div style={{ overflowY: "auto", minHeight: 0 }}>
+              <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} maxBoxHeight={400} fontSize={14} />
+            </div>
           </div>
         </div>
       )}
@@ -129,7 +156,7 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
         <div role="dialog" aria-modal="true" onClick={() => setPreview(false)}
           style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 460, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+            style={{ maxWidth: 700, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexShrink: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
               <button onClick={() => setPreview(false)} aria-label="關閉"
@@ -140,8 +167,8 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
               {repo.url} →
             </a>
             <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", margin: "14px 0 6px", flexShrink: 0 }}>🤖 AI 總結</div>
-            <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.7, whiteSpace: "pre-wrap", overflowY: "auto", minHeight: 0 }}>
-              {repo.summary || "還沒有總結（等下一次每日更新自動生成）"}
+            <div style={{ overflowY: "auto", minHeight: 0 }}>
+              <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} maxBoxHeight={260} fontSize={13} />
             </div>
           </div>
         </div>
@@ -218,10 +245,11 @@ export default function GithubTrendingRoom({ uid }) {
       if (bookmarkedIds.has(repoId)) {
         await deleteDoc(doc(db, "githubBookmarks", uid, "items", repoId));
       } else {
-        const { id, name, fullName, owner, ownerAvatar, description, url, stars, language, createdAt, summary } = repo;
+        const { id, name, fullName, owner, ownerAvatar, description, url, stars, language, createdAt, summaryDetail, summaryFeatures, summaryUsage } = repo;
         await setDoc(doc(db, "githubBookmarks", uid, "items", repoId), {
           id, name, fullName, owner, ownerAvatar, description: description || "", url, stars, language: language || "",
-          createdAt: createdAt || "", summary: summary || "", bookmarkedAt: serverTimestamp(),
+          createdAt: createdAt || "", summaryDetail: summaryDetail || "", summaryFeatures: summaryFeatures || "", summaryUsage: summaryUsage || "",
+          bookmarkedAt: serverTimestamp(),
         });
       }
     } catch (err) {

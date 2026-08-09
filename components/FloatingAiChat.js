@@ -26,8 +26,15 @@ const WIN_WIDTH = 380;
 // 固定頂到底，拖曳只剩水平方向有意義——按住頂部（EVON AI 那條 header，見
 // AiChatRoom.js 的 compact 版）左右拖，放開就停在放開的位置，不再需要「滑回
 // 底部」那段動畫（以前是小視窗才需要，現在整個視窗本來就是頂到底）。
+const MINI_HEIGHT = 44; // 跟 AiChatRoom.js 縮小版 header 自己的高度一致
+
 export default function FloatingAiChat({ user, db, open, onOpenChange, showTrigger = false }) {
   const [left, setLeft] = useState(EDGE_MARGIN);
+  // 縮小狀態——跟開關（open）是分開的兩件事：縮小之後視窗還是「開著」的，
+  // 只是變成貼底部的一個小方塊，AiChatRoom 沒有被卸載（見它自己 compact+
+  // minimized 那段的處理），對話內容/捲動位置都還在，不會因為縮小又展開
+  // 就重置。
+  const [minimized, setMinimized] = useState(false);
   const winRef = useRef(null);
   const dragRef = useRef({ dragging: false });
 
@@ -85,8 +92,12 @@ export default function FloatingAiChat({ user, db, open, onOpenChange, showTrigg
   return (
     <div ref={winRef} style={{
       position: "fixed", left, width: WIN_WIDTH,
-      top: "calc(var(--shell-margin, 0px) + env(safe-area-inset-top))",
-      height: "calc(var(--viewport-h, 100vh) - var(--shell-margin, 0px) * 2 - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+      ...(minimized
+        ? { top: "auto", bottom: EDGE_MARGIN, height: MINI_HEIGHT }
+        : {
+            top: "calc(var(--shell-margin, 0px) + env(safe-area-inset-top))",
+            height: "calc(var(--viewport-h, 100vh) - var(--shell-margin, 0px) * 2 - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
+          }),
       maxWidth: `calc(100vw - ${EDGE_MARGIN * 2}px)`,
       zIndex: 2500, display: "flex", flexDirection: "column",
       background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg, 18px)",
@@ -95,6 +106,8 @@ export default function FloatingAiChat({ user, db, open, onOpenChange, showTrigg
       <AiChatRoom
         user={user} db={db} compact
         onClose={() => onOpenChange(false)}
+        minimized={minimized}
+        onMinimize={() => setMinimized(v => !v)}
         headerDragProps={{
           onPointerDown: onHeaderPointerDown,
           onPointerMove: onHeaderPointerMove,
