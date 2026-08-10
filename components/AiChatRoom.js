@@ -35,7 +35,7 @@ function formatConvTime(ts) {
 function ReasoningBlock({ text }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ maxWidth: "70%" }}>
+    <div style={{ width: "100%", boxSizing: "border-box" }}>
       <button onClick={() => setOpen(v => !v)}
         style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 11, padding: "2px 4px" }}>
         🤔 思考過程 <span style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>▾</span>
@@ -437,24 +437,39 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
               </div>
             )}
             <MarkdownMessageStyles />
+            {/* 一般聊天室（私訊/群組/大廳）是左右各半的訊息氣泡——雙方各佔畫面
+                一半寬度，靠左右對齊分辨是誰說的。AI 助手不一樣：雙方共用同一份
+                100% 寬的版面（像 ChatGPT 那種一列一列的做法），改用頭像+底色
+                分辨是使用者還是 AI，而不是靠左右各半——AI 的回覆常常是一大段
+                markdown/程式碼，塞在半個畫面寬的氣泡裡會被壓得很窄，改滿版後
+                閱讀空間直接翻倍。 */}
             {messages.map((m, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start", gap: 6 }}>
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%", boxSizing: "border-box" }}>
                 {m.role === "assistant" && m.reasoning && <ReasoningBlock text={m.reasoning} />}
                 <div style={{
-                  maxWidth: "70%", padding: "10px 14px", borderRadius: "var(--radius-lg)",
-                  background: m.role === "user" ? "var(--accent)" : "var(--bubble-assistant-bg, var(--panel-alt))",
-                  color: m.role === "user" ? "var(--accent-text)" : "var(--text)",
-                  fontSize: 14, wordBreak: "break-word",
+                  display: "flex", alignItems: "flex-start", gap: 10, width: "100%", boxSizing: "border-box",
+                  padding: "12px 14px", borderRadius: "var(--radius-lg)",
+                  background: m.role === "user" ? "var(--panel)" : "var(--bubble-assistant-bg, var(--panel-alt))",
+                  border: m.role === "user" ? "1px solid var(--border)" : "none",
                 }}>
-                  {m.role === "user" ? <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div> : <MarkdownMessage content={m.content} />}
+                  <div style={{
+                    width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
+                    background: m.role === "user" ? "var(--accent)" : "linear-gradient(135deg,#4f46e5,#7c3aed)",
+                    color: m.role === "user" ? "var(--accent-text)" : "#fff",
+                  }}>
+                    {m.role === "user" ? "🙂" : "🤖"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--text)", wordBreak: "break-word" }}>
+                    {m.role === "user" ? <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div> : <MarkdownMessage content={m.content} />}
+                  </div>
                 </div>
               </div>
             ))}
             {sending && (
-              <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                <div style={{ padding: "10px 14px", borderRadius: "var(--radius-lg)", background: "var(--bubble-assistant-bg, var(--panel-alt))", color: "var(--text-faint)", fontSize: 14 }}>
-                  思考中...
-                </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "var(--radius-lg)", background: "var(--bubble-assistant-bg, var(--panel-alt))" }}>
+                <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, background: "linear-gradient(135deg,#4f46e5,#7c3aed)", color: "#fff" }}>🤖</div>
+                <span style={{ color: "var(--text-faint)", fontSize: 14 }}>思考中...</span>
               </div>
             )}
             <div ref={endRef} />
