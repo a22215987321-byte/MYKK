@@ -53,7 +53,7 @@ export const CHIBI_AGENT_PRESETS: Record<string, ChibiAgentPreset> = {
       talking: 'emotes/wave',
     },
   },
-  'code-agent': {
+  'intelligence-agent': {
     facing: 'front',
     stateAnims: {
       working: 'emotes/idea',

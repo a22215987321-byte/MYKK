@@ -15,9 +15,9 @@ export const CHIBI_CHARACTER_SKINS = [
 
 const SKIN_BY_AGENT_ID = {
   'strategy-agent': 'misaki',
-  'code-agent': 'erikari',
+  'intelligence-agent': 'erikari',
   'brand-agent': 'harri',
-  'engineering-agent': 'nate',
+  'systems-agent': 'soeren',
   'analytics-agent': 'luke',
   'creative-agent': 'mario',
 } as const

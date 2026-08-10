@@ -65,11 +65,11 @@ export const AGENT_ROSTER: AgentRosterEntry[] = [
     task: '策略：把目標拆成行動路線圖',
   },
   {
-    id: 'code-agent',
-    name: '阿研',
-    role: '研究代理',
-    color: 0x4a90d9,
-    task: '研究：掃描市場情報',
+    id: 'intelligence-agent',
+    name: '澄音',
+    role: 'AI 情報整合師',
+    color: 0x0f766e,
+    task: '情報整合：彙整市場與研究訊號',
   },
   {
     id: 'brand-agent',
@@ -79,11 +79,11 @@ export const AGENT_ROSTER: AgentRosterEntry[] = [
     task: '品牌：設計產品敘事與內容',
   },
   {
-    id: 'engineering-agent',
-    name: '拓真',
-    role: '自動化工程師',
+    id: 'systems-agent',
+    name: '景曜',
+    role: '系統整合架構師',
     color: 0xf5c542,
-    task: '工程：建立自動化工作流程',
+    task: '系統：整合跨平台服務節點',
   },
   {
     id: 'analytics-agent',
