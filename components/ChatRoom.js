@@ -2983,18 +2983,20 @@ export default function ChatApp({ user }) {
               點了完全沒反應。改成先算出「這次要切到的值」，resetAllViews()
               歸零全部（含 showOffice）之後，最後才把 showOffice 設成真正
               要的值，確保它是這批更新裡最後生效的那個。 */}
-          <button onClick={() => { const next = !showOffice; resetAllViews(); setShowOffice(next); }} title="切換 AI Office"
-            style={{
-              width: 56, height: "var(--railitem-h, 54px)", flexShrink: 0, boxSizing: "border-box",
-              borderRadius: "var(--radius-lg, 18px)", border: "1px solid var(--border)", cursor: "pointer",
-              background: showOffice ? "linear-gradient(135deg,#f59e0b,#ef4444)" : "var(--panel)",
-              color: showOffice ? "#fff" : "var(--text-muted)",
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
-              boxShadow: "var(--card-shadow)",
-            }}>
-            <span style={{ fontSize: 18 }}>🏢</span>
-            <span style={{ fontSize: 8, fontWeight: 700 }}>OFFICE</span>
-          </button>
+          {aiChatAllowed && (
+            <button onClick={() => { const next = !showOffice; resetAllViews(); setShowOffice(next); }} title="切換 AI Office"
+              style={{
+                width: 56, height: "var(--railitem-h, 54px)", flexShrink: 0, boxSizing: "border-box",
+                borderRadius: "var(--radius-lg, 18px)", border: "1px solid var(--border)", cursor: "pointer",
+                background: showOffice ? "linear-gradient(135deg,#f59e0b,#ef4444)" : "var(--panel)",
+                color: showOffice ? "#fff" : "var(--text-muted)",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+                boxShadow: "var(--card-shadow)",
+              }}>
+              <span style={{ fontSize: 18 }}>🏢</span>
+              <span style={{ fontSize: 8, fontWeight: 700 }}>OFFICE</span>
+            </button>
+          )}
           </div>
         )}
 
@@ -4071,9 +4073,9 @@ export default function ChatApp({ user }) {
             本身是 position:relative）的獨立圖層——側欄、資料夾 rail、右欄
             全部會被蓋住看不見，感覺像切到另一個頁面，但其實還是同一個 SPA、
             沒有真的換路由。右上角 ✕ 關掉回到原本畫面。 */}
-        {showOffice && (
+        {showOffice && aiChatAllowed && (
           <div style={{ position: "absolute", inset: 0, zIndex: 400, borderRadius: "var(--shell-radius)", overflow: "hidden" }}>
-            <OfficeMode onClose={() => setShowOffice(false)} />
+            <OfficeMode onClose={() => setShowOffice(false)} user={user} />
           </div>
         )}
       </div>
