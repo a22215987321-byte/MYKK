@@ -14,6 +14,7 @@ const AiChatRoom = dynamic(() => import("./AiChatRoom"), {
 const EDGE_MARGIN = 16;
 const COLLAPSED_SIZE = 56;
 const WIN_WIDTH = 380;
+const MINI_WIDTH = 220;
 
 // 隨處可見的浮動 AI 對話小工具。開關狀態是受控的（open/onOpenChange，由
 // ChatRoom.js 管理）：桌面版的觸發鈕是資料夾 rail 上方那顆小圖示，這裡只
@@ -37,11 +38,12 @@ export default function FloatingAiChat({ user, db, open, onOpenChange, showTrigg
   const [minimized, setMinimized] = useState(false);
   const winRef = useRef(null);
   const dragRef = useRef({ dragging: false });
+  const width = minimized ? MINI_WIDTH : WIN_WIDTH;
 
   useEffect(() => {
     if (typeof window === "undefined" || !open) return;
-    setLeft(l => Math.max(EDGE_MARGIN, Math.min(l, window.innerWidth - WIN_WIDTH - EDGE_MARGIN)));
-  }, [open]);
+    setLeft(l => Math.max(EDGE_MARGIN, Math.min(l, window.innerWidth - width - EDGE_MARGIN)));
+  }, [open, minimized, width]);
 
   const onHeaderPointerDown = (e) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -91,7 +93,7 @@ export default function FloatingAiChat({ user, db, open, onOpenChange, showTrigg
 
   return (
     <div ref={winRef} style={{
-      position: "fixed", left, width: WIN_WIDTH,
+      position: "fixed", left, width,
       ...(minimized
         ? { top: "auto", bottom: EDGE_MARGIN, height: MINI_HEIGHT }
         : {

@@ -1356,10 +1356,6 @@ export default function ChatApp({ user }) {
   const playAudioQueue = useCallback((tracks, startIndex = 0) => {
     setAudioQueue({ tracks, startIndex });
   }, []);
-  // 資料夾 rail 上「顯示/隱藏所有資料夾」開關——預設 true（跟改版之前一樣，
-  // 每個資料夾都是隨時看得到的小圖示），關掉之後只留 🏠 全部功能，資料夾
-  // 圖示跟「新增資料夾」都收起來，rail 看起來更乾淨。
-  const [foldersRailOpen, setFoldersRailOpen] = useState(true);
 
   const [myProfile,      setMyProfile]      = useState(null);
   const [myProfileError, setMyProfileError] = useState('');
@@ -2896,18 +2892,27 @@ export default function ChatApp({ user }) {
           </div>
         </header>
 
-        {/* 資料夾 rail 外面再包一層直向 flex 欄，讓「AI 對話」觸發鈕可以疊在
-            資料夾 rail 正上方、同一條左側窄欄裡——AI 視窗本身還是 position:fixed
-            蓋滿全螢幕（見 FloatingAiChat.js），這裡只是觸發鈕的位置。 */}
+        {/* 資料夾 rail：側欄最左邊一條窄欄，只放資料夾圖示（Discord 伺服器欄
+            的概念）——AI 對話觸發鈕／「全部功能」／每個資料夾一個小圖案／
+            新增資料夾全部是同一個面板裡的項目，跟側欄本身是獨立的兩塊，收合
+            側欄不會連帶把這條 rail 也藏起來。整條窄欄只有這一個長方條方塊
+            （背景+邊框+圓角），高度撐滿，不再拆成「AI 鈕」跟「資料夾清單」
+            兩個各自有邊框的小方塊疊在一起——之前那樣中間會留一條看起來像
+            誤植的縫，現在是一整塊幽影風格的面板。 */}
         {!isMobile && (
-          <div style={{ display: "flex", flexDirection: "column", flexShrink: 0, gap: 10, margin: "12px 6px" }}>
+          <div className="cr-folder-rail" style={{
+            width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "stretch",
+            gap: 10, padding: "14px 4px", overflowY: "auto", overflowX: "hidden",
+            margin: "12px 6px", borderRadius: "var(--radius-lg, 18px)",
+            background: "var(--panel)", border: "1px solid var(--border)", boxShadow: "var(--card-shadow)",
+          }}>
             {aiChatAllowed && (
               <button onClick={() => setAiFloatOpen(true)} title="EVON AI 對話"
                 style={{
-                  width: 56, height: "var(--railitem-h, 54px)", boxSizing: "border-box",
+                  width: "100%", height: "var(--railitem-h, 54px)", boxSizing: "border-box",
                   display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
-                  borderRadius: "var(--radius-lg, 18px)", border: "1px solid var(--border)", cursor: "pointer", padding: 0,
-                  background: "var(--panel)", boxShadow: "var(--card-shadow)",
+                  borderRadius: "var(--radius-md)", border: "none", cursor: "pointer", padding: 0, flexShrink: 0,
+                  background: "none",
                 }}>
                 <div style={{
                   width: 30, height: 30, borderRadius: "var(--radius-sm, 8px)",
@@ -2919,68 +2924,39 @@ export default function ChatApp({ user }) {
                 <span style={{ fontSize: 9, color: "var(--text-faint)" }}>AI</span>
               </button>
             )}
-
-            {/* 資料夾 rail：側欄最左邊一條窄欄，只放資料夾圖示（Discord 伺服器欄
-                的概念）——「全部功能」＋每個資料夾一個小圖案＋新增資料夾，跟側欄
-                本身是獨立的兩塊，收合側欄不會連帶把這條 rail 也藏起來。外面加一個
-                長方條方塊（背景+邊框+圓角），讓它看起來是獨立的一塊面板，不是
-                零散飄在側欄外面的圖示。 */}
-            <div className="cr-folder-rail" style={{
-              width: 56, flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column", alignItems: "stretch",
-              gap: 10, padding: "14px 4px", overflowY: "auto", overflowX: "hidden",
-              borderRadius: "var(--radius-lg, 18px)",
-              background: "var(--panel)", border: "1px solid var(--border)", boxShadow: "var(--card-shadow)",
-            }}>
-              {/* RAIL_ITEM_HEIGHT (54px) 跟左側功能方塊（NavItem 非 compact 版：
-                  9px 上下 padding + 34px 圖示 + 2px 邊框 = 54px）對齊，寬度也
-                  改成填滿這條窄欄扣掉左右 padding 後的寬度，不再是置中飄著的
-                  一個小圓圈——資料夾方塊跟左側功能方塊高度、寬度感覺要一致。 */}
-              <button
-                ref={sidebarLayout.registerTop("__home__")}
-                onClick={() => sidebarLayout.setActiveFolder(null)}
-                title="全部功能"
-                style={{
-                  width: "100%", height: "var(--railitem-h, 54px)", borderRadius: "var(--radius-md)",
-                  border: "none", cursor: "pointer", fontSize: 17, flexShrink: 0, boxSizing: "border-box",
-                  background: sidebarLayout.activeFolderId ? "var(--navcard-bg, transparent)" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
-                  color: sidebarLayout.activeFolderId ? "var(--text-muted)" : "#fff",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                🏠
-              </button>
-              {/* 資料夾圖案本身現在是顯示/隱藏「所有已建立資料夾」的開關——第一次
-                  點開，再點一次全部收起來，只留 🏠 跟這顆開關本身，其他兩顆
-                  （逐個資料夾圖示＋新增資料夾）一起顯示/隱藏。 */}
-              <button onClick={() => setFoldersRailOpen(v => !v)} title={foldersRailOpen ? "隱藏所有資料夾" : "顯示所有資料夾"}
-                style={{
-                  width: "100%", height: "var(--railitem-h, 54px)", borderRadius: "var(--radius-md)",
-                  border: "1px solid transparent", cursor: "pointer", fontSize: 15, flexShrink: 0, boxSizing: "border-box",
-                  background: foldersRailOpen ? "var(--navcard-bg, rgba(255,255,255,0.06))" : "none",
-                  color: "var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                📁
-              </button>
-              {foldersRailOpen && (
-                <>
-                  {sidebarLayout.layout.filter(e => e.startsWith("folder:")).map(entry => {
-                    const fid = entry.slice(7);
-                    const folder = sidebarLayout.folders[fid];
-                    if (!folder) return null;
-                    return (
-                      <LayoutDragWrap key={entry} dragKey={entry} sourceContainer="top" controller={sidebarLayout}>
-                        <FolderRailIcon
-                          name={folder.name} count={folder.items.length}
-                          active={sidebarLayout.activeFolderId === fid}
-                          isDropTarget={sidebarLayout.dropTarget?.folderId === fid}
-                          onClick={(e) => openFolderPanel(fid, e)}
-                        />
-                      </LayoutDragWrap>
-                    );
-                  })}
-                  <AddFolderRailButton onAdd={(name) => sidebarLayout.addFolder(name)} />
-                </>
-              )}
-            </div>
+            {/* RAIL_ITEM_HEIGHT (54px) 跟左側功能方塊（NavItem 非 compact 版：
+                9px 上下 padding + 34px 圖示 + 2px 邊框 = 54px）對齊，寬度也
+                改成填滿這條窄欄扣掉左右 padding 後的寬度，不再是置中飄著的
+                一個小圓圈——資料夾方塊跟左側功能方塊高度、寬度感覺要一致。 */}
+            <button
+              ref={sidebarLayout.registerTop("__home__")}
+              onClick={() => sidebarLayout.setActiveFolder(null)}
+              title="全部功能"
+              style={{
+                width: "100%", height: "var(--railitem-h, 54px)", borderRadius: "var(--radius-md)",
+                border: "none", cursor: "pointer", fontSize: 17, flexShrink: 0, boxSizing: "border-box",
+                background: sidebarLayout.activeFolderId ? "var(--navcard-bg, transparent)" : "linear-gradient(135deg,var(--accent),var(--accent-2))",
+                color: sidebarLayout.activeFolderId ? "var(--text-muted)" : "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+              🏠
+            </button>
+            {sidebarLayout.layout.filter(e => e.startsWith("folder:")).map(entry => {
+              const fid = entry.slice(7);
+              const folder = sidebarLayout.folders[fid];
+              if (!folder) return null;
+              return (
+                <LayoutDragWrap key={entry} dragKey={entry} sourceContainer="top" controller={sidebarLayout}>
+                  <FolderRailIcon
+                    name={folder.name} count={folder.items.length}
+                    active={sidebarLayout.activeFolderId === fid}
+                    isDropTarget={sidebarLayout.dropTarget?.folderId === fid}
+                    onClick={(e) => openFolderPanel(fid, e)}
+                  />
+                </LayoutDragWrap>
+              );
+            })}
+            <AddFolderRailButton onAdd={(name) => sidebarLayout.addFolder(name)} />
           </div>
         )}
 

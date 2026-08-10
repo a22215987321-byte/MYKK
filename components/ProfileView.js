@@ -460,6 +460,9 @@ function formatAudioTime(sec) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+const AUDIO_ROW_HEIGHT = 60; // 60px 高的列（36px 頭像 + 上下 10px padding + 邊框）+ 8px 間距，拖曳排序用固定值算位置，不用量測 DOM。
+const AUDIO_ROW_GAP = 8;
+
 // 音頻收藏的播放器——收藏清單裡任一首開始播放後，播完自動接下一首（順序
 // 播放），可以切「單曲循環」讓目前這首重複播放。只用一個共用的 <audio>
 // 元素切換 src，不是每首歌各自一個 <audio>。
@@ -468,25 +471,55 @@ function formatAudioTime(sec) {
 // 高度拉滿、切功能頁不中斷），這個元件自己底下那顆 <audio> 跟播放列完全不
 // 啟用，避免兩邊同時出聲音。沒有傳進來（/profile/[uid] 那個獨立頁面，沒有
 // ChatRoom 可以掛全域播放器）才會走本來就有的內建播放邏輯當 fallback。
-function AudioQueuePlayer({ tracks, onPlayAudioQueue }) {
+//
+// 清單本身可以按住拖曳重新排序——每一列都是絕對定位、top 用 index 算出來，
+// 拖曳中的那一列直接跟著游標的 top 走（沒有 transition，即時跟手），其他
+// 列被擠過去時走 200ms 的 top transition，看起來是慢慢被推下去，不是瞬間
+// 跳位。用 track id（不是 index）記目前排序跟目前播放中的是哪一首，這樣
+// 拖曳重排的時候不會因為 index 對不上而播錯歌。放開手才會呼叫 onReorder
+// 把最終順序存回 Firestore（只有本人查看自己收藏時才會傳這個 prop）。
+function AudioQueuePlayer({ tracks, onPlayAudioQueue, onReorder }) {
   const audioRef = useRef(null);
-  const [currentIndex, setCurrentIndex] = useState(null);
+  const [order, setOrder] = useState(() => tracks.map(t => t.id));
+  const orderRef = useRef(order);
+  const [currentId, setCurrentId] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [repeatOne, setRepeatOne] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [dragId, setDragId] = useState(null);
+  const [dragTop, setDragTop] = useState(0);
+  const dragInfo = useRef({ dragging: false, moved: false, grabOffsetY: 0, index: 0 });
+  const containerRef = useRef(null);
 
-  const currentTrack = currentIndex != null ? tracks[currentIndex] : null;
+  // 外面重新丟一份新的 tracks 進來（收藏了新的一首、取消收藏、或第一次載入）
+  // ——保留使用者已經手動排過的順序，新進來的補在最後面，被移除的直接濾掉。
+  useEffect(() => {
+    setOrder(prev => {
+      const incomingIds = tracks.map(t => t.id);
+      const incomingSet = new Set(incomingIds);
+      const kept = prev.filter(id => incomingSet.has(id));
+      const keptSet = new Set(kept);
+      const added = incomingIds.filter(id => !keptSet.has(id));
+      const next = [...kept, ...added];
+      orderRef.current = next;
+      return next;
+    });
+  }, [tracks]);
+
+  const byId = useMemo(() => new Map(tracks.map(t => [t.id, t])), [tracks]);
+  const orderedTracks = order.map(id => byId.get(id)).filter(Boolean);
+  const currentTrack = currentId != null ? (byId.get(currentId) || null) : null;
 
   useEffect(() => {
     const a = audioRef.current;
-    if (!a || currentIndex == null) return;
+    if (!a || currentId == null || !currentTrack) return;
     // 影片來源的音頻收藏沒有 audioUrl，直接把 videoUrl 餵給 <audio> 元素——
     // 瀏覽器本來就支援用 <audio> 播放影片檔案，只拿聲音軌、不理會畫面。
-    a.src = tracks[currentIndex]?.audioUrl || tracks[currentIndex]?.videoUrl;
+    a.src = currentTrack.audioUrl || currentTrack.videoUrl;
     a.play().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex]);
+  }, [currentId]);
 
   useEffect(() => {
     const a = audioRef.current;
@@ -501,10 +534,11 @@ function AudioQueuePlayer({ tracks, onPlayAudioQueue }) {
         a.play().catch(() => {});
         return;
       }
-      setCurrentIndex(idx => {
-        if (idx == null) return idx;
-        const next = idx + 1;
-        return next < tracks.length ? next : null;
+      setCurrentId(id => {
+        if (id == null) return id;
+        const idx = orderRef.current.indexOf(id);
+        const nextId = idx >= 0 ? orderRef.current[idx + 1] : undefined;
+        return nextId ?? null;
       });
     };
     a.addEventListener("play", onPlay);
@@ -519,39 +553,110 @@ function AudioQueuePlayer({ tracks, onPlayAudioQueue }) {
       a.removeEventListener("loadedmetadata", onLoaded);
       a.removeEventListener("ended", onEnded);
     };
-  }, [repeatOne, tracks]);
+  }, [repeatOne]);
 
   const togglePlay = () => {
     const a = audioRef.current;
-    if (!a || currentIndex == null) return;
+    if (!a || currentId == null) return;
     if (a.paused) a.play().catch(() => {}); else a.pause();
   };
-  const playPrev = () => setCurrentIndex(idx => (idx == null ? 0 : Math.max(idx - 1, 0)));
-  const playNext = () => setCurrentIndex(idx => (idx == null ? 0 : Math.min(idx + 1, tracks.length - 1)));
+  const playPrev = () => setCurrentId(id => {
+    const idx = id == null ? -1 : orderRef.current.indexOf(id);
+    return orderRef.current[Math.max(idx - 1, 0)] ?? id;
+  });
+  const playNext = () => setCurrentId(id => {
+    const idx = id == null ? -1 : orderRef.current.indexOf(id);
+    return orderRef.current[Math.min(idx + 1, orderRef.current.length - 1)] ?? id;
+  });
+
+  const commitReorder = () => {
+    if (onReorder) onReorder(orderRef.current.map(id => byId.get(id)).filter(Boolean));
+  };
+
+  const onRowPointerDown = (e, id, index) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragInfo.current = { dragging: false, moved: false, grabOffsetY: e.clientY - rect.top, index };
+    setDragId(id);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+  };
+  const onRowPointerMove = (e, id) => {
+    if (dragId !== id || !containerRef.current) return;
+    const info = dragInfo.current;
+    const containerTop = containerRef.current.getBoundingClientRect().top;
+    const rowStep = AUDIO_ROW_HEIGHT + AUDIO_ROW_GAP;
+    const wantedTop = e.clientY - containerTop - info.grabOffsetY;
+    if (!info.dragging) {
+      if (Math.abs(wantedTop - info.index * rowStep) < 6) return;
+      info.dragging = true;
+    }
+    info.moved = true;
+    e.preventDefault();
+    const maxTop = (orderedTracks.length - 1) * rowStep;
+    setDragTop(Math.max(0, Math.min(maxTop, wantedTop)));
+    const targetIndex = Math.max(0, Math.min(orderedTracks.length - 1, Math.round(wantedTop / rowStep)));
+    if (targetIndex !== info.index) {
+      setOrder(prev => {
+        const next = [...prev];
+        const [moved] = next.splice(info.index, 1);
+        next.splice(targetIndex, 0, moved);
+        orderRef.current = next;
+        return next;
+      });
+      info.index = targetIndex;
+    }
+  };
+  const onRowPointerUp = (e, id, track) => {
+    if (dragId !== id) return;
+    const info = dragInfo.current;
+    setDragId(null);
+    if (info.moved) {
+      commitReorder();
+    } else {
+      if (onPlayAudioQueue) { onPlayAudioQueue(orderedTracks, info.index); }
+      else { currentId === id ? togglePlay() : setCurrentId(id); }
+    }
+  };
 
   return (
     <div>
       <style>{"@keyframes audioSpin { to { transform: rotate(360deg); } }"}</style>
       <audio ref={audioRef} style={{ display: "none" }} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {tracks.map((t, i) => {
-          const isCurrent = currentIndex === i;
+      <div ref={containerRef} style={{
+        position: "relative",
+        height: orderedTracks.length ? orderedTracks.length * (AUDIO_ROW_HEIGHT + AUDIO_ROW_GAP) - AUDIO_ROW_GAP : 0,
+      }}>
+        {orderedTracks.map((t, i) => {
+          const isCurrent = currentId === t.id;
           const isPlayingThis = isCurrent && playing;
+          const isDragging = dragId === t.id;
+          const top = isDragging ? dragTop : i * (AUDIO_ROW_HEIGHT + AUDIO_ROW_GAP);
           return (
-            <button key={t.id} onClick={() => {
-              if (onPlayAudioQueue) { onPlayAudioQueue(tracks, i); return; }
-              isCurrent ? togglePlay() : setCurrentIndex(i);
-            }}
-              style={{ display: "flex", alignItems: "center", gap: 12, background: isCurrent ? "var(--panel-hover)" : "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}>
+            <div key={t.id}
+              onPointerDown={e => onRowPointerDown(e, t.id, i)}
+              onPointerMove={e => onRowPointerMove(e, t.id)}
+              onPointerUp={e => onRowPointerUp(e, t.id, t)}
+              onPointerCancel={() => setDragId(null)}
+              style={{
+                position: "absolute", left: 0, right: 0, top, height: AUDIO_ROW_HEIGHT,
+                display: "flex", alignItems: "center", gap: 12,
+                background: isCurrent ? "var(--panel-hover)" : "var(--panel)",
+                border: "1px solid var(--border)", borderRadius: 12, padding: "0 12px",
+                cursor: isDragging ? "grabbing" : "grab", boxSizing: "border-box",
+                touchAction: "none", userSelect: "none",
+                transition: isDragging ? "none" : "top 200ms ease",
+                boxShadow: isDragging ? "0 10px 24px rgba(0,0,0,0.25)" : "none",
+                zIndex: isDragging ? 10 : 1,
+              }}>
               {t.userAvatarImage
-                ? <img src={t.userAvatarImage} alt={t.userNickname} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                ? <img src={t.userAvatarImage} alt={t.userNickname} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} draggable={false} />
                 : <div style={{ width: 36, height: 36, borderRadius: "50%", background: t.userColor || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#fff", flexShrink: 0 }}>{t.userAvatar || "🎵"}</div>
               }
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: isCurrent ? "var(--accent)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {t.text?.trim() || "（未命名音樂）"}
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{t.userNickname}</div>
+                <div style={{ fontSize: 11, color: "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.userNickname}</div>
               </div>
               {/* 音頻自己的圓形圖示——播放中會順時針轉動（跟黑膠唱片一樣的視覺
                   語言），圖示本身在播放/暫停之間切換，不是「用戶頭像」那顆。 */}
@@ -565,16 +670,16 @@ function AudioQueuePlayer({ tracks, onPlayAudioQueue }) {
               }}>
                 {isPlayingThis ? "⏸" : "▶"}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
 
       {currentTrack && (
         <div style={{ position: "sticky", bottom: 8, marginTop: 12, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10, boxShadow: "var(--card-shadow)" }}>
-          <button onClick={playPrev} disabled={currentIndex === 0} aria-label="上一首" style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 16, opacity: currentIndex === 0 ? 0.4 : 1 }}>⏮</button>
+          <button onClick={playPrev} disabled={order.indexOf(currentId) === 0} aria-label="上一首" style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 16, opacity: order.indexOf(currentId) === 0 ? 0.4 : 1 }}>⏮</button>
           <button onClick={togglePlay} aria-label={playing ? "暫停" : "播放"} style={{ background: "var(--accent)", border: "none", borderRadius: "50%", width: 30, height: 30, color: "var(--accent-text)", cursor: "pointer", fontSize: 14, flexShrink: 0 }}>{playing ? "⏸" : "▶"}</button>
-          <button onClick={playNext} disabled={currentIndex === tracks.length - 1} aria-label="下一首" style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 16, opacity: currentIndex === tracks.length - 1 ? 0.4 : 1 }}>⏭</button>
+          <button onClick={playNext} disabled={order.indexOf(currentId) === order.length - 1} aria-label="下一首" style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 16, opacity: order.indexOf(currentId) === order.length - 1 ? 0.4 : 1 }}>⏭</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentTrack.text?.trim() || "（未命名音樂）"}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
@@ -669,6 +774,26 @@ function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen
     (p.audioUrl && (p.bookmarks || []).includes(profile.uid)) ||
     (p.videoUrl && (p.audioBookmarks || []).includes(profile.uid))
   );
+  // 使用者自己拖曳排過的順序存在 users/{uid}.audioFavoritesOrder（一串
+  // post id）——照這個順序排，裡面沒有的（新收藏、還沒排過的）補在最後面。
+  // 只有本人（isOwner）才能拖，看別人公開的收藏只能照對方排好的順序看。
+  const audioOrder = profile.audioFavoritesOrder || [];
+  const orderedAudioFavorites = useMemo(() => {
+    const byId = new Map(audioFavorites.map(t => [t.id, t]));
+    const ordered = audioOrder.map(id => byId.get(id)).filter(Boolean);
+    const seen = new Set(ordered.map(t => t.id));
+    return [...ordered, ...audioFavorites.filter(t => !seen.has(t.id))];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioFavorites, profile.audioFavoritesOrder]);
+
+  const handleReorderAudio = async (newTracks) => {
+    try {
+      await updateDoc(doc(db, "users", profile.uid), { audioFavoritesOrder: newTracks.map(t => t.id) });
+    } catch (e) {
+      console.error("[FavoritesTab] reorder audio favorites failed", e);
+      toast("排序儲存失敗，請重試");
+    }
+  };
 
   return (
     <div style={{ padding: 16 }}>
@@ -702,7 +827,7 @@ function FavoritesTab({ profile, isOwner, favoritePosts, favoritesLoaded, onOpen
       ) : audioFavorites.length === 0 ? (
         <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-dim)", fontSize: 13 }}>還沒有收藏任何音樂</div>
       ) : (
-        <AudioQueuePlayer tracks={audioFavorites} onPlayAudioQueue={onPlayAudioQueue} />
+        <AudioQueuePlayer tracks={orderedAudioFavorites} onPlayAudioQueue={onPlayAudioQueue} onReorder={isOwner ? handleReorderAudio : undefined} />
       )}
     </div>
   );
