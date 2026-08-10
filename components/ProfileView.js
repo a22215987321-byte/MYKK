@@ -194,6 +194,7 @@ function NewPostForm({ profile, onPosted }) {
       imageUrls: [],
       videoUrl: null,
       audioUrl: null,
+      thumbnailUrl: null,
       subtitles: null,
       likes: [],
       visibility,
@@ -203,11 +204,12 @@ function NewPostForm({ profile, onPosted }) {
     try {
       if (media.hasMedia) {
         console.log("[ProfileView.NewPostForm] uploading media", { imageCount: media.imageFiles.length, hasVideo: !!media.videoFile, hasAudio: !!media.audioFile });
-        const { imageUrls, videoUrl, audioUrl, subtitles } = await media.upload();
+        const { imageUrls, videoUrl, audioUrl, thumbnailUrl, subtitles } = await media.upload();
         payload.imageUrls = imageUrls;
         payload.imageUrl = imageUrls[0] || null;
         payload.videoUrl = videoUrl;
         payload.audioUrl = audioUrl;
+        payload.thumbnailUrl = thumbnailUrl || null;
         payload.subtitles = subtitles;
       }
       console.log("[ProfileView.NewPostForm] submitting post", {
@@ -361,7 +363,7 @@ function PostItem({ post, profile, isOwner, onTogglePin, onOpenMedia }) {
             )}
             {post.videoUrl && (
               <div style={{ borderRadius: 16, overflow: "hidden", marginTop: 10 }}>
-                <VideoPlayer src={post.videoUrl} subtitles={post.subtitles} />
+                <VideoPlayer src={post.videoUrl} poster={post.thumbnailUrl} subtitles={post.subtitles} />
               </div>
             )}
             {!post.videoUrl && post.imageUrl && (
@@ -395,9 +397,12 @@ function formatDuration(sec) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// YouTube 頻道頁那種影片縮圖卡：縮圖是影片本身的畫面（載入 metadata 後把
-// currentTime 撥到 0.1 秒，逼瀏覽器畫出一張真的畫面當封面，而不是黑畫面），
-// 右下角疊字幕長度，滑鼠移過去顯示標題跟讚數/時間。
+// YouTube 頻道頁那種影片縮圖卡——有 thumbnailUrl（新貼文，發文時就擷取好
+// 的封面圖，見 lib/useMediaAttachments.js）就直接顯示那張真的圖片，立刻
+// 顯示、不用等影片本身載入。沒有的話（這個功能上線前貼的舊影片）才回退
+// 用舊方法：載入 metadata 後把 currentTime 撥到 0.1 秒，逼瀏覽器畫出一張
+// 真的畫面當封面，不然會整個黑畫面。右下角疊字幕長度，滑鼠移過去顯示
+// 標題跟讚數/時間。
 function VideoThumb({ post, onOpen }) {
   const videoRef = useRef(null);
   const [duration, setDuration] = useState(0);
@@ -413,9 +418,15 @@ function VideoThumb({ post, onOpen }) {
     <button onClick={onOpen} type="button"
       style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: 10, overflow: "hidden" }}>
       <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", background: "#000", borderRadius: 10, overflow: "hidden" }}>
+        {/* video 一直掛著（只為了讀時長，見 onLoadedMetadata），有
+            thumbnailUrl 的話上面疊一張真的封面圖蓋住它，不然黑畫面/影片
+            本身那幀會透出來。 */}
         <video ref={videoRef} src={post.videoUrl} muted playsInline preload="metadata"
           onLoadedMetadata={onLoadedMetadata}
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }} />
+        {post.thumbnailUrl && (
+          <img src={post.thumbnailUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        )}
         {duration > 0 && (
           <span style={{ position: "absolute", right: 6, bottom: 6, background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 5px", borderRadius: 4 }}>
             {formatDuration(duration)}
@@ -1057,7 +1068,7 @@ function MediaLightbox({ mediaList, index, profile, viewerUid, myProfile, isMobi
             area never depends on how much text happens to be below it. */}
         <div style={{ position: "relative", flex: isMobile ? "0 0 62%" : "1 1 auto", height: isMobile ? undefined : "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           {post.videoUrl
-            ? <VideoPlayer src={post.videoUrl} autoPlay subtitles={post.subtitles} />
+            ? <VideoPlayer src={post.videoUrl} poster={post.thumbnailUrl} autoPlay subtitles={post.subtitles} />
             : images.length > 0 && <img src={images[imgIdx]} alt="貼文圖片" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
           }
           {images.length > 1 && (

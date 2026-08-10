@@ -250,7 +250,7 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel, initia
         </div>
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "10px 20px 40px" }}>
           <div style={{ borderRadius: 12, overflow: "hidden", background: "#000" }}>
-            <VideoPlayer key={watchVideo.id} src={watchVideo.videoUrl} autoPlay subtitles={watchVideo.subtitles} />
+            <VideoPlayer key={watchVideo.id} src={watchVideo.videoUrl} poster={watchVideo.thumbnailUrl} autoPlay subtitles={watchVideo.subtitles} />
           </div>
 
           <h1 style={{ fontSize: 19, fontWeight: 800, color: "var(--text)", margin: "16px 0 10px" }}>
@@ -317,8 +317,11 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel, initia
               <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6 }}>
                 {recommended.map(v => (
                   <div key={v.id} onClick={() => openVideo(v)} style={{ cursor: "pointer", width: 180, flexShrink: 0 }}>
-                    <div style={{ width: "100%", aspectRatio: "16 / 9", borderRadius: 10, overflow: "hidden", background: "#000" }}>
-                      <video src={v.videoUrl} muted preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", borderRadius: 10, overflow: "hidden", background: "#000" }}>
+                      {v.thumbnailUrl
+                        ? <img src={v.thumbnailUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        : <video src={v.videoUrl} muted preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      }
                     </div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", marginTop: 6, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                       {v.text?.trim() || "（無標題）"}
@@ -448,7 +451,10 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel, initia
                 {sortedVideos.map(v => (
                   <div key={v.id} onClick={() => openVideo(v)} style={{ cursor: "pointer" }}>
                     <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", borderRadius: 12, overflow: "hidden", background: "#000" }}>
-                      <video src={v.videoUrl} muted preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      {v.thumbnailUrl
+                        ? <img src={v.thumbnailUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        : <video src={v.videoUrl} muted preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      }
                     </div>
                     <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>

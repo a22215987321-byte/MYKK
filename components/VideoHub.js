@@ -52,9 +52,11 @@ function ChannelCard({ channel, viewerUid, onOpen, onToggleSubscribe }) {
   );
 }
 
-// 熱門影片格網用的縮圖卡——跟 ProfileView.js 的 VideoThumb 邏輯一樣（用
-// <video preload="metadata"> 讀出真正的時長跟一幀畫面當縮圖），多加了
-// 頻道名稱，因為這裡是跨頻道列表，需要標明是誰發的。
+// 熱門影片格網用的縮圖卡——跟 ProfileView.js 的 VideoThumb 邏輯一樣：有
+// thumbnailUrl（發文時就擷取好的封面圖，見 lib/useMediaAttachments.js）
+// 直接疊一張真的圖片上去，立刻顯示；沒有的話（舊影片）才回退用
+// <video preload="metadata"> 讀時長跟撥一幀畫面當縮圖。多加了頻道名稱，
+// 因為這裡是跨頻道列表，需要標明是誰發的。
 function VideoThumbCard({ video, onOpen }) {
   const videoRef = useRef(null);
   const [duration, setDuration] = useState(0);
@@ -73,6 +75,9 @@ function VideoThumbCard({ video, onOpen }) {
         <video ref={videoRef} src={video.videoUrl} muted playsInline preload="metadata"
           onLoadedMetadata={onLoadedMetadata}
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }} />
+        {video.thumbnailUrl && (
+          <img src={video.thumbnailUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        )}
         {duration > 0 && (
           <span style={{ position: "absolute", right: 6, bottom: 6, background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 5px", borderRadius: 4 }}>
             {formatDuration(duration)}

@@ -143,6 +143,50 @@ export function MediaBookmarkMenu({ post, bookmarked, onToggle }) {
   );
 }
 
+// 動態消息的貼文卡本來在兩個地方各放一顆看起來很像的收藏鈕——頁首一顆
+// MediaBookmarkMenu（只有影片/MP3貼文才有，管 audioBookmarks／收藏MP3）、
+// 貼文下方右邊一顆泛用的📑（管 bookmarks／收藏影片或泛用收藏），使用者
+// 反映「兩個收藏MP3圖案」分不清楚是同一個功能重複還是兩個不同功能。
+// 改成只留右下角這一顆：純文字/圖片/MP3貼文維持原樣直接切換；影片貼文
+// 點下去彈出兩個選項（收藏影片／收藏MP3），把 MediaBookmarkMenu 原本在
+// 頁首的功能收進同一顆按鈕的下拉選單裡，不再是畫面上兩顆各自獨立的圖示。
+function PostBookmarkButton({ post, bookmarked, audioBookmarked, onToggle, onToggleAudio }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const isVideo = !!post.videoUrl;
+
+  if (!isVideo) {
+    return (
+      <button onClick={onToggle} className="feed-action-btn"
+        style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: bookmarked ? "var(--accent)" : "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0, marginLeft: "auto" }}>
+        <span style={{ fontSize: 18 }}>{bookmarked ? "🔖" : "📑"}</span>
+      </button>
+    );
+  }
+
+  const anyBookmarked = bookmarked || audioBookmarked;
+  return (
+    <div style={{ position: "relative", marginLeft: "auto" }}>
+      <button ref={btnRef} onClick={() => setOpen(v => !v)} className="feed-action-btn" aria-label="收藏選項"
+        style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: anyBookmarked ? "var(--accent)" : "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}>
+        <span style={{ fontSize: 18 }}>{anyBookmarked ? "🔖" : "📑"}</span>
+      </button>
+      <PortalPopover anchorRef={btnRef} open={open} onClose={() => setOpen(false)} placement="top-right" minWidth={150}>
+        <div style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", overflow: "hidden" }}>
+          <button onClick={() => { onToggle(); setOpen(false); }}
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", padding: "10px 14px", color: "var(--text)", cursor: "pointer", fontSize: 13 }}>
+            <span>{bookmarked ? "🔖" : "📑"}</span> {bookmarked ? "取消收藏影片" : "收藏影片"}
+          </button>
+          <button onClick={() => { onToggleAudio(); setOpen(false); }}
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", padding: "10px 14px", color: "var(--text)", cursor: "pointer", fontSize: 13 }}>
+            <span>{audioBookmarked ? "🔖" : "🎵"}</span> {audioBookmarked ? "取消收藏 MP3" : "收藏 MP3"}
+          </button>
+        </div>
+      </PortalPopover>
+    </div>
+  );
+}
+
 function PostCard({ post, myUid, myProfile, onOpenProfile }) {
   const [showComments, setShowComments] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -245,11 +289,6 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
           </Link>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {(post.videoUrl || post.audioUrl) && (
-            <MediaBookmarkMenu post={post}
-              bookmarked={post.audioUrl ? bookmarked : audioBookmarked}
-              onToggle={post.audioUrl ? toggleBookmark : toggleAudioBookmark} />
-          )}
           {isMine && (
             <div style={{ position: "relative" }}>
               <button onClick={() => setMenuOpen(v => !v)}
@@ -317,7 +356,7 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
       {/* Video */}
       {post.videoUrl && (
         <div className="feed-media" style={{ width: "100%", background: "#000" }}>
-          <VideoPlayer src={post.videoUrl} subtitles={post.subtitles} />
+          <VideoPlayer src={post.videoUrl} poster={post.thumbnailUrl} subtitles={post.subtitles} />
         </div>
       )}
 
@@ -347,10 +386,8 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
           style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}>
           <Icon name="send" size={17} />
         </button>
-        <button onClick={toggleBookmark} className="feed-action-btn"
-          style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: bookmarked ? "var(--accent)" : "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0, marginLeft: "auto" }}>
-          <span style={{ fontSize: 18 }}>{bookmarked ? "🔖" : "📑"}</span>
-        </button>
+        <PostBookmarkButton post={post} bookmarked={bookmarked} audioBookmarked={audioBookmarked}
+          onToggle={toggleBookmark} onToggleAudio={toggleAudioBookmark} />
       </div>
 
       {/* Comments */}
@@ -491,6 +528,7 @@ function NewPostForm({ myProfile, onPosted }) {
       imageUrls: [],
       videoUrl: null,
       audioUrl: null,
+      thumbnailUrl: null,
       subtitles: null,
       likes: [],
       bookmarks: [],
@@ -501,11 +539,12 @@ function NewPostForm({ myProfile, onPosted }) {
     try {
       if (media.hasMedia) {
         console.log("[Feed.NewPostForm] uploading media", { imageCount: media.imageFiles.length, hasVideo: !!media.videoFile, hasAudio: !!media.audioFile });
-        const { imageUrls, videoUrl, audioUrl, subtitles } = await media.upload();
+        const { imageUrls, videoUrl, audioUrl, thumbnailUrl, subtitles } = await media.upload();
         payload.imageUrls = imageUrls;
         payload.imageUrl = imageUrls[0] || null;
         payload.videoUrl = videoUrl;
         payload.audioUrl = audioUrl;
+        payload.thumbnailUrl = thumbnailUrl || null;
         payload.subtitles = subtitles;
       }
       console.log("[Feed.NewPostForm] submitting post", {
