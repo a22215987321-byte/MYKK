@@ -3246,16 +3246,6 @@ export default function ChatApp({ user }) {
             )}
           </div>
 
-          {/* AI OFFICE——資料夾 rail 下方那顆切換鈕控制，Phase 1 只有辦公室
-              視覺場景（見 components/office/OfficeMode.js），任務/對話/
-              行事曆之後才接上，跟其他功能頁一樣用 resetAllViews() 互斥
-              切換，不開新頁面/路由。 */}
-          {showOffice && !activeFriendId && !activeGroupId && (
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-              <OfficeMode />
-            </div>
-          )}
-
           {/* Leaderboard view — warm-ivory "luxury magazine" pastel design,
               per an exact reference mock (see RANK_PALETTE above for the
               9 rank colors this pulls from). */}
@@ -4074,6 +4064,17 @@ export default function ChatApp({ user }) {
             onSelectVideo={() => { resetAllViews(); setShowVideoHub(true); settleDrawer(false); }}
             pendingCount={pendingInCount}
           />
+        )}
+
+        {/* AI OFFICE——資料夾 rail 下方那顆切換鈕控制。這裡不是 .cr-main
+            裡面的其中一塊，是蓋住整個 .cr-shell（絕對定位＋滿版，.cr-shell
+            本身是 position:relative）的獨立圖層——側欄、資料夾 rail、右欄
+            全部會被蓋住看不見，感覺像切到另一個頁面，但其實還是同一個 SPA、
+            沒有真的換路由。右上角 ✕ 關掉回到原本畫面。 */}
+        {showOffice && (
+          <div style={{ position: "absolute", inset: 0, zIndex: 400, borderRadius: "var(--shell-radius)", overflow: "hidden" }}>
+            <OfficeMode onClose={() => setShowOffice(false)} />
+          </div>
         )}
       </div>
 
