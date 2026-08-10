@@ -2977,7 +2977,13 @@ export default function ChatApp({ user }) {
           {/* AI OFFICE 切換鈕——點下去在同一個 SPA 裡切換模式，不開新頁面
               （見下面 showOffice && <OfficeMode/> 那段）。目前是 Phase 1：
               只有辦公室視覺場景，任務/對話/行事曆之後才會接上。 */}
-          <button onClick={() => { setShowOffice(v => !v); if (!showOffice) resetAllViews(); }} title="切換 AI Office"
+          {/* 之前這裡先 setShowOffice(v => !v) 再呼叫 resetAllViews()——但
+              resetAllViews() 內部也會 setShowOffice(false)，兩個更新在同一
+              個事件處理器裡排隊，後呼叫的贏，結果永遠被重置回 false，等於
+              點了完全沒反應。改成先算出「這次要切到的值」，resetAllViews()
+              歸零全部（含 showOffice）之後，最後才把 showOffice 設成真正
+              要的值，確保它是這批更新裡最後生效的那個。 */}
+          <button onClick={() => { const next = !showOffice; resetAllViews(); setShowOffice(next); }} title="切換 AI Office"
             style={{
               width: 56, height: "var(--railitem-h, 54px)", flexShrink: 0, boxSizing: "border-box",
               borderRadius: "var(--radius-lg, 18px)", border: "1px solid var(--border)", cursor: "pointer",
