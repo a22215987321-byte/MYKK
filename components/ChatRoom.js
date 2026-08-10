@@ -52,6 +52,12 @@ const AiCompanionRoom = dynamic(() => import("./AiCompanionRoom"), {
   ssr: false,
   loading: () => <LoadingState label="載入 AI 夥伴..." minHeight="100%" />,
 });
+// AI OFFICE（見 components/office/OfficeMode.js）——裡面用到 pixi.js/spine
+// 動畫引擎，體積不小，一樣延遲載入、只有真的切到這個模式才下載。
+const OfficeMode = dynamic(() => import("./office/OfficeMode"), {
+  ssr: false,
+  loading: () => <LoadingState label="載入 AI Office..." minHeight="100%" />,
+});
 import AiCompanionCreator from "./AiCompanionCreator";
 import UpgradeMembership, { UpgradeHighlights } from "./UpgradeMembership";
 import EmojiStickerPicker from "./EmojiStickerPicker";
@@ -1443,6 +1449,10 @@ export default function ChatApp({ user }) {
   // 從「影片」首頁的熱門影片格網直接點某支影片時，要記住是哪一支，讓
   // ChannelProfileView 一開就直接播放它，而不是先停在頻道列表頁再手動點。
   const [videoHubVideoId,    setVideoHubVideoId]    = useState(null);
+  // AI OFFICE 模式——資料夾 rail 下方那顆切換鈕控制，跟其他功能頁共用同一套
+  // resetAllViews() 機制，不是另外開一個路由/頁面。Phase 1 只有辦公室視覺
+  // 場景（見 components/office/OfficeMode.js），任務/對話/行事曆之後才接上。
+  const [showOffice,         setShowOffice]         = useState(false);
 
   // Mobile / sidebar states
   const isMobile = useIsMobile();
@@ -1577,6 +1587,7 @@ export default function ChatApp({ user }) {
     // 真的要離開某個頻道回到搜尋列表，是 ChannelProfileView 自己的返回鍵
     // 呼叫 setVideoHubUid(null)，不是靠切換頁面順便清掉。
     setShowVideoHub(false);
+    setShowOffice(false);
   }, []);
 
   // Cinema states
@@ -2892,18 +2903,22 @@ export default function ChatApp({ user }) {
           </div>
         </header>
 
-        {/* 資料夾 rail：側欄最左邊一條窄欄，只放資料夾圖示（Discord 伺服器欄
-            的概念）——AI 對話觸發鈕／「全部功能」／每個資料夾一個小圖案／
-            新增資料夾全部是同一個面板裡的項目，跟側欄本身是獨立的兩塊，收合
-            側欄不會連帶把這條 rail 也藏起來。整條窄欄只有這一個長方條方塊
-            （背景+邊框+圓角），高度撐滿，不再拆成「AI 鈕」跟「資料夾清單」
-            兩個各自有邊框的小方塊疊在一起——之前那樣中間會留一條看起來像
-            誤植的縫，現在是一整塊幽影風格的面板。 */}
+        {/* 資料夾 rail 外面再包一層直向欄——資料夾方塊本身縮小成「剛好容納
+            內容」的高度（不再撐滿整條側欄），下面多一顆「AI OFFICE」切換鈕，
+            點下去在同一個 SPA 裡切換模式（不開新頁面），見 showOffice 那段
+            渲染。 */}
         {!isMobile && (
+          <div style={{ display: "flex", flexDirection: "column", flexShrink: 0, gap: 10, margin: "12px 6px" }}>
+          {/* 資料夾 rail：側欄最左邊一條窄欄，只放資料夾圖示（Discord 伺服器欄
+              的概念）——AI 對話觸發鈕／「全部功能」／每個資料夾一個小圖案／
+              新增資料夾全部是同一個面板裡的項目，跟側欄本身是獨立的兩塊，收合
+              側欄不會連帶把這條 rail 也藏起來。這一整塊只有一個長方條方塊
+              （背景+邊框+圓角），高度改成跟著內容縮（maxHeight 45vh + 自己
+              捲動），不再霸佔整條側欄的高度。 */}
           <div className="cr-folder-rail" style={{
             width: 56, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "stretch",
-            gap: 10, padding: "14px 4px", overflowY: "auto", overflowX: "hidden",
-            margin: "12px 6px", borderRadius: "var(--radius-lg, 18px)",
+            gap: 10, padding: "14px 4px", overflowY: "auto", overflowX: "hidden", maxHeight: "45vh",
+            borderRadius: "var(--radius-lg, 18px)",
             background: "var(--panel)", border: "1px solid var(--border)", boxShadow: "var(--card-shadow)",
           }}>
             {aiChatAllowed && (
@@ -2957,6 +2972,23 @@ export default function ChatApp({ user }) {
               );
             })}
             <AddFolderRailButton onAdd={(name) => sidebarLayout.addFolder(name)} />
+          </div>
+
+          {/* AI OFFICE 切換鈕——點下去在同一個 SPA 裡切換模式，不開新頁面
+              （見下面 showOffice && <OfficeMode/> 那段）。目前是 Phase 1：
+              只有辦公室視覺場景，任務/對話/行事曆之後才會接上。 */}
+          <button onClick={() => { setShowOffice(v => !v); if (!showOffice) resetAllViews(); }} title="切換 AI Office"
+            style={{
+              width: 56, height: "var(--railitem-h, 54px)", flexShrink: 0, boxSizing: "border-box",
+              borderRadius: "var(--radius-lg, 18px)", border: "1px solid var(--border)", cursor: "pointer",
+              background: showOffice ? "linear-gradient(135deg,#f59e0b,#ef4444)" : "var(--panel)",
+              color: showOffice ? "#fff" : "var(--text-muted)",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+              boxShadow: "var(--card-shadow)",
+            }}>
+            <span style={{ fontSize: 18 }}>🏢</span>
+            <span style={{ fontSize: 8, fontWeight: 700 }}>OFFICE</span>
+          </button>
           </div>
         )}
 
@@ -3207,6 +3239,16 @@ export default function ChatApp({ user }) {
                 onOpenVideo={(channelUid, videoId) => { setVideoHubVideoId(videoId); setVideoHubUid(channelUid); }} />
             )}
           </div>
+
+          {/* AI OFFICE——資料夾 rail 下方那顆切換鈕控制，Phase 1 只有辦公室
+              視覺場景（見 components/office/OfficeMode.js），任務/對話/
+              行事曆之後才接上，跟其他功能頁一樣用 resetAllViews() 互斥
+              切換，不開新頁面/路由。 */}
+          {showOffice && !activeFriendId && !activeGroupId && (
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              <OfficeMode />
+            </div>
+          )}
 
           {/* Leaderboard view — warm-ivory "luxury magazine" pastel design,
               per an exact reference mock (see RANK_PALETTE above for the
