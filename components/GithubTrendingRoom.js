@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../lib/firebase";
-import { doc, setDoc, deleteDoc, serverTimestamp, onSnapshot, collection, query, orderBy } from "firebase/firestore";
+import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, collection, query, orderBy } from "firebase/firestore";
 import { toast } from "../lib/toast";
 
 function timeAgo(iso) {
@@ -24,6 +24,13 @@ function formatShortDate(input) {
   const d = input?.toDate ? input.toDate() : (input ? new Date(input) : null);
   if (!d || isNaN(d)) return "";
   return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+async function apiRequest(url, options) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `服務錯誤（${response.status}）`);
+  return data;
 }
 
 const LANG_COLORS = {
@@ -196,10 +203,109 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
   );
 }
 
+function Field({ label, value }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{value || "（無）"}</div>
+    </div>
+  );
+}
+
+// 收藏／6月Top100 共用的網格卡片——一行3個，點擊會原地展開成整行寬度
+// （gridColumn: "1 / -1"）、高度也跟著長出下面的格式區塊，不再像原本
+// RepoCard 那樣彈一個置中的彈窗。展開格式是「用途／主要語言／授權／星數／
+// 值得關注的原因」5 個欄位，跟每日熱門榜的「項目詳細/功能/運用」3 方塊是
+// 不同的呈現（使用者指定要這個格式），用途／值得關注的原因兩個文字欄位是
+// 現點現生成（見 /api/github/summarize-repo.js），生成一次後由呼叫端寫回
+// Firestore 快取，之後同一個 repo 不用再生成一次。
+function GithubGridCard({ repo, rank, bookmarked, onToggleBookmark, expanded, onToggleExpand, generating, pinnable, onPin }) {
+  const [menuPos, setMenuPos] = useState(null);
+  return (
+    <div
+      onClick={() => onToggleExpand(repo)}
+      onDoubleClick={pinnable ? (e) => { e.stopPropagation(); onPin(repo); } : undefined}
+      onContextMenu={e => { e.preventDefault(); setMenuPos({ x: e.clientX, y: e.clientY }); }}
+      title={pinnable ? "點擊展開／收合，左鍵雙擊置頂" : "點擊展開／收合"}
+      style={{
+        gridColumn: expanded ? "1 / -1" : "auto",
+        background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14,
+        padding: 14, cursor: "pointer", display: "flex", flexDirection: "column", gap: 10,
+      }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {rank != null && <div style={{ fontSize: 13, fontWeight: 800, color: "var(--text-faint)", width: 20, flexShrink: 0, textAlign: "center" }}>{rank}</div>}
+        {repo.ownerAvatar
+          ? <img src={repo.ownerAvatar} alt={repo.owner} style={{ width: 36, height: 36, borderRadius: 9, objectFit: "cover", flexShrink: 0 }} />
+          : <div style={{ width: 36, height: 36, borderRadius: 9, background: "var(--panel-alt)", flexShrink: 0 }} />}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {repo.fullName}
+            {bookmarked && <span style={{ marginLeft: 5, fontSize: 11 }} title="已收藏">⭐</span>}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+            <span>⭐ {repo.stars?.toLocaleString?.() ?? repo.stars}</span>
+            {repo.language && (
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: LANG_COLORS[repo.language] || "var(--text-faint)" }} />
+                {repo.language}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div onClick={e => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+          {repo.description && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{repo.description}</div>}
+          {generating ? (
+            <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "8px 0" }}>🤖 AI 生成中…</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+              <Field label="用途" value={repo.summaryPurpose} />
+              <Field label="主要語言" value={repo.language || "未標示"} />
+              <Field label="授權" value={repo.license || "未標示"} />
+              <Field label="星數" value={repo.stars?.toLocaleString?.() ?? repo.stars} />
+              <Field label="值得關注的原因" value={repo.summaryWhyNotable} />
+            </div>
+          )}
+          <a href={repo.url} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 12, color: "var(--accent)", textDecoration: "none", wordBreak: "break-all" }}>
+            {repo.url} →
+          </a>
+        </div>
+      )}
+
+      {menuPos && (
+        <>
+          <div onClick={() => setMenuPos(null)} style={{ position: "fixed", inset: 0, zIndex: 3099 }} />
+          <div style={{
+            position: "fixed", left: menuPos.x, top: menuPos.y, zIndex: 3100,
+            background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10,
+            boxShadow: "var(--card-shadow)", overflow: "hidden", minWidth: 120,
+          }}>
+            <button onClick={() => { onToggleBookmark(repo); setMenuPos(null); }}
+              style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "10px 14px", background: "none", border: "none", color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer" }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+              onMouseLeave={e => e.currentTarget.style.background = "none"}>
+              {bookmarked ? "❌ 取消收藏" : "⭐ 收藏"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const MONTH_KEY = "2026-06";
+
 // 每天自動更新一次的GitHub熱門新專案（過去7天內建立、星星數最高的10個）——
 // 資料是 pages/api/cron/github-trending.js 這支排程每天抓一次寫進 Firestore
 // 的快取，這裡單純讀，不會自己去打GitHub API（一堆使用者同時看這頁的話，
 // 沒登入的GitHub API一分鐘只能打10次，馬上就會被擋）。
+//
+// 「6月Top100」是另一份獨立資料——2026年6月整月建立、星星數最高的100個，
+// 一次性抓好放 siteData/githubTop100_2026-06（見
+// pages/api/github/fetch-month.js），不像熱門榜每天更新。
 //
 // 收藏是每個使用者自己的，存在 githubBookmarks/{uid}/items/{repoId}——存的
 // 是收藏當下的完整 repo 內容（不是只存個 id 回頭查 siteData），因為熱門榜
@@ -208,9 +314,14 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
 export default function GithubTrendingRoom({ uid }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("hot"); // "hot" | "bookmarks"
+  const [monthData, setMonthData] = useState(null);
+  const [monthLoading, setMonthLoading] = useState(true);
+  const [tab, setTab] = useState("hot"); // "hot" | "bookmarks" | "top100"
   const [bookmarks, setBookmarks] = useState([]);
   const [bookmarksReady, setBookmarksReady] = useState(false);
+  const [expandedBookmarkId, setExpandedBookmarkId] = useState(null);
+  const [expandedTop100Id, setExpandedTop100Id] = useState(null);
+  const [generatingId, setGeneratingId] = useState(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "siteData", "githubTrending"), snap => {
@@ -219,6 +330,17 @@ export default function GithubTrendingRoom({ uid }) {
     }, err => {
       console.error("[GithubTrendingRoom] snapshot failed", err);
       setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "siteData", `githubTop100_${MONTH_KEY}`), snap => {
+      setMonthData(snap.exists() ? snap.data() : null);
+      setMonthLoading(false);
+    }, err => {
+      console.error("[GithubTrendingRoom] month snapshot failed", err);
+      setMonthLoading(false);
     });
     return unsub;
   }, []);
@@ -245,10 +367,11 @@ export default function GithubTrendingRoom({ uid }) {
       if (bookmarkedIds.has(repoId)) {
         await deleteDoc(doc(db, "githubBookmarks", uid, "items", repoId));
       } else {
-        const { id, name, fullName, owner, ownerAvatar, description, url, stars, language, createdAt, summaryDetail, summaryFeatures, summaryUsage } = repo;
+        const { id, name, fullName, owner, ownerAvatar, description, url, stars, language, license, createdAt, summaryDetail, summaryFeatures, summaryUsage, summaryPurpose, summaryWhyNotable } = repo;
         await setDoc(doc(db, "githubBookmarks", uid, "items", repoId), {
-          id, name, fullName, owner, ownerAvatar, description: description || "", url, stars, language: language || "",
+          id, name, fullName, owner, ownerAvatar, description: description || "", url, stars, language: language || "", license: license || "",
           createdAt: createdAt || "", summaryDetail: summaryDetail || "", summaryFeatures: summaryFeatures || "", summaryUsage: summaryUsage || "",
+          summaryPurpose: summaryPurpose || "", summaryWhyNotable: summaryWhyNotable || "",
           bookmarkedAt: serverTimestamp(),
         });
       }
@@ -258,26 +381,81 @@ export default function GithubTrendingRoom({ uid }) {
     }
   };
 
+  // 雙擊收藏卡片置頂——收藏清單本來就是照 bookmarkedAt 由新到舊排序，把
+  // bookmarkedAt 重新蓋成現在，自然就排到最前面，不用另外加一個排序欄位。
+  const pinBookmark = async (repo) => {
+    if (!uid) return;
+    try {
+      await updateDoc(doc(db, "githubBookmarks", uid, "items", String(repo.id)), { bookmarkedAt: serverTimestamp() });
+      toast(`已把「${repo.fullName}」移到最前面`);
+    } catch (err) {
+      console.error("[GithubTrendingRoom] pinBookmark failed", err);
+      toast("置頂失敗，請重試");
+    }
+  };
+
+  const generateSummary = async (repo, writeBack) => {
+    setGeneratingId(repo.id);
+    try {
+      const result = await apiRequest("/api/github/summarize-repo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName: repo.fullName, description: repo.description, language: repo.language, stars: repo.stars, license: repo.license }),
+      });
+      await writeBack(result);
+    } catch (err) {
+      console.error("[GithubTrendingRoom] generateSummary failed", err);
+      toast(err.message || "AI 總結生成失敗，請重試");
+    } finally {
+      setGeneratingId(null);
+    }
+  };
+
+  const toggleBookmarkExpand = (repo) => {
+    if (expandedBookmarkId === repo.id) { setExpandedBookmarkId(null); return; }
+    setExpandedBookmarkId(repo.id);
+    if (!repo.summaryPurpose && !repo.summaryWhyNotable && uid) {
+      void generateSummary(repo, async (result) => {
+        await updateDoc(doc(db, "githubBookmarks", uid, "items", String(repo.id)), {
+          summaryPurpose: result.purpose || "", summaryWhyNotable: result.whyNotable || "",
+        });
+      });
+    }
+  };
+
+  const toggleTop100Expand = (repo) => {
+    if (expandedTop100Id === repo.id) { setExpandedTop100Id(null); return; }
+    setExpandedTop100Id(repo.id);
+    if (!repo.summaryPurpose && !repo.summaryWhyNotable) {
+      void generateSummary(repo, async (result) => {
+        const updatedRepos = (monthData?.repos || []).map(r => r.id === repo.id
+          ? { ...r, summaryPurpose: result.purpose || "", summaryWhyNotable: result.whyNotable || "" }
+          : r);
+        await setDoc(doc(db, "siteData", `githubTop100_${MONTH_KEY}`), { ...monthData, repos: updatedRepos }, { merge: true });
+      });
+    }
+  };
+
   const repos = data?.repos || [];
+  const monthRepos = monthData?.repos || [];
   const rangeLabel = data?.since && data?.updatedAt
     ? `${formatShortDate(data.since)}-${formatShortDate(data.updatedAt)}`
     : "";
-  const list = tab === "hot" ? repos : bookmarks;
 
   return (
     <div style={{ minHeight: "100%", background: "var(--bg)", color: "var(--text)" }}>
-      <div style={{ maxWidth: 720, padding: "20px 24px 80px" }}>
+      <div style={{ maxWidth: 900, padding: "20px 24px 80px" }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
           <h1 style={{ margin: "4px 0", fontSize: 22, fontWeight: 800 }}>
             🔥 GitHub 每週熱門專案{rangeLabel && ` ${rangeLabel}`}
           </h1>
-          {data?.updatedAt && (
+          {tab === "hot" && data?.updatedAt && (
             <div style={{ fontSize: 13, color: "var(--text-muted)", whiteSpace: "nowrap" }}>上次更新：{formatUpdatedAt(data.updatedAt)}</div>
           )}
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          {[["hot", "🔥 熱門"], ["bookmarks", "⭐ 收藏"]].map(([key, label]) => (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {[["hot", "🔥 熱門"], ["bookmarks", "⭐ 收藏"], ["top100", "🏆 6月 Top100"]].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{
                 border: "1px solid var(--border)", borderRadius: 999, padding: "6px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer",
@@ -289,20 +467,65 @@ export default function GithubTrendingRoom({ uid }) {
           ))}
         </div>
 
-        {(tab === "hot" ? loading : !bookmarksReady) ? (
-          <div style={{ textAlign: "center", color: "var(--text-faint)", padding: "60px 0" }}>載入中...</div>
-        ) : list.length === 0 ? (
-          <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "60px 20px" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>{tab === "hot" ? "🕐" : "⭐"}</div>
-            {tab === "hot" ? "還沒有資料，等下一次自動更新（每天一次）" : "還沒有收藏任何專案——右鍵點專案卡片就能收藏"}
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {list.map((repo, i) => (
-              <RepoCard key={repo.id} repo={repo} rank={i + 1}
-                bookmarked={bookmarkedIds.has(String(repo.id))} onToggleBookmark={toggleBookmark} />
-            ))}
-          </div>
+        {tab === "hot" && (
+          loading ? (
+            <div style={{ textAlign: "center", color: "var(--text-faint)", padding: "60px 0" }}>載入中...</div>
+          ) : repos.length === 0 ? (
+            <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "60px 20px" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🕐</div>
+              還沒有資料，等下一次自動更新（每天一次）
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {repos.map((repo, i) => (
+                <RepoCard key={repo.id} repo={repo} rank={i + 1}
+                  bookmarked={bookmarkedIds.has(String(repo.id))} onToggleBookmark={toggleBookmark} />
+              ))}
+            </div>
+          )
+        )}
+
+        {tab === "bookmarks" && (
+          !bookmarksReady ? (
+            <div style={{ textAlign: "center", color: "var(--text-faint)", padding: "60px 0" }}>載入中...</div>
+          ) : bookmarks.length === 0 ? (
+            <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "60px 20px" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>⭐</div>
+              還沒有收藏任何專案——右鍵點專案卡片就能收藏
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+              {bookmarks.map((repo, i) => (
+                <GithubGridCard key={repo.id} repo={repo} rank={i + 1}
+                  bookmarked pinnable onPin={pinBookmark}
+                  expanded={expandedBookmarkId === repo.id} onToggleExpand={toggleBookmarkExpand}
+                  generating={generatingId === repo.id} onToggleBookmark={toggleBookmark} />
+              ))}
+            </div>
+          )
+        )}
+
+        {tab === "top100" && (
+          monthLoading ? (
+            <div style={{ textAlign: "center", color: "var(--text-faint)", padding: "60px 0" }}>載入中...</div>
+          ) : monthRepos.length === 0 ? (
+            <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "60px 20px" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
+              還沒有 {MONTH_KEY} 的資料
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 12 }}>{MONTH_KEY} 建立、星數最高的 {monthRepos.length} 個開源專案</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                {monthRepos.map((repo, i) => (
+                  <GithubGridCard key={repo.id} repo={repo} rank={i + 1}
+                    bookmarked={bookmarkedIds.has(String(repo.id))}
+                    expanded={expandedTop100Id === repo.id} onToggleExpand={toggleTop100Expand}
+                    generating={generatingId === repo.id} onToggleBookmark={toggleBookmark} />
+                ))}
+              </div>
+            </>
+          )
         )}
       </div>
     </div>

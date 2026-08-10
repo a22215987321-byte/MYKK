@@ -150,6 +150,7 @@ export default async function handler(req, res) {
       url: item.html_url,
       stars: item.stargazers_count || 0,
       language: item.language || "",
+      license: item.license?.spdx_id || "",
       createdAt: item.created_at,
     }));
 
