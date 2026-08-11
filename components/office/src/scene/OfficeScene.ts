@@ -62,6 +62,13 @@ export class OfficeScene {
   private agentEntities = new Map<string, AgentEntity>()
   private deskEntities = new Map<string, DeskEntity>()
   private officeLayer: Container | null = null
+  // 使用者在場景還沒初始化完成（loadSpineAssets/loadOfficeAssets 這幾個
+  // await 還沒 resolve）就切到別的側欄頁面——SpineOfficeCanvas.tsx 的
+  // useEffect cleanup 會呼叫 destroy()，但當時還在跑的 init() 之後會恢復
+  // 執行，繼續用已經被 destroy() 摧毀的 this.world／this.app，直接爆
+  // 「Cannot read properties of null」。這個旗標讓 init() 在每個 await
+  // 後面檢查一次，發現已經被 destroy 就直接中止，不要再碰任何場景物件。
+  private disposed = false
 
   private movement = new MovementSystem()
   private animation = new AnimationSystem()
@@ -96,6 +103,10 @@ export class OfficeScene {
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
     })
+    if (this.disposed) {
+      app.destroy(true, { children: true })
+      return
+    }
 
     this.app = app
     container.appendChild(app.canvas)
@@ -105,7 +116,9 @@ export class OfficeScene {
     this.fitStage(width, height)
 
     await loadSpineAssets()
+    if (this.disposed) return
     const officeOk = await loadOfficeAssets()
+    if (this.disposed) return
     if (!officeOk) {
       console.error(
         '[Office] desk.png / chair.png 加载失败，工位将使用矢量占位图。请检查 public/assets/office/ 并硬刷新。',
@@ -247,10 +260,12 @@ export class OfficeScene {
   }
 
   destroy() {
+    this.disposed = true
     bindOfficeScene(null)
     this.app?.ticker.remove(this.onTick)
     this.app?.destroy(true, { children: true })
     this.app = null
+    this.world = null
     this.agentEntities.clear()
     this.deskEntities.clear()
     this.officeLayer = null
