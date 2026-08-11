@@ -9,6 +9,20 @@
   font-family: Inter, "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
   color: #181817;
 }
+/* 原始檔案還有一條 * { box-sizing: border-box; } 全域重置，也是同一次
+   DROP_SELECTORS 清掉之後忘了補的——後果比顏色更隱蔽：.task-card 這類
+   「width:100% + 自己的 padding/border」的元件，在瀏覽器預設的
+   content-box 模型下，padding／border 會加在 width:100% 算出來的寬度
+   之外，實際佔用寬度比父層容器還寬，超出的部分會被切在畫面看不見的地方
+   ——使用者反映「右邊任務完成方塊明顯突出了」就是這個：.task-card 算出
+   257px，父層 .right-rail 內容寬只有 231px，多出來的部分直接超出視窗
+   右緣。這裡補回等效的 border-box 重置，鎖在 .ai-office-root 範圍內。 */
+.ai-office-root,
+.ai-office-root *,
+.ai-office-root *::before,
+.ai-office-root *::after {
+  box-sizing: border-box;
+}
 .ai-office-root button,
 .ai-office-root input,
 .ai-office-root select,
