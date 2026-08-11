@@ -33,6 +33,18 @@ async function apiRequest(url, options) {
   return data;
 }
 
+const TAG_STYLE = {
+  display: "flex", alignItems: "center", gap: 5,
+  padding: "3px 10px", borderRadius: 999,
+  background: "var(--panel-alt)", border: "1px solid var(--border)",
+  fontSize: 12, color: "var(--text-muted)", fontWeight: 600,
+};
+
+const BODY_TEXT_STYLE = {
+  fontSize: 14, lineHeight: 1.7, color: "var(--text)",
+  margin: "0 0 14px", whiteSpace: "pre-wrap",
+};
+
 const LANG_COLORS = {
   JavaScript: "#f1e05a", TypeScript: "#3178c6", Python: "#3572A5", Go: "#00ADD8",
   Rust: "#dea584", Java: "#b07219", "C++": "#f34b7d", C: "#555555", Swift: "#F05138",
@@ -254,23 +266,52 @@ function GithubGridCard({ repo, rank, bookmarked, onToggleBookmark, expanded, on
         </div>
       </div>
 
+      {/* 展開後的詳細介紹——原本是一排等寬欄位的表格式排版（用途/語言/授權/
+          星數/原因五個方塊並排），中文內容欄太窄、每行被切得很短，「值得
+          關注的原因」又跟左邊擠在一起，整張卡片像表格不像文章。改成：頂部
+          小型橫向標籤（星數/語言/授權）取代原本各自佔一欄；主內容改左右
+          兩區（左 ~70% 放英文簡介+中文用途說明，右 ~30% 只放「為什麼值得
+          看」且限制在 3-4 行）；GitHub 連結獨立放最底部一行；整塊內容寬度
+          收窄到 93% 並置中，不貼滿卡片邊緣，讓文字有呼吸空間。 */}
       {expanded && (
-        <div onClick={e => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
-          {repo.description && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{repo.description}</div>}
+        <div onClick={e => e.stopPropagation()}
+          style={{ borderTop: "1px solid var(--border)", paddingTop: 14, width: "93%", margin: "0 auto", boxSizing: "border-box" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+            <span style={TAG_STYLE}>⭐ {repo.stars?.toLocaleString?.() ?? repo.stars}</span>
+            {repo.language && (
+              <span style={TAG_STYLE}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: LANG_COLORS[repo.language] || "var(--text-faint)" }} />
+                {repo.language}
+              </span>
+            )}
+            <span style={TAG_STYLE}>{repo.license || "未標示授權"}</span>
+          </div>
+
           {generating ? (
-            <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "8px 0" }}>🤖 AI 生成中…</div>
+            <div style={{ fontSize: 13, color: "var(--text-faint)", padding: "16px 0" }}>🤖 AI 生成中…</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-              <Field label="用途" value={repo.summaryPurpose} />
-              <Field label="主要語言" value={repo.language || "未標示"} />
-              <Field label="授權" value={repo.license || "未標示"} />
-              <Field label="星數" value={repo.stars?.toLocaleString?.() ?? repo.stars} />
-              <Field label="值得關注的原因" value={repo.summaryWhyNotable} />
+            <div style={{ display: "grid", gridTemplateColumns: "7fr 3fr", gap: 24, marginBottom: 16 }}>
+              <div style={{ minWidth: 0 }}>
+                {repo.description && (
+                  <p style={{ ...BODY_TEXT_STYLE, color: "var(--text-muted)", fontStyle: "italic" }}>{repo.description}</p>
+                )}
+                <p style={BODY_TEXT_STYLE}>{repo.summaryPurpose || "（還沒有介紹，點這張卡片會自動生成）"}</p>
+              </div>
+              <div style={{ minWidth: 0, borderLeft: "1px solid var(--border)", paddingLeft: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", marginBottom: 6, textTransform: "uppercase" }}>為什麼值得看</div>
+                <div style={{
+                  fontSize: 14, lineHeight: 1.7, color: "var(--text-muted)",
+                  display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden",
+                }}>
+                  {repo.summaryWhyNotable || "（無）"}
+                </div>
+              </div>
             </div>
           )}
+
           <a href={repo.url} target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: 12, color: "var(--accent)", textDecoration: "none", wordBreak: "break-all" }}>
-            {repo.url} →
+            style={{ display: "block", fontSize: 13, color: "var(--accent)", textDecoration: "none", wordBreak: "break-all", paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+            查看 GitHub →
           </a>
         </div>
       )}

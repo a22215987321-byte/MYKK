@@ -4068,13 +4068,14 @@ export default function ChatApp({ user }) {
           />
         )}
 
-        {/* AI OFFICE——資料夾 rail 下方那顆切換鈕控制。這裡不是 .cr-main
-            裡面的其中一塊，是蓋住整個 .cr-shell（絕對定位＋滿版，.cr-shell
-            本身是 position:relative）的獨立圖層——側欄、資料夾 rail、右欄
-            全部會被蓋住看不見，感覺像切到另一個頁面，但其實還是同一個 SPA、
-            沒有真的換路由。右上角 ✕ 關掉回到原本畫面。 */}
+        {/* AI OFFICE——資料夾 rail 下方那顆切換鈕控制。原本是蓋住 .cr-shell
+            的絕對定位圖層（fixed 在 shell 的圓角方塊裡），但 .cr-shell 本身
+            四周有留白／圓角，外面露出的是 body 的背景色——深色主題下這圈
+            留白會整片變黑，看起來像畫面外圍多了一圈黑邊。改成 position:fixed
+            蓋住整個瀏覽器視窗（不是只蓋 .cr-shell），不再受 shell 的
+            margin/圓角影響，才會是真正「整頁一個大方塊」。 */}
         {showOffice && aiChatAllowed && (
-          <div style={{ position: "absolute", inset: 0, zIndex: 400, borderRadius: "var(--shell-radius)", overflow: "hidden" }}>
+          <div style={{ position: "fixed", inset: 0, zIndex: 2000, overflow: "hidden" }}>
             <OfficeMode onClose={() => setShowOffice(false)} user={user} />
           </div>
         )}

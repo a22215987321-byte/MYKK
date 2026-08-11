@@ -384,7 +384,7 @@ export default function OfficeMode({ onClose, user }) {
   };
 
   return (
-    <div className="ai-office-root" style={{ position: "relative", height: "100%", width: "100%", overflow: "hidden" }}>
+    <div className="ai-office-root" style={{ position: "relative", height: "100%", width: "100%", overflow: "hidden", background: "#efefec" }}>
       <main className="app-shell">
         <aside className="sidebar">
           <div className="brand"><span className="brand-mark">🏢</span><span>AI Office</span></div>
@@ -468,7 +468,10 @@ export default function OfficeMode({ onClose, user }) {
             onClose={() => setChatOpen(false)} onSend={sendChatMessage} onOpenTask={openChatTask} />
         </section>
 
-        <aside className="right-rail">
+        {/* 開「新增任務」（含右欄快捷工具的「GitHub 整理」，其實也是開同一個
+            modalOpen）的時候把右欄整塊藏起來，不然彈窗背後那塊「目前任務流」
+            還露在旁邊，畫面感覺很擠。 */}
+        <aside className="right-rail" style={modalOpen ? { display: "none" } : undefined}>
           <div className="rail-title"><h2>目前任務流</h2><ListChecks size={22} /></div>
           <div className={`api-connection ${apiStatus.connected ? "online" : "offline"}`}>
             {apiStatus.connected ? <CloudCheck size={19} weight="fill" /> : <CloudSlash size={19} />}
