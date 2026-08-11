@@ -3930,7 +3930,10 @@ export default function ChatApp({ user }) {
           />
         )}
 
-        {/* Right panel: calendar overlay on mobile, sidebar on desktop */}
+        {/* Right panel: calendar overlay on mobile, sidebar on desktop. GitHub
+            熱門頁面整塊隱藏——右欄平常放群組/好友/公共大廳，跟 GitHub 頁面
+            無關，開著只是佔位置、擠壓中間內容寬度。 */}
+        {!showGithubTrending && (
         <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{
           width: `var(--cal-w-override, ${calWidth}px)`, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden",
           border: "var(--col-border, none)",
@@ -4054,6 +4057,7 @@ export default function ChatApp({ user }) {
             </div>
           )}
         </div>
+        )}
 
         {isMobile && (
           <ChatMobileTabBar

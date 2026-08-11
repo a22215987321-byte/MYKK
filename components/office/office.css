@@ -1,3 +1,14 @@
+/* 原本 ai-office 專案的 :root 有 color:#181817／font-family 這些基礎文字
+   樣式，被所有子元素繼承——CSS 過腳本轉成 .ai-office-root 前綴時，:root
+   本身在 DROP_SELECTORS 清單裡被整條拿掉（避免全站漏出去），但忘了在
+   .ai-office-root 補一份等效的，導致這裡的文字顏色變成繼承 EvonChat 外層
+   主題的顏色——如果那個主題剛好是深色系（文字接近白色），疊在 AI Office
+   自己這身淺色 UI 上就變成「白字白底看不到」。這裡補回來，鎖死在
+   .ai-office-root 範圍內，不會影響外層其他頁面。 */
+.ai-office-root {
+  font-family: Inter, "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  color: #181817;
+}
 .ai-office-root button,
 .ai-office-root input,
 .ai-office-root select,

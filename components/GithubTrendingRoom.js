@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { db } from "../lib/firebase";
 import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, collection, query, orderBy } from "firebase/firestore";
 import { toast } from "../lib/toast";
@@ -32,18 +32,6 @@ async function apiRequest(url, options) {
   if (!response.ok) throw new Error(data.error || `服務錯誤（${response.status}）`);
   return data;
 }
-
-const TAG_STYLE = {
-  display: "flex", alignItems: "center", gap: 5,
-  padding: "3px 10px", borderRadius: 999,
-  background: "var(--panel-alt)", border: "1px solid var(--border)",
-  fontSize: 12, color: "var(--text-muted)", fontWeight: 600,
-};
-
-const BODY_TEXT_STYLE = {
-  fontSize: 14, lineHeight: 1.7, color: "var(--text)",
-  margin: "0 0 14px", whiteSpace: "pre-wrap",
-};
 
 const LANG_COLORS = {
   JavaScript: "#f1e05a", TypeScript: "#3178c6", Python: "#3572A5", Go: "#00ADD8",
@@ -224,116 +212,126 @@ function Field({ label, value }) {
   );
 }
 
-// 收藏／6月Top100 共用的網格卡片——一行3個，點擊會原地展開成整行寬度
-// （gridColumn: "1 / -1"）、高度也跟著長出下面的格式區塊，不再像原本
-// RepoCard 那樣彈一個置中的彈窗。展開格式是「用途／主要語言／授權／星數／
-// 值得關注的原因」5 個欄位，跟每日熱門榜的「項目詳細/功能/運用」3 方塊是
-// 不同的呈現（使用者指定要這個格式），用途／值得關注的原因兩個文字欄位是
-// 現點現生成（見 /api/github/summarize-repo.js），生成一次後由呼叫端寫回
-// Firestore 快取，之後同一個 repo 不用再生成一次。
+function DetailRow({ label, children }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text)", whiteSpace: "pre-wrap" }}>{children}</div>
+    </div>
+  );
+}
+
+// 收藏／6月Top100 共用的網格卡片——一行3個小方塊，點擊會彈出一個獨立的
+// 置中詳情彈窗（跟每日熱門榜的預覽彈窗、AI Office 的結果彈窗同一種模式），
+// 不是原地在網格裡展開（那個排版試過，使用者反應像表格、很難讀）。彈窗
+// 內容照使用者指定的格式由上到下直排：連結／用途／主要語言／授權／星數／
+// 為何值得關注，不分左右欄。用途／為何值得關注是現點現生成（見
+// /api/github/summarize-repo.js），生成一次後由呼叫端寫回 Firestore 快取，
+// 之後同一個 repo 不用再生成一次。
 function GithubGridCard({ repo, rank, bookmarked, onToggleBookmark, expanded, onToggleExpand, generating, pinnable, onPin }) {
   const [menuPos, setMenuPos] = useState(null);
+  const nameRef = useRef(null);
+
+  // 專案名稱常見連字號（expo-content-transition），瀏覽器預設雙擊選字
+  // 只會選到連字號分隔的其中一段，不是整個名稱——這裡雙擊直接選整個名稱
+  // 節點的文字內容，選好使用者自己按 Ctrl+C 複製。
+  const selectWholeName = () => {
+    const el = nameRef.current;
+    if (!el || typeof window.getSelection !== "function") return;
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
   return (
-    <div
-      onClick={() => onToggleExpand(repo)}
-      onDoubleClick={pinnable ? (e) => { e.stopPropagation(); onPin(repo); } : undefined}
-      onContextMenu={e => { e.preventDefault(); setMenuPos({ x: e.clientX, y: e.clientY }); }}
-      title={pinnable ? "點擊展開／收合，左鍵雙擊置頂" : "點擊展開／收合"}
-      style={{
-        gridColumn: expanded ? "1 / -1" : "auto",
-        background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14,
-        padding: 14, cursor: "pointer", display: "flex", flexDirection: "column", gap: 10,
-      }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {rank != null && <div style={{ fontSize: 13, fontWeight: 800, color: "var(--text-faint)", width: 20, flexShrink: 0, textAlign: "center" }}>{rank}</div>}
-        {repo.ownerAvatar
-          ? <img src={repo.ownerAvatar} alt={repo.owner} style={{ width: 36, height: 36, borderRadius: 9, objectFit: "cover", flexShrink: 0 }} />
-          : <div style={{ width: 36, height: 36, borderRadius: 9, background: "var(--panel-alt)", flexShrink: 0 }} />}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {repo.fullName}
-            {bookmarked && <span style={{ marginLeft: 5, fontSize: 11 }} title="已收藏">⭐</span>}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-            <span>⭐ {repo.stars?.toLocaleString?.() ?? repo.stars}</span>
-            {repo.language && (
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: LANG_COLORS[repo.language] || "var(--text-faint)" }} />
-                {repo.language}
-              </span>
-            )}
+    <>
+      <div
+        onClick={() => onToggleExpand(repo)}
+        onDoubleClick={pinnable ? (e) => { e.stopPropagation(); onPin(repo); } : undefined}
+        onContextMenu={e => { e.preventDefault(); setMenuPos({ x: e.clientX, y: e.clientY }); }}
+        title={pinnable ? "點擊查看詳情，左鍵雙擊置頂" : "點擊查看詳情"}
+        style={{
+          background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14,
+          padding: 14, cursor: "pointer", display: "flex", flexDirection: "column", gap: 10,
+        }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {rank != null && <div style={{ fontSize: 13, fontWeight: 800, color: "var(--text-faint)", width: 20, flexShrink: 0, textAlign: "center" }}>{rank}</div>}
+          {repo.ownerAvatar
+            ? <img src={repo.ownerAvatar} alt={repo.owner} style={{ width: 36, height: 36, borderRadius: 9, objectFit: "cover", flexShrink: 0 }} />
+            : <div style={{ width: 36, height: 36, borderRadius: 9, background: "var(--panel-alt)", flexShrink: 0 }} />}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {repo.fullName}
+              {bookmarked && <span style={{ marginLeft: 5, fontSize: 11 }} title="已收藏">⭐</span>}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+              <span>⭐ {repo.stars?.toLocaleString?.() ?? repo.stars}</span>
+              {repo.language && (
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: LANG_COLORS[repo.language] || "var(--text-faint)" }} />
+                  {repo.language}
+                </span>
+              )}
+            </div>
           </div>
         </div>
+
+        {menuPos && (
+          <>
+            <div onClick={(e) => { e.stopPropagation(); setMenuPos(null); }} style={{ position: "fixed", inset: 0, zIndex: 3099 }} />
+            <div style={{
+              position: "fixed", left: menuPos.x, top: menuPos.y, zIndex: 3100,
+              background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10,
+              boxShadow: "var(--card-shadow)", overflow: "hidden", minWidth: 120,
+            }}>
+              <button onClick={(e) => { e.stopPropagation(); onToggleBookmark(repo); setMenuPos(null); }}
+                style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "10px 14px", background: "none", border: "none", color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}>
+                {bookmarked ? "❌ 取消收藏" : "⭐ 收藏"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* 展開後的詳細介紹——原本是一排等寬欄位的表格式排版（用途/語言/授權/
-          星數/原因五個方塊並排），中文內容欄太窄、每行被切得很短，「值得
-          關注的原因」又跟左邊擠在一起，整張卡片像表格不像文章。改成：頂部
-          小型橫向標籤（星數/語言/授權）取代原本各自佔一欄；主內容改左右
-          兩區（左 ~70% 放英文簡介+中文用途說明，右 ~30% 只放「為什麼值得
-          看」且限制在 3-4 行）；GitHub 連結獨立放最底部一行；整塊內容寬度
-          收窄到 93% 並置中，不貼滿卡片邊緣，讓文字有呼吸空間。 */}
       {expanded && (
-        <div onClick={e => e.stopPropagation()}
-          style={{ borderTop: "1px solid var(--border)", paddingTop: 14, width: "93%", margin: "0 auto", boxSizing: "border-box" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-            <span style={TAG_STYLE}>⭐ {repo.stars?.toLocaleString?.() ?? repo.stars}</span>
-            {repo.language && (
-              <span style={TAG_STYLE}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: LANG_COLORS[repo.language] || "var(--text-faint)" }} />
-                {repo.language}
-              </span>
-            )}
-            <span style={TAG_STYLE}>{repo.license || "未標示授權"}</span>
-          </div>
-
-          {generating ? (
-            <div style={{ fontSize: 13, color: "var(--text-faint)", padding: "16px 0" }}>🤖 AI 生成中…</div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "7fr 3fr", gap: 24, marginBottom: 16 }}>
-              <div style={{ minWidth: 0 }}>
-                {repo.description && (
-                  <p style={{ ...BODY_TEXT_STYLE, color: "var(--text-muted)", fontStyle: "italic" }}>{repo.description}</p>
-                )}
-                <p style={BODY_TEXT_STYLE}>{repo.summaryPurpose || "（還沒有介紹，點這張卡片會自動生成）"}</p>
+        <div role="dialog" aria-modal="true" onClick={() => onToggleExpand(repo)}
+          style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ maxWidth: 640, width: "100%", maxHeight: "82vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 22 }}>
+              {repo.ownerAvatar
+                ? <img src={repo.ownerAvatar} alt={repo.owner} style={{ width: 44, height: 44, borderRadius: 11, objectFit: "cover", flexShrink: 0 }} />
+                : <div style={{ width: 44, height: 44, borderRadius: 11, background: "var(--panel-alt)", flexShrink: 0 }} />}
+              <div ref={nameRef} onDoubleClick={selectWholeName}
+                style={{ flex: 1, minWidth: 0, fontSize: 18, fontWeight: 800, color: "var(--text)", lineHeight: 1.4, wordBreak: "break-word" }}>
+                {rank != null ? `${rank}. ` : ""}{repo.fullName}
               </div>
-              <div style={{ minWidth: 0, borderLeft: "1px solid var(--border)", paddingLeft: 20 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", marginBottom: 6, textTransform: "uppercase" }}>為什麼值得看</div>
-                <div style={{
-                  fontSize: 14, lineHeight: 1.7, color: "var(--text-muted)",
-                  display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden",
-                }}>
-                  {repo.summaryWhyNotable || "（無）"}
-                </div>
-              </div>
+              <button onClick={() => onToggleExpand(repo)} aria-label="關閉"
+                style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 4, flexShrink: 0 }}>✕</button>
             </div>
-          )}
 
-          <a href={repo.url} target="_blank" rel="noopener noreferrer"
-            style={{ display: "block", fontSize: 13, color: "var(--accent)", textDecoration: "none", wordBreak: "break-all", paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-            查看 GitHub →
-          </a>
+            {generating ? (
+              <div style={{ fontSize: 13, color: "var(--text-faint)", padding: "16px 0" }}>🤖 AI 生成中…</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                <DetailRow label="連結">
+                  <a href={repo.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none", wordBreak: "break-all" }}>{repo.url}</a>
+                </DetailRow>
+                <DetailRow label="用途">{repo.summaryPurpose || "（還沒有介紹，點這張卡片會自動生成）"}</DetailRow>
+                <DetailRow label="主要語言">{repo.language || "未標示"}</DetailRow>
+                <DetailRow label="授權">{repo.license || "未標示"}</DetailRow>
+                <DetailRow label="星數">{repo.stars?.toLocaleString?.() ?? repo.stars}</DetailRow>
+                <DetailRow label="為何值得關注">{repo.summaryWhyNotable || "（無）"}</DetailRow>
+              </div>
+            )}
+          </div>
         </div>
       )}
-
-      {menuPos && (
-        <>
-          <div onClick={() => setMenuPos(null)} style={{ position: "fixed", inset: 0, zIndex: 3099 }} />
-          <div style={{
-            position: "fixed", left: menuPos.x, top: menuPos.y, zIndex: 3100,
-            background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10,
-            boxShadow: "var(--card-shadow)", overflow: "hidden", minWidth: 120,
-          }}>
-            <button onClick={() => { onToggleBookmark(repo); setMenuPos(null); }}
-              style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "10px 14px", background: "none", border: "none", color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer" }}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
-              onMouseLeave={e => e.currentTarget.style.background = "none"}>
-              {bookmarked ? "❌ 取消收藏" : "⭐ 收藏"}
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+    </>
   );
 }
 
