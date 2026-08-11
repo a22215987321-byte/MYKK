@@ -251,6 +251,15 @@ export default function OfficeMode({ onClose, user }) {
       .catch(() => setApiStatus((current) => ({ ...current, loading: false, connected: false })));
   }, []);
 
+  // 日程排程主要靠 Vercel Cron 每天跑一次（免費方案的 Cron 只能設定一天一次，
+  // 見 vercel.json），但使用者實際開著 AI Office 的時候，額外在這裡也主動
+  // 打一次同一支 API，讓已經到期的排程不用等到隔天的 Cron 才執行——兩邊
+  // 呼叫的是同一支端點，該端點本身有「只處理到期的 scheduled 項目」的判斷，
+  // 重複呼叫不會重複執行同一筆。
+  useEffect(() => {
+    apiRequest("/api/cron/office-schedules", { method: "POST" }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     const q = query(collection(db, "officeTasks"), orderBy("createdAt", "desc"), fsLimit(300));
     return onSnapshot(q, (snap) => {
