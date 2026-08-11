@@ -28,14 +28,23 @@
 .ai-office-root select,
 .ai-office-root textarea { font: inherit; }
 .ai-office-root button { color: inherit; }
+/* 外殼版面——參考 shadcnstore/shadcn-dashboard-landing-template 的
+   sidebar + SidebarInset 思路：側欄/右欄用 rem 定義的 CSS 變數（不是寫死
+   px），中間主欄用 flex:1 自動撐滿剩餘空間（等同它們 SidebarInset 的
+   flex-1），而不是 CSS Grid 三個固定/半固定的欄寬——這樣任何螢幕寬度、
+   側欄寬度改變時，主欄永遠用「剩下多少就填多少」計算，不會有算錯導致
+   溢出的固定寬度算式。三個中斷點（1480/1180/860px）沿用原本就有、已經
+   調過的收合行為，只是把裡面「改 grid-template-columns 的固定px」換成
+   「改這兩個 CSS 變數」。 */
 .ai-office-root .app-shell {
+  --office-sidebar-w: 13rem;
+  --office-rail-w: 15.75rem;
   width: 100%;
   max-width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 208px minmax(0, 1fr) 252px;
+  display: flex;
   background: #efefec;
   overflow: hidden;
   isolation: isolate;
@@ -44,18 +53,29 @@
 .ai-office-root .right-rail {
   min-width: 0;
   min-height: 0;
+  flex: 0 0 auto;
   background: #fbfbfa;
   border-color: #e4e4df;
   border-style: solid;
   z-index: 4;
 }
 .ai-office-root .sidebar {
+  width: var(--office-sidebar-w);
   border-width: 0 1px 0 0;
   padding: 15px 14px 10px;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+.ai-office-root .right-rail { width: var(--office-rail-w); }
+.ai-office-root .main-column {
+  flex: 1 1 0%;
+  /* 讓內部卡片格線之後如果想用 @container 查詢，有一個容器可以量——
+     這次先只建立這個 containment context（純基礎建設，不影響現有版面），
+     卡片本身的排版沒有動。 */
+  container-type: inline-size;
+  container-name: office-main;
 }
 .ai-office-root .brand {
   display: flex;
@@ -744,7 +764,7 @@
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 @media (max-width: 1480px) {
-.ai-office-root .app-shell { grid-template-columns: 190px minmax(0, 1fr) 232px; }
+.ai-office-root .app-shell { --office-sidebar-w: 11.875rem; --office-rail-w: 14.5rem; }
 .ai-office-root .sidebar { padding-inline: 11px; }
 .ai-office-root .primary-nav button,
 .ai-office-root .workspace-block button { gap: 9px; padding-inline: 10px; }
@@ -759,7 +779,7 @@
 
 
 @media (max-width: 1180px) {
-.ai-office-root .app-shell { grid-template-columns: 184px minmax(0, 1fr); }
+.ai-office-root .app-shell { --office-sidebar-w: 11.5rem; }
 .ai-office-root .right-rail { display: none; }
 .ai-office-root .note-grid,
 .ai-office-root .github-tool-grid,
@@ -771,7 +791,7 @@
 
 
 @media (max-width: 860px) {
-.ai-office-root .app-shell { grid-template-columns: 70px minmax(0, 1fr); }
+.ai-office-root .app-shell { --office-sidebar-w: 4.375rem; }
 .ai-office-root .sidebar { padding: 12px 8px; align-items: center; }
 .ai-office-root .brand { padding-inline: 0; }
 .ai-office-root .brand > span:last-child,
