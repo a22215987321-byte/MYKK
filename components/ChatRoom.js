@@ -1433,7 +1433,7 @@ export default function ChatApp({ user }) {
   // 狀態，跟桌面版雙方塊完全脫鉤（見下面 moreMenuState/moreMenuSetters）。
   const [blocks, setBlocks] = useState({
     A: { tabs: ["feed"], active: "feed" },
-    B: { tabs: ["conversations"], active: "conversations" },
+    B: { tabs: [], active: null },
   });
   const [focusedBlock, setFocusedBlock] = useState("A");
   // 預設 "feed"（不是 null）是刻意的：跟桌面版 blocks.A 預設開 feed 分頁
@@ -1536,10 +1536,9 @@ export default function ChatApp({ user }) {
   // 桌面版可拖曳調整寬度：側欄跟日曆欄各自的寬度、拖完存 localStorage，
   // 中間 <main> 本來就是 flex:1，兩邊寬度一變它自動跟著縮放，不用另外處理。
   const SIDEBAR_DEFAULT_WIDTH = 236;
-  // 原本是給右欄那條窄窄的好友清單設計的預設寬度/可調範圍（200-420）——
-  // 現在右欄變成一塊跟左邊一樣重的「大方塊」（B塊），拉寬預設值跟上限，
-  // 兩塊才拉得到接近對半。
-  const CAL_DEFAULT_WIDTH = 480;
+  // 右欄是窄窄的好友/群組/公共大廳固定清單（不是分頁方塊），寬度給一個
+  // 適合清單而非內容頁面的預設值。
+  const CAL_DEFAULT_WIDTH = 252;
   // 資料夾 rail（.cr-folder-rail）固定寬度——收合/展開按鈕是 .cr-sidebar 的
   // sibling、用 left 絕對定位貼齊側欄邊界，rail 插進 .cr-shell 之後側欄本身
   // 往右挪了這麼多，這裡也要跟著補上，不然按鈕位置會對不準。
@@ -1564,7 +1563,7 @@ export default function ChatApp({ user }) {
       const sw = parseInt(localStorage.getItem("cr-sidebar-width"), 10);
       if (sw >= 220 && sw <= 420) setSidebarWidth(sw);
       const cw = parseInt(localStorage.getItem("cr-cal-width"), 10);
-      if (cw >= 320 && cw <= 900) setCalWidth(cw);
+      if (cw >= 200 && cw <= 420) setCalWidth(cw);
     } catch {}
   }, []);
 
@@ -1574,8 +1573,8 @@ export default function ChatApp({ user }) {
     const startX = e.clientX;
     const startWidth = which === "sidebar" ? sidebarWidth : calWidth;
     const setW = which === "sidebar" ? setSidebarWidth : setCalWidth;
-    const min = which === "sidebar" ? 220 : 320;
-    const max = which === "sidebar" ? 420 : 900;
+    const min = which === "sidebar" ? 220 : 200;
+    const max = which === "sidebar" ? 420 : 420;
     const onMove = (ev) => {
       // Calendar panel sits on the right edge, so dragging it right should
       // shrink it (not grow) — flip the delta's sign for that one handle.
@@ -2602,16 +2601,17 @@ export default function ChatApp({ user }) {
   };
   const sidebarItemPadding = { padding: "0 10px 6px" };
 
-  // ===== 「對話」分頁內容（取代原本永久固定的右欄 .cr-cal）=====
-  // 桌面版專用的公共大廳/群組/好友清單——跟手機版那份（在下面 isMobile
-  // 分支裡，維持原樣沒動）是分開authored的兩份 JSX，樣式/觸控尺寸本來就
-  // 不一樣。點群組/好友這裡故意不呼叫 resetAllViews()：這是雙方塊分頁
-  // 系統下的其中一個分頁，選了誰只是讓這個分頁自己的內容從「清單」換成
-  // 「對話串」，不該把其他已經開著的分頁也一起關掉。
+  // ===== 右欄固定清單（.cr-cal，桌面版永久顯示，不是分頁）=====
+  // 跟手機版那份（在下面 isMobile 分支裡，維持原樣沒動）是分開 authored
+  // 的兩份 JSX，樣式/觸控尺寸本來就不一樣。點群組/好友這裡故意不呼叫
+  // resetAllViews()：這只是切換「目前選中的對話對象」，不該把已經開著
+  // 的其他分頁一起關掉；同時要 openTab("conversations")，確保目前作用中
+  // 的那塊（A 或 B）真的有「對話」這個分頁在顯示，不然選了好友畫面卻
+  // 沒地方能顯示對話串。
   const conversationsListPane = (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
       <div style={{ padding: "8px 8px 4px" }}>
-        <button onClick={() => { setActiveFriendId(null); setActiveGroupId(null); }} className={`fb ${!activeFriendId && !activeGroupId ? "act" : ""}`}>
+        <button onClick={() => { setActiveFriendId(null); setActiveGroupId(null); openTab("conversations"); }} className={`fb ${!activeFriendId && !activeGroupId ? "act" : ""}`}>
           <div className="cr-fb-icon" style={{ width: 44, height: 44, fontSize: 20, background: "linear-gradient(135deg,var(--accent-2),#a855f7)" }}>💬</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="cr-fb-name" style={{ fontSize: 14 }}># 公共大廳</div>
@@ -2630,7 +2630,7 @@ export default function ChatApp({ user }) {
         {myGroups.map(group => {
           const isActive = activeGroupId === group.id;
           return (
-            <button key={group.id} onClick={() => { setActiveFriendId(null); setActiveGroupId(group.id); }}
+            <button key={group.id} onClick={() => { setActiveFriendId(null); setActiveGroupId(group.id); openTab("conversations"); }}
               className={`fb ${isActive ? "act" : ""}`}>
               <div style={{ position: "relative", flexShrink: 0 }}>
                 <div className="cr-fb-icon" style={{ width: 44, height: 44, fontSize: 20 }}>
@@ -2670,7 +2670,7 @@ export default function ChatApp({ user }) {
         {myFriends.map(friend => {
           const isActive = activeFriendId === friend.uid;
           return (
-            <button key={friend.uid} onClick={() => { setActiveGroupId(null); setActiveFriendId(friend.uid); }}
+            <button key={friend.uid} onClick={() => { setActiveGroupId(null); setActiveFriendId(friend.uid); openTab("conversations"); }}
               onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, friend }); }}
               className={`fb ${isActive ? "act" : ""}`}>
               <div style={{ position: "relative", flexShrink: 0 }}>
@@ -2826,6 +2826,64 @@ export default function ChatApp({ user }) {
       )}
       {activeFriendId && !activeFriendProfile && (
         <div role="status" aria-live="polite" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)" }}>載入中...</div>
+      )}
+      {/* 沒有選中任何好友/群組時，「對話」分頁預設顯示公共大廳——跟右邊
+          固定欄（好友/群組清單）分開：清單負責瀏覽選人，選了誰、或什麼
+          都沒選，這裡負責顯示對應的聊天內容。 */}
+      {!activeFriendId && !activeGroupId && (
+        <>
+          <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
+            <span style={{ fontSize: 20 }}>💬</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}># 公共大廳</div>
+              <div style={{ fontSize: 11, color: "var(--text-faint)" }}>大家都可以看到這裡的訊息</div>
+            </div>
+          </div>
+          <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, background: "transparent" }}>
+            <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 12, padding: "8px 0 16px" }}>
+              今天 · {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric" })}
+            </div>
+            {hallMessages.length === 0 && (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
+                <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
+                <div>大廳還沒有訊息，來說第一句話吧！</div>
+              </div>
+            )}
+            {hallMessages.map((msg, i) => {
+              if (msg.isSystem) return (
+                <div key={msg.id} style={{ textAlign: "center", marginBottom: 10 }}>
+                  <span style={{ background: "var(--panel)", color: "var(--text-faint)", fontSize: 12, padding: "5px 14px", borderRadius: 20, border: "1px solid var(--border)" }}>ℹ️ {msg.text}</span>
+                </div>
+              );
+              const isMine = msg.senderId === uid;
+              const showSender = !isMine && hallMessages[i-1]?.senderId !== msg.senderId;
+              return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["hall_messages", msg.id]} msgFontSize={msgFontSize} prevCreatedAt={hallMessages[i-1]?.createdAt} />;
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+          <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
+              <input ref={hallFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendHallMedia(f); e.target.value = ""; } }} />
+              <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片/影片"
+                style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: hallUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
+                {hallUploading ? "⏳" : "📎"}
+              </button>
+              <button ref={hallEmojiBtnRef} onClick={() => { if (isMobile && document.activeElement?.blur) document.activeElement.blur(); setEmojiPickerOpen(v => v === 'hall' ? null : 'hall'); }} title="表情/手勢"
+                style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
+                😊
+              </button>
+              <input type="text" value={hallInput} onChange={e => setHallInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendHall()} placeholder="輸入訊息..."
+                style={{ flex: 1, minWidth: 0, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
+              <button className="sb" onClick={sendHall} style={{ background: "var(--sendbtn-bg, var(--accent))", border: "none", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--sendbtn-width, auto)", height: "var(--sendbtn-height, auto)", boxSizing: "border-box", padding: "9px 16px", color: "var(--accent-text)", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>傳送</button>
+            </div>
+            {emojiPickerOpen === 'hall' && (
+              <EmojiStickerPicker isMobile={isMobile} anchorRef={hallEmojiBtnRef} uid={uid}
+                onClose={() => setEmojiPickerOpen(null)}
+                onInsertEmoji={ch => setHallInput(v => v + ch)}
+                onSendItem={item => sendHallItem(item)} />
+            )}
+          </div>
+        </>
       )}
     </>
   );
@@ -3047,7 +3105,7 @@ export default function ChatApp({ user }) {
     githubTrending: <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><GithubTrendingRoom uid={uid} /></div>,
     ieltsBand4: <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><IeltsBand4 onNav={() => closeTab(keyBlock.ieltsBand4, "ieltsBand4")} /></div>,
     englishMcq: <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishMcqPractice onNav={() => closeTab(keyBlock.englishMcq, "englishMcq")} /></div>,
-    conversations: activeFriendId || activeGroupId ? conversationsThreadPane : conversationsListPane,
+    conversations: conversationsThreadPane,
   };
 
   return (
@@ -3363,7 +3421,7 @@ export default function ChatApp({ user }) {
             ℹ️ 個人資料
           </button>
           <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
-          <button onClick={() => { setActiveFriendId(contextMenu.friend.uid); setActiveGroupId(null); setContextMenu(null); }}
+          <button onClick={() => { setActiveFriendId(contextMenu.friend.uid); setActiveGroupId(null); openTab("conversations"); setContextMenu(null); }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 14px", color: "var(--text)", background: "none", border: "none", textAlign: "left", fontSize: 13, cursor: "pointer" }}
             onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
             onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
@@ -3391,7 +3449,7 @@ export default function ChatApp({ user }) {
                 {friendInfo.bio && <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 10, lineHeight: 1.6 }}>{friendInfo.bio}</div>}
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button onClick={() => { setActiveFriendId(friendInfo.uid); setActiveGroupId(null); setFriendInfo(null); }}
+                <button onClick={() => { setActiveFriendId(friendInfo.uid); setActiveGroupId(null); openTab("conversations"); setFriendInfo(null); }}
                   style={{ flex: 1, background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 0", color: "var(--accent-text)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   💬 傳送訊息                </button>
                 <Link href={`/profile/${friendInfo.uid}`} onClick={() => setFriendInfo(null)}
@@ -3769,7 +3827,10 @@ export default function ChatApp({ user }) {
             跟 sidebar 同步、零延遲；抽屜關閉時固定在 translateX(0)。 */}
         <main ref={mainElRef} className="cr-main"
           style={{
-            flex: 1, display: (isMobile && mobileView === 'more') ? "none" : "flex", flexDirection: "column", minWidth: 0, minHeight: 0,
+            flex: 1, display: (isMobile && mobileView === 'more') ? "none" : "flex",
+            // 手機版單欄直向堆疊；桌面版左右並排兩塊分頁大方塊（見下面 isMobile
+            // 分支），所以這裡的 flexDirection 要跟著切。
+            flexDirection: isMobile ? "column" : "row", minWidth: 0, minHeight: 0,
             // Same reasoning as .cr-shell above, including --force-shell-bg.
             background: "var(--force-shell-bg, var(--chat-world-transparent, var(--bg)))",
           }}>
@@ -3958,19 +4019,39 @@ export default function ChatApp({ user }) {
             )
               )
             ) : (
-            <>
-              <TabBar block="A" tabs={blocks.A.tabs} active={blocks.A.active} meta={TAB_META}
-                onActivate={activateTab} onClose={closeTab} controller={tabDrag} />
-              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                {blocks.A.tabs.length === 0 ? (
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>從左側點一個功能開始，或把分頁拖過來這裡</div>
-                ) : blocks.A.tabs.map(key => (
-                  <div key={key} style={{ flex: 1, minHeight: 0, display: key === blocks.A.active ? "flex" : "none", flexDirection: "column" }}>
-                    {CONTENT_REGISTRY[key]}
+              // 桌面版：中間版面本身分成左右兩塊獨立分頁大方塊（A/B），各自
+              // 有自己的分頁列——右邊固定的好友/群組清單欄（.cr-cal）是完全
+              // 分開的第三塊，不是 B 塊，見下面 .cr-cal 那段。兩塊中間用細
+              // 分隔線隔開，寬度固定對半（沒有另外做可拖曳調整，使用者只
+              // 要求分頁可以拖曳搬到另一塊，沒有要求兩塊寬度互相可調）。
+              <>
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--panel)" }}>
+                  <TabBar block="A" tabs={blocks.A.tabs} active={blocks.A.active} meta={TAB_META}
+                    onActivate={activateTab} onClose={closeTab} controller={tabDrag} />
+                  <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                    {blocks.A.tabs.length === 0 ? (
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>從左側點一個功能開始，或把分頁拖過來這裡</div>
+                    ) : blocks.A.tabs.map(key => (
+                      <div key={key} style={{ flex: 1, minHeight: 0, display: key === blocks.A.active ? "flex" : "none", flexDirection: "column" }}>
+                        {CONTENT_REGISTRY[key]}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </>
+                </div>
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                  <TabBar block="B" tabs={blocks.B.tabs} active={blocks.B.active} meta={TAB_META}
+                    onActivate={activateTab} onClose={closeTab} controller={tabDrag} />
+                  <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                    {blocks.B.tabs.length === 0 ? (
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>把分頁拖過來這裡，或從左側點一個功能開始</div>
+                    ) : blocks.B.tabs.map(key => (
+                      <div key={key} style={{ flex: 1, minHeight: 0, display: key === blocks.B.active ? "flex" : "none", flexDirection: "column" }}>
+                        {CONTENT_REGISTRY[key]}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
             )
           }
         </main>
@@ -3999,12 +4080,11 @@ export default function ChatApp({ user }) {
           />
         )}
 
-        {/* 右側大方塊（Block B）：桌面版是分頁列 + 內容，跟 Block A 同一套
-            機制——群組/好友/公共大廳現在是「對話」這個可開關的分頁，不再
-            永久固定；手機版維持原樣：日曆備忘錄浮層（calendarOpen 控制的
-            獨立疊層，跟雙方塊分頁系統完全脫鉤）。GitHub 熱門現在只是普通
-            分頁，不再需要「開著就把整個右欄藏起來」那個特例，右欄一律
-            顯示。 */}
+        {/* 右欄：桌面版是永久固定的好友/群組/公共大廳清單（沒有分頁列，
+            跟中間那兩塊分頁大方塊是完全分開的第三塊）；手機版維持原樣：
+            日曆備忘錄浮層（calendarOpen 控制的獨立疊層，跟雙方塊分頁系統
+            完全脫鉤）。GitHub 熱門現在只是普通分頁，不再需要「開著就把
+            整個右欄藏起來」那個特例，右欄一律顯示。 */}
         <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{
           width: `var(--cal-w-override, ${calWidth}px)`, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden",
           border: "var(--col-border, none)",
@@ -4027,22 +4107,10 @@ export default function ChatApp({ user }) {
               {activeSpanishNotes && <PageNotes noteKey={activeSpanishNotes.key} pageTitle={activeSpanishNotes.title} />}
               <CalendarMemo uid={uid} />
             </>
+          ) : (blocks.A.active === "upgrade" || blocks.B.active === "upgrade") ? (
+            <UpgradeHighlights />
           ) : (
-            <>
-              <TabBar block="B" tabs={blocks.B.tabs} active={blocks.B.active} meta={TAB_META}
-                onActivate={activateTab} onClose={closeTab} controller={tabDrag} />
-              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                {blocks.B.tabs.length === 0 && blocks.A.active === "upgrade" ? (
-                  <UpgradeHighlights />
-                ) : blocks.B.tabs.length === 0 ? (
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>把分頁拖過來這裡，或點左側「對話」開始</div>
-                ) : blocks.B.tabs.map(key => (
-                  <div key={key} style={{ flex: 1, minHeight: 0, display: key === blocks.B.active ? "flex" : "none", flexDirection: "column" }}>
-                    {CONTENT_REGISTRY[key]}
-                  </div>
-                ))}
-              </div>
-            </>
+            conversationsListPane
           )}
         </div>
 
