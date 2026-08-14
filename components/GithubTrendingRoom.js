@@ -103,7 +103,7 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
                 {repo.description}
               </div>
             )}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, fontSize: 11, color: "var(--text-faint)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, fontSize: 11, color: "var(--text-faint)", flexWrap: "wrap" }}>
               <span>⭐ {repo.stars.toLocaleString()}</span>
               {repo.language && (
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -533,7 +533,7 @@ export default function GithubTrendingRoom({ uid }) {
               還沒有收藏任何專案——右鍵點專案卡片就能收藏
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
               {bookmarks.map((repo, i) => (
                 <GithubGridCard key={repo.id} repo={repo} rank={i + 1}
                   bookmarked pinnable onPin={pinBookmark}
@@ -555,7 +555,7 @@ export default function GithubTrendingRoom({ uid }) {
           ) : (
             <>
               <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 12 }}>{MONTH_KEY} 建立、星數最高的 {monthRepos.length} 個開源專案</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
                 {monthRepos.map((repo, i) => (
                   <GithubGridCard key={repo.id} repo={repo} rank={i + 1}
                     bookmarked={bookmarkedIds.has(String(repo.id))}

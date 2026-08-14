@@ -3102,7 +3102,7 @@ export default function ChatApp({ user }) {
     englishPron: <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishPronunciation user={user} db={db} onNav={() => closeTab(keyBlock.englishPron, "englishPron")} /></div>,
     customVocab: <CustomVocabRoom user={myProfile || user} db={db} />,
     dict: <DictionaryRoom />,
-    githubTrending: <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><GithubTrendingRoom uid={uid} /></div>,
+    githubTrending: <div style={{ flex: 1, minHeight: 0, minWidth: 0, overflowY: "auto", overflowX: "hidden" }}><GithubTrendingRoom uid={uid} /></div>,
     ieltsBand4: <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><IeltsBand4 onNav={() => closeTab(keyBlock.ieltsBand4, "ieltsBand4")} /></div>,
     englishMcq: <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishMcqPractice onNav={() => closeTab(keyBlock.englishMcq, "englishMcq")} /></div>,
     conversations: conversationsThreadPane,
