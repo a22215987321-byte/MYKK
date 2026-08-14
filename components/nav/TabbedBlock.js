@@ -148,7 +148,7 @@ export function TabDragGhost({ controller }) {
 
 // 一塊大方塊上方的瀏覽器式分頁列——只畫分頁本身，實際功能內容渲染在
 // ChatRoom.js 另一份 flat grid 裡，這裡不接觸任何功能元件。
-export function TabBar({ block, tabs, active, meta, onActivate, onClose, controller }) {
+export function TabBar({ block, tabs, active, meta, onActivate, onClose, onDoubleClickTab, controller }) {
   const { dragState, dropTarget, startDrag, wasJustDragged, registerTab, registerZone } = controller;
   const isDropTarget = dropTarget?.block === block;
   return (
@@ -163,6 +163,7 @@ export function TabBar({ block, tabs, active, meta, onActivate, onClose, control
             onMouseDown={startDrag(key, block, m)}
             onClickCapture={(e) => { if (wasJustDragged(key)) { e.stopPropagation(); e.preventDefault(); } }}
             onClick={() => onActivate(block, key)}
+            onDoubleClick={() => onDoubleClickTab?.(block, key)}
             className={`cr-blocktab${key === active ? " act" : ""}`}
             style={{ visibility: isDragging ? "hidden" : "visible" }}
             title={m.label}

@@ -1439,6 +1439,20 @@ export default function ChatApp({ user }) {
     A: { tabs: ["feed"], active: "feed" },
     B: { tabs: ["conversations"], active: "conversations" },
   });
+  // 雙擊「動態消息」或「影片」分頁會讓它所在的那塊從半版變滿版（另一塊
+  // 暫時隱藏），再雙擊一次復原——只有這兩個功能需要滿版看內容（貼文/
+  // 影片這種本來就想看大一點），其他功能沒有這個需求，故意只對這兩個
+  // key 開放，不是每個分頁都能雙擊放大。
+  const MAXIMIZABLE_TAB_KEYS = useMemo(() => new Set(["feed", "videoHub"]), []);
+  const [maximizedBlock, setMaximizedBlock] = useState(null); // null | "A" | "B"
+  const toggleMaximizeBlock = (block, key) => {
+    if (!MAXIMIZABLE_TAB_KEYS.has(key)) return;
+    setMaximizedBlock((prev) => (prev === block ? null : block));
+  };
+  // 方塊裡的分頁全部關掉了卻還停在「滿版」狀態會變成另一塊永遠消失、
+  // 沒有任何東西可以點回來——渲染時用這個代替 maximizedBlock 本身，
+  // 兩塊都清空掉的話自動當作沒有滿版。
+  const effectiveMaximizedBlock = maximizedBlock && blocks[maximizedBlock].tabs.length > 0 ? maximizedBlock : null;
   // 預設 "feed"（不是 null）是刻意的：跟桌面版 blocks.A 預設開 feed 分頁
   // 對齊，也剛好重現手機版原本的行為——首次載入沒人手動切過任何東西時
   // 顯示動態消息，點底部「首頁」鈕（呼叫 resetAllViews()）才會清成 null
@@ -4026,10 +4040,16 @@ export default function ChatApp({ user }) {
               // 分開的第三塊，不是 B 塊，見下面 .cr-cal 那段。兩塊中間用細
               // 分隔線隔開，寬度固定對半（沒有另外做可拖曳調整，使用者只
               // 要求分頁可以拖曳搬到另一塊，沒有要求兩塊寬度互相可調）。
+              // 雙擊「動態消息」/「影片」分頁時 effectiveMaximizedBlock 會
+              // 指到那一塊，另一塊直接 display:none——沒有另外用寬度百分比
+              // 計算，剩下唯一還顯示的那塊靠 flex:1 自動撐滿整列。
               <>
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--panel)" }}>
+                <div style={{
+                  flex: 1, minWidth: 0, display: effectiveMaximizedBlock === "B" ? "none" : "flex", flexDirection: "column",
+                  borderRight: effectiveMaximizedBlock ? "none" : "1px solid var(--panel)",
+                }}>
                   <TabBar block="A" tabs={blocks.A.tabs} active={blocks.A.active} meta={TAB_META}
-                    onActivate={activateTab} onClose={closeTab} controller={tabDrag} />
+                    onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />
                   <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                     {blocks.A.tabs.length === 0 ? (
                       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>從左側點一個功能開始，或把分頁拖過來這裡</div>
@@ -4040,9 +4060,9 @@ export default function ChatApp({ user }) {
                     ))}
                   </div>
                 </div>
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                <div style={{ flex: 1, minWidth: 0, display: effectiveMaximizedBlock === "A" ? "none" : "flex", flexDirection: "column" }}>
                   <TabBar block="B" tabs={blocks.B.tabs} active={blocks.B.active} meta={TAB_META}
-                    onActivate={activateTab} onClose={closeTab} controller={tabDrag} />
+                    onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />
                   <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                     {blocks.B.tabs.length === 0 ? (
                       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>把分頁拖過來這裡，或從左側點一個功能開始</div>
