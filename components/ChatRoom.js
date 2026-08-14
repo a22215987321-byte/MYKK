@@ -1431,11 +1431,14 @@ export default function ChatApp({ user }) {
   // 監聽或播放進度的功能，兩邊各開一份代表監聽/播放也重複一份。手機版
   // 沿用「一次只看一個功能」的舊體驗，用 mobileActiveKey 這個獨立字串
   // 狀態，跟桌面版雙方塊完全脫鉤（見下面 moreMenuState/moreMenuSetters）。
+  // A 塊放一般功能（預設開 Feed）、B 塊固定放「對話」——不是誰先被點開誰
+  // 就佔哪塊，是每個 key 都有自己固定要去的塊（見下面 openTab 的
+  // DEFAULT_BLOCK 判斷），拖曳可以事後手動搬到另一塊，但預設一律照這個
+  // 規則分配，不看使用者上一步點的是哪一塊。
   const [blocks, setBlocks] = useState({
     A: { tabs: ["feed"], active: "feed" },
-    B: { tabs: [], active: null },
+    B: { tabs: ["conversations"], active: "conversations" },
   });
-  const [focusedBlock, setFocusedBlock] = useState("A");
   // 預設 "feed"（不是 null）是刻意的：跟桌面版 blocks.A 預設開 feed 分頁
   // 對齊，也剛好重現手機版原本的行為——首次載入沒人手動切過任何東西時
   // 顯示動態消息，點底部「首頁」鈕（呼叫 resetAllViews()）才會清成 null
@@ -1461,8 +1464,9 @@ export default function ChatApp({ user }) {
     return b != null && blocks[b].active === key;
   };
   const openTab = (key) => {
-    const target = keyBlock[key] || focusedBlock;
-    setFocusedBlock(target);
+    // 已經開著就切過去；沒開過的話固定分配：「對話」去 B 塊，其餘一律去
+    // A 塊——不是看哪塊「目前作用中」。
+    const target = keyBlock[key] || (key === "conversations" ? "B" : "A");
     setBlocks((prev) => {
       const blk = prev[target];
       const tabs = blk.tabs.includes(key) ? blk.tabs : [...blk.tabs, key];
@@ -1480,12 +1484,10 @@ export default function ChatApp({ user }) {
     });
   };
   const activateTab = (block, key) => {
-    setFocusedBlock(block);
     setBlocks((prev) => ({ ...prev, [block]: { ...prev[block], active: key } }));
   };
   const moveTabToBlock = (key, fromBlock, toBlock, beforeKey) => {
     if (fromBlock === toBlock) return;
-    setFocusedBlock(toBlock);
     setBlocks((prev) => {
       const fromTabs = prev[fromBlock].tabs.filter((k) => k !== key);
       const fromActive = prev[fromBlock].active === key ? (fromTabs[0] || null) : prev[fromBlock].active;
@@ -1633,7 +1635,7 @@ export default function ChatApp({ user }) {
   // 雙方塊分頁系統上線後，這裡只需要歸零「不屬於分頁系統本身」的共用狀態：
   // 目前開啟中的好友/群組對話串、他們各自的資訊頁、動態消息點開的個人頁、
   // 手機版首頁子畫面、手機版目前開啟的功能、AI OFFICE。分頁本身開了哪些、
-  // 哪塊作用中，都交給 blocks/focusedBlock 自己管理，不受這裡影響——切換
+  // 哪個分頁作用中，都交給 blocks 自己管理，不受這裡影響——切換
   // 到某個功能不該把使用者已經開著的其他分頁一起關掉。
   const resetAllViews = useCallback(() => {
     setActiveFriendId(null); setActiveGroupId(null);
