@@ -389,15 +389,20 @@ html[data-theme="glass"] body {
 html[data-theme="pastel-pearl"] {
   /* Surfaces carry a wash of whichever accent is active (via color-mix
      below) so picking a palette visibly retints the background itself, not
-     just buttons/badges. First pass at 3-9% was correct but imperceptible
-     on screen (only a few RGB units of shift) — bumped to a level that
-     actually reads as "the background changed" per follow-up feedback,
-     while still keeping it light enough to look like the same cream/paper
-     system per palette, not a saturated color block. */
-  --bg: color-mix(in srgb, var(--accent) 20%, #f7f4ef);
-  --panel: color-mix(in srgb, var(--accent) 10%, #fffdf9);
-  --panel-alt: color-mix(in srgb, var(--accent) 24%, #f2eee8);
-  --panel-hover: color-mix(in srgb, var(--accent) 14%, #ffffff);
+     just buttons/badges — kept above the "imperceptible" 3-9% range an
+     earlier pass used, but pulled back down from a later 20%/24% pass that
+     over-saturated every surface into a flat, uniform peach block (cards,
+     inputs and message bubbles all reading the same color as the page
+     background, no hierarchy). Reference mock (soft pearl/coral peach,
+     2026-08-16) shows cards/inputs sitting close to white with the accent
+     concentrated in buttons/badges/active states instead — --panel-alt in
+     particular was almost as saturated as raw --accent, which is what made
+     every secondary surface (post composer box, message bubbles, pill
+     chips) read as solid coral instead of a subtle warm-white. */
+  --bg: color-mix(in srgb, var(--accent) 5%, #f9f6f2);
+  --panel: color-mix(in srgb, var(--accent) 3%, #fffdfa);
+  --panel-alt: color-mix(in srgb, var(--accent) 4%, #f9f6f3);
+  --panel-hover: color-mix(in srgb, var(--accent) 4%, #ffffff);
   --border: #d8d0c7;
   --border-soft: #e8e1d8;
 

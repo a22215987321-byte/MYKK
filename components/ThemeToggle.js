@@ -61,7 +61,7 @@ function PaletteSwatch({ palette, selected, onSelect }) {
       }}>
         {selected && <span aria-hidden="true" style={{ fontSize: 12, fontWeight: 900, color: "#444444" }}>✓</span>}
       </span>
-      <span style={{ fontSize: 10, color: "var(--text)", whiteSpace: "nowrap", lineHeight: 1.2 }}>{palette.label}</span>
+      <span style={{ fontSize: 10, color: "var(--text)", whiteSpace: "nowrap", lineHeight: 1.2, userSelect: "text", WebkitUserSelect: "text" }}>{palette.label}</span>
     </button>
   );
 }
@@ -101,7 +101,7 @@ function WorldSwatch({ world, thumbSrc, selected, onSelect }) {
         {!thumbSrc && "🚫"}
         {selected && <span aria-hidden="true" style={{ fontSize: 12, fontWeight: 900, color: "#fff", textShadow: "0 0 3px rgba(0,0,0,0.8)" }}>✓</span>}
       </span>
-      <span style={{ fontSize: 10, color: "var(--text)", whiteSpace: "nowrap", lineHeight: 1.2 }}>{world.label.replace(/^\S+\s/, "")}</span>
+      <span style={{ fontSize: 10, color: "var(--text)", whiteSpace: "nowrap", lineHeight: 1.2, userSelect: "text", WebkitUserSelect: "text" }}>{world.label.replace(/^\S+\s/, "")}</span>
     </button>
   );
 }
@@ -131,7 +131,7 @@ function WorldVariantGrid({ world, selected, onSelect }) {
             borderRadius: 10, cursor: "pointer",
           }}>
           <span style={{ width: 52, height: 36, borderRadius: 6, overflow: "hidden", background: `url(${v.src}) center/cover`, border: "1px solid rgba(0,0,0,0.15)" }} />
-          <span style={{ fontSize: 10, color: "var(--text)" }}>{v.label}</span>
+          <span style={{ fontSize: 10, color: "var(--text)", userSelect: "text", WebkitUserSelect: "text" }}>{v.label}</span>
         </button>
       ))}
     </div>
@@ -317,6 +317,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
                 padding: "10px 14px", background: "none", border: "none",
                 borderBottom: "1px solid var(--border-soft)", color: "var(--text)",
                 fontSize: 13, textAlign: "left", cursor: "pointer",
+                userSelect: "text", WebkitUserSelect: "text",
               }}
               onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
               onMouseLeave={e => e.currentTarget.style.background = "none"}
@@ -333,6 +334,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
                     display: "flex", alignItems: "center", gap: 8, width: "100%",
                     padding: "8px 14px", background: "none", border: "none",
                     color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer",
+                    userSelect: "text", WebkitUserSelect: "text",
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
                   onMouseLeave={e => e.currentTarget.style.background = "none"}>
@@ -355,6 +357,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
                 padding: "10px 14px", background: "none", border: "none",
                 borderBottom: "1px solid var(--border-soft)", color: "var(--text)",
                 fontSize: 13, textAlign: "left", cursor: "pointer",
+                userSelect: "text", WebkitUserSelect: "text",
               }}
               onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
               onMouseLeave={e => e.currentTarget.style.background = "none"}
@@ -369,7 +372,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{msgFontSize}</span>
                   <button onClick={onResetMsgFontSize} title="復原文字大小與側欄/日曆版面尺寸"
-                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "1px 6px", color: "var(--text-faint)", fontSize: 11, cursor: "pointer" }}>
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "1px 6px", color: "var(--text-faint)", fontSize: 11, cursor: "pointer", userSelect: "text", WebkitUserSelect: "text" }}>
                     復原
                   </button>
                 </div>
@@ -388,6 +391,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
                 padding: "9px 14px", background: "none", border: "none",
                 borderBottom: t.id === "pastel-pearl" && showPaletteGrid && !isMobile ? "1px solid var(--border-soft)" : "none",
                 color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer",
+                userSelect: "text", WebkitUserSelect: "text",
               }}
               onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
               onMouseLeave={e => e.currentTarget.style.background = "none"}
@@ -423,6 +427,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
                 padding: "10px 14px", background: "none", border: "none",
                 borderTop: "1px solid var(--border-soft)", color: "#ef4444",
                 fontSize: 13, textAlign: "left", cursor: "pointer",
+                userSelect: "text", WebkitUserSelect: "text",
               }}
               onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
               onMouseLeave={e => e.currentTarget.style.background = "none"}
