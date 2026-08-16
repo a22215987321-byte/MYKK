@@ -1,4 +1,4 @@
-export default function NavItem({ icon, iconBg, label, sublabel, active, onClick, compact, mobileTouch }) {
+export default function NavItem({ icon, iconImg, iconBg, label, sublabel, active, onClick, compact, mobileTouch }) {
   return (
     <button onClick={onClick} className={`fb ${active ? "act" : ""}`}
       style={{
@@ -25,7 +25,12 @@ export default function NavItem({ icon, iconBg, label, sublabel, active, onClick
         borderRadius: "var(--navcard-icon-radius, var(--radius-md))",
         background: iconBg, display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: compact ? 16 : 18, flexShrink: 0,
-      }}>{icon}</div>
+      }}>
+        {/* iconImg（自製圖示，png，透明底白色線稿）疊在原本的漸層方塊上面，
+            蓋掉 emoji——沒有提供 iconImg 的項目維持原本 emoji 顯示，新舊
+            圖示可以並存，不用一次全部換完。 */}
+        {iconImg ? <img src={iconImg} alt="" style={{ width: "58%", height: "58%", objectFit: "contain" }} /> : icon}
+      </div>
       <div style={{ minWidth: 0, overflow: "hidden" }}>
         <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
         {sublabel && <div style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sublabel}</div>}

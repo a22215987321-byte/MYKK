@@ -2527,11 +2527,11 @@ export default function ChatApp({ user }) {
   // 同一個圖層，兩邊都要能用同一份 topItems。
   const topItems = {
     leaderboard: (
-      <NavItem icon="🏆" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
+      <NavItem icon="🏆" iconImg="/icons/leaderboard.png" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
         active={isTabActive("leaderboard")} onClick={() => openTab("leaderboard")} />
     ),
     calendar: (
-      <NavItem icon="📅" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="行事曆" sublabel="日曆備忘錄"
+      <NavItem icon="📅" iconImg="/icons/calendar.png" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="行事曆" sublabel="日曆備忘錄"
         active={isTabActive("calendar")} onClick={() => openTab("calendar")} />
     ),
     videoHub: (
@@ -2539,79 +2539,79 @@ export default function ChatApp({ user }) {
         active={isTabActive("videoHub")} onClick={() => openTab("videoHub")} />
     ),
     upgrade: (
-      <NavItem icon="👑" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
+      <NavItem icon="👑" iconImg="/icons/upgrade.png" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
         active={isTabActive("upgrade")} onClick={() => openTab("upgrade")} />
     ),
     cinema: (
-      <NavItem icon="🎬" iconBg="linear-gradient(135deg,var(--accent-hover),#2563eb)" label="電影院" sublabel="同步觀看影片"
+      <NavItem icon="🎬" iconImg="/icons/cinema.png" iconBg="linear-gradient(135deg,var(--accent-hover),#2563eb)" label="電影院" sublabel="同步觀看影片"
         active={isTabActive("cinema")} onClick={() => openTab("cinema")} />
     ),
     imageEditor: (
-      <NavItem icon="🖼️" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="圖片編輯" sublabel="裁剪・濾鏡・貼圖"
+      <NavItem icon="🖼️" iconImg="/icons/imageEditor.png" iconBg="linear-gradient(135deg,#0891b2,#0e7490)" label="圖片編輯" sublabel="裁剪・濾鏡・貼圖"
         active={isTabActive("imageEditor")} onClick={() => openTab("imageEditor")} />
     ),
     aiChat: (
-      <NavItem icon="🤖" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel={aiChatAllowed ? "有問題都可以問我" : "🔒 已鎖定"}
+      <NavItem icon="🤖" iconImg="/icons/aiChat.png" iconBg="linear-gradient(135deg,#4f46e5,#7c3aed)" label="AI 助手" sublabel={aiChatAllowed ? "有問題都可以問我" : "🔒 已鎖定"}
         active={isTabActive("aiChat")} onClick={() => openTab("aiChat")} />
     ),
     docConvert: (
-      <NavItem icon="🔄" iconBg="linear-gradient(135deg,#0d9488,#0891b2)" label="文檔轉換" sublabel="圖片・影音格式互轉"
+      <NavItem icon="🔄" iconImg="/icons/docConvert.png" iconBg="linear-gradient(135deg,#0d9488,#0891b2)" label="文檔轉換" sublabel="圖片・影音格式互轉"
         active={isTabActive("docConvert")} onClick={() => openTab("docConvert")} />
     ),
     aiCompanion: (
-      <NavItem icon="💞" iconBg="linear-gradient(135deg,#db2777,#9333ea)" label="AI 夥伴" sublabel={myProfile?.hasAiCompanion ? "語音陪伴" : "付費解鎖"}
+      <NavItem icon="💞" iconImg="/icons/aiCompanion.png" iconBg="linear-gradient(135deg,#db2777,#9333ea)" label="AI 夥伴" sublabel={myProfile?.hasAiCompanion ? "語音陪伴" : "付費解鎖"}
         active={isTabActive("aiCompanion")} onClick={() => openTab("aiCompanion")} />
     ),
     englishPron: (
-      <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音"
+      <NavItem compact icon="🔤" iconImg="/icons/englishPron.png" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音"
         active={isTabActive("englishPron")} onClick={() => openTab("englishPron")} />
     ),
     ieltsBand4: (
-      <NavItem compact icon="🎯" iconBg="linear-gradient(135deg,#1e3a1e,#6366f1)" label="IELTS 4.0 入門" sublabel="詞彙・聽力・口說"
+      <NavItem compact icon="🎯" iconImg="/icons/ieltsBand4.png" iconBg="linear-gradient(135deg,#1e3a1e,#6366f1)" label="IELTS 4.0 入門" sublabel="詞彙・聽力・口說"
         active={isTabActive("ieltsBand4")} onClick={() => openTab("ieltsBand4")} />
     ),
     englishMcq: (
-      <NavItem compact icon="📝" iconBg="linear-gradient(135deg,#0c4a6e,#0ea5e9)" label="英文選擇題練習" sublabel="短文理解・錯題解釋"
+      <NavItem compact icon="📝" iconImg="/icons/englishMcq.png" iconBg="linear-gradient(135deg,#0c4a6e,#0ea5e9)" label="英文選擇題練習" sublabel="短文理解・錯題解釋"
         active={isTabActive("englishMcq")} onClick={() => openTab("englishMcq")} />
     ),
     vocab: (
-      <NavItem icon="📚" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習"
+      <NavItem icon="📚" iconImg="/icons/vocab.png" iconBg="linear-gradient(135deg,#065f46,#10b981)" label="IELTS 詞彙" sublabel="IELTS 單字練習"
         active={isTabActive("vocab")} onClick={() => openTab("vocab")} />
     ),
     spanish: (
-      <NavItem icon="🇪🇸" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西班牙語學習" sublabel="CEFR A1/A2"
+      <NavItem icon="🇪🇸" iconImg="/icons/spanish.png" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西班牙語學習" sublabel="CEFR A1/A2"
         active={isTabActive("spanish")} onClick={() => openTab("spanish")} />
     ),
     spanishCourse: (
-      <NavItem compact icon="🗺️" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="西語 A1 路線" sublabel="初學者情境課程"
+      <NavItem compact icon="🗺️" iconImg="/icons/spanishCourse.png" iconBg="linear-gradient(135deg,#1e1b4b,#6366f1)" label="西語 A1 路線" sublabel="初學者情境課程"
         active={isTabActive("spanishCourse")} onClick={() => openTab("spanishCourse")} />
     ),
     spanishPron: (
-      <NavItem compact icon="🔤" iconBg="linear-gradient(135deg,#7c1d1d,#b91c1c)" label="西語發音" sublabel="母音 · 子音 · 重音"
+      <NavItem compact icon="🔤" iconImg="/icons/spanishPron.png" iconBg="linear-gradient(135deg,#7c1d1d,#b91c1c)" label="西語發音" sublabel="母音 · 子音 · 重音"
         active={isTabActive("spanishPron")} onClick={() => openTab("spanishPron")} />
     ),
     spanishGrammar: (
-      <NavItem compact icon="📐" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="西語文法" sublabel="ser/estar · 代詞 · 動詞"
+      <NavItem compact icon="📐" iconImg="/icons/spanishGrammar.png" iconBg="linear-gradient(135deg,#14532d,#16a34a)" label="西語文法" sublabel="ser/estar · 代詞 · 動詞"
         active={isTabActive("spanishGrammar")} onClick={() => openTab("spanishGrammar")} />
     ),
     spanishVerbs: (
-      <NavItem compact icon="🧩" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢"
+      <NavItem compact icon="🧩" iconImg="/icons/spanishVerbs.png" iconBg="linear-gradient(135deg,#7c2d12,#dc2626)" label="西語動詞變位" sublabel="完整變位查詢"
         active={isTabActive("spanishVerbs")} onClick={() => openTab("spanishVerbs")} />
     ),
     spanishMcq: (
-      <NavItem compact icon="📝" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西語選擇題練習" sublabel="短文理解・動詞變位填空"
+      <NavItem compact icon="📝" iconImg="/icons/spanishMcq.png" iconBg="linear-gradient(135deg,#7c1d1d,#dc2626)" label="西語選擇題練習" sublabel="短文理解・動詞變位填空"
         active={isTabActive("spanishMcq")} onClick={() => openTab("spanishMcq")} />
     ),
     customVocab: (
-      <NavItem icon="✏️" iconBg="linear-gradient(135deg,var(--accent-hover),#7c3aed)" label="自定詞彙" sublabel="建立個人單字本"
+      <NavItem icon="✏️" iconImg="/icons/customVocab.png" iconBg="linear-gradient(135deg,var(--accent-hover),#7c3aed)" label="自定詞彙" sublabel="建立個人單字本"
         active={isTabActive("customVocab")} onClick={() => openTab("customVocab")} />
     ),
     dict: (
-      <NavItem icon="📖" iconBg="linear-gradient(135deg,#0f2e1c,#166534)" label="字典" sublabel="英・西・法 A-Z"
+      <NavItem icon="📖" iconImg="/icons/dict.png" iconBg="linear-gradient(135deg,#0f2e1c,#166534)" label="字典" sublabel="英・西・法 A-Z"
         active={isTabActive("dict")} onClick={() => openTab("dict")} />
     ),
     githubTrending: (
-      <NavItem icon="🔥" iconBg="linear-gradient(135deg,#1f2937,#111827)" label="GitHub 熱門" sublabel="每日新專案 Top 10"
+      <NavItem icon="🔥" iconImg="/icons/githubTrending.png" iconBg="linear-gradient(135deg,#1f2937,#111827)" label="GitHub 熱門" sublabel="每日新專案 Top 10"
         active={isTabActive("githubTrending")} onClick={() => openTab("githubTrending")} />
     ),
   };
@@ -3800,11 +3800,11 @@ export default function ChatApp({ user }) {
           {/* Feed + 對話：跟資料夾拖拉排序清單是分開的資料來源，永遠釘在
               最上方（跟 topItems 不同，不能被拖進資料夾）。 */}
           <div style={{ padding: "4px 10px 0" }}>
-            <NavItem icon="📰" iconBg="linear-gradient(135deg,#ec4899,#f59e0b)" label="動態消息" sublabel="查看好友動態"
+            <NavItem icon="📰" iconImg="/icons/feed.png" iconBg="linear-gradient(135deg,#ec4899,#f59e0b)" label="動態消息" sublabel="查看好友動態"
               active={isTabActive("feed")} onClick={() => openTab("feed")} />
           </div>
           <div style={{ padding: "4px 10px 0" }}>
-            <NavItem icon="💬" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="對話" sublabel="公共大廳・群組・好友"
+            <NavItem icon="💬" iconImg="/icons/conversations.png" iconBg="linear-gradient(135deg,var(--accent-2),#a855f7)" label="對話" sublabel="公共大廳・群組・好友"
               active={isTabActive("conversations")} onClick={() => openTab("conversations")} />
           </div>
 
