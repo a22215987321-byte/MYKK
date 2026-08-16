@@ -3164,20 +3164,30 @@ export default function ChatApp({ user }) {
         /* ── 雙大方塊分頁列（TabbedBlock.js）── 跟 ChatMobileTabBar.js 自己的
            .cr-tabbar（手機底部導覽列）是完全不同的元件，故意用不同 class
            名字避免撞名互相吃到對方樣式。分頁越多越窄（flex:0 1 160px +
-           min-width），窄到底改橫向捲動，預設本來就置左不用額外設定。 */
+           min-width），窄到底改橫向捲動，預設本來就置左不用額外設定。
+           每個分頁是獨立的圓角方塊（自己的邊框+間距），不是用直線分隔的
+           扁平長條——跟側欄 NavItem、其他卡片一樣走「方塊」風格，作用中
+           那個額外加陰影，像從列子裡浮起來。 */
         .cr-blocktabs {
-          display: flex; overflow-x: auto; flex-shrink: 0; scrollbar-width: thin;
-          border-bottom: 1px solid var(--panel); background: var(--panel-alt);
+          display: flex; align-items: center; overflow-x: auto; flex-shrink: 0; scrollbar-width: thin;
+          gap: 6px; padding: 8px 8px 7px; background: var(--panel);
+          border-bottom: 1px solid var(--border-soft, var(--panel));
         }
-        .cr-blocktabs.drop-target { background: var(--accent-hover); }
+        .cr-blocktabs.drop-target { background: var(--accent-subtle); }
         .cr-blocktab {
           display: flex; align-items: center; gap: 6px; flex: 0 1 160px; min-width: 96px;
-          padding: 8px 10px; white-space: nowrap; overflow: hidden; cursor: pointer;
-          border: none; border-right: 1px solid var(--panel); background: transparent;
+          padding: 7px 12px; white-space: nowrap; overflow: hidden; cursor: pointer;
+          border: 1px solid var(--border-soft, var(--border)); background: var(--panel-alt);
+          border-radius: var(--radius-md, 10px);
           color: var(--text-muted); font-size: 12px;
+          transition: background 0.15s, color 0.15s, box-shadow 0.15s, border-color 0.15s;
         }
-        .cr-blocktab:hover { background: var(--accent-hover); }
-        .cr-blocktab.act { background: var(--accent-active); color: var(--text); }
+        .cr-blocktab:hover { background: var(--accent-hover); border-color: var(--accent-border, var(--border)); }
+        .cr-blocktab.act {
+          background: var(--accent-active); color: var(--text); font-weight: 600;
+          border-color: var(--accent-border, transparent);
+          box-shadow: var(--card-shadow, 0 2px 10px rgba(0,0,0,0.08));
+        }
         .cr-blocktab-icon { flex-shrink: 0; font-size: 13px; }
         .cr-blocktab-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
         .cr-blocktab-close {
