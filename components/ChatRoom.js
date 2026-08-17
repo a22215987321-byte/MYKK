@@ -1439,14 +1439,10 @@ export default function ChatApp({ user }) {
     A: { tabs: ["feed"], active: "feed" },
     B: { tabs: ["conversations"], active: "conversations" },
   });
-  // 雙擊「動態消息」或「影片」分頁會讓它所在的那塊從半版變滿版（另一塊
-  // 暫時隱藏），再雙擊一次復原——只有這兩個功能需要滿版看內容（貼文/
-  // 影片這種本來就想看大一點），其他功能沒有這個需求，故意只對這兩個
-  // key 開放，不是每個分頁都能雙擊放大。
-  const MAXIMIZABLE_TAB_KEYS = useMemo(() => new Set(["feed", "videoHub"]), []);
+  // 雙擊任何分頁會讓它所在的那塊從半版變滿版（另一塊暫時隱藏），
+  // 再雙擊一次復原——所有功能都能這樣放大看，沒有白名單限制。
   const [maximizedBlock, setMaximizedBlock] = useState(null); // null | "A" | "B"
-  const toggleMaximizeBlock = (block, key) => {
-    if (!MAXIMIZABLE_TAB_KEYS.has(key)) return;
+  const toggleMaximizeBlock = (block) => {
     setMaximizedBlock((prev) => (prev === block ? null : block));
   };
   // 方塊裡的分頁全部關掉了卻還停在「滿版」狀態會變成另一塊永遠消失、
@@ -3571,7 +3567,9 @@ export default function ChatApp({ user }) {
             內容」的高度（不再撐滿整條側欄），下面多一顆「AI OFFICE」切換鈕，
             點下去在同一個 SPA 裡切換模式（不開新頁面），見 showOffice 那段
             渲染。 */}
-        {!isMobile && (
+        {/* 資料夾 rail 跟 AI Office 入口先整個隱藏（使用者要求），不是刪除
+            ——之後要復原只要把這個 false 拿掉。 */}
+        {false && !isMobile && (
           <div style={{ display: "flex", flexDirection: "column", flexShrink: 0, gap: 10, margin: "12px 6px" }}>
           {/* 資料夾 rail：側欄最左邊一條窄欄，只放資料夾圖示（Discord 伺服器欄
               的概念）——AI 對話觸發鈕／「全部功能」／每個資料夾一個小圖案／
@@ -4054,16 +4052,25 @@ export default function ChatApp({ user }) {
             ) : (
               // 桌面版：中間版面本身分成左右兩塊獨立分頁大方塊（A/B），各自
               // 有自己的分頁列——右邊固定的好友/群組清單欄（.cr-cal）是完全
-              // 分開的第三塊，不是 B 塊，見下面 .cr-cal 那段。兩塊中間用細
-              // 分隔線隔開，寬度固定對半（沒有另外做可拖曳調整，使用者只
-              // 要求分頁可以拖曳搬到另一塊，沒有要求兩塊寬度互相可調）。
-              // 雙擊「動態消息」/「影片」分頁時 effectiveMaximizedBlock 會
-              // 指到那一塊，另一塊直接 display:none——沒有另外用寬度百分比
+              // 分開的第三塊，不是 B 塊，見下面 .cr-cal 那段。A/B 兩塊跟側欄/
+              // .cr-cal 一樣套用 --col-* 系列變數（邊框/圓角/陰影），中間用
+              // .cr-main 既有的 gap（var(--panel-gap)）留出間隙，不再用一條
+              // 分隔線相連——三個風格（預設/柔和珠光/幽影深窗）现在共用同一套
+              // --col-*/--panel-gap 數值，只有顏色本身照各自主題變。寬度固定
+              // 對半（沒有另外做可拖曳調整，使用者只要求分頁可以拖曳搬到另一
+              // 塊，沒有要求兩塊寬度互相可調）。雙擊任一分頁時 effectiveMaximizedBlock
+              // 會指到那一塊，另一塊直接 display:none——沒有另外用寬度百分比
               // 計算，剩下唯一還顯示的那塊靠 flex:1 自動撐滿整列。
               <>
                 <div style={{
                   flex: 1, minWidth: 0, display: effectiveMaximizedBlock === "B" ? "none" : "flex", flexDirection: "column",
-                  borderRight: effectiveMaximizedBlock ? "none" : "1px solid var(--panel)",
+                  overflow: "hidden",
+                  border: "var(--col-border, none)",
+                  borderRadius: "var(--col-radius, 0px)",
+                  boxShadow: "var(--col-shadow, none)",
+                  backdropFilter: "var(--col-blur, none)", WebkitBackdropFilter: "var(--col-blur, none)",
+                  background: "var(--force-panel-bg, var(--chat-world-transparent, var(--panel-alt)))",
+                  backgroundImage: "var(--chat-world-transparent, var(--panel-gradient-img, none))",
                 }}>
                   <TabBar block="A" tabs={blocks.A.tabs} active={blocks.A.active} meta={TAB_META}
                     onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />
@@ -4077,7 +4084,16 @@ export default function ChatApp({ user }) {
                     ))}
                   </div>
                 </div>
-                <div style={{ flex: 1, minWidth: 0, display: effectiveMaximizedBlock === "A" ? "none" : "flex", flexDirection: "column" }}>
+                <div style={{
+                  flex: 1, minWidth: 0, display: effectiveMaximizedBlock === "A" ? "none" : "flex", flexDirection: "column",
+                  overflow: "hidden",
+                  border: "var(--col-border, none)",
+                  borderRadius: "var(--col-radius, 0px)",
+                  boxShadow: "var(--col-shadow, none)",
+                  backdropFilter: "var(--col-blur, none)", WebkitBackdropFilter: "var(--col-blur, none)",
+                  background: "var(--force-panel-bg, var(--chat-world-transparent, var(--panel-alt)))",
+                  backgroundImage: "var(--chat-world-transparent, var(--panel-gradient-img, none))",
+                }}>
                   <TabBar block="B" tabs={blocks.B.tabs} active={blocks.B.active} meta={TAB_META}
                     onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />
                   <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>

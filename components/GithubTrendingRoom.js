@@ -483,7 +483,7 @@ export default function GithubTrendingRoom({ uid }) {
 
   return (
     <div style={{ minHeight: "100%", background: "var(--bg)", color: "var(--text)" }}>
-      <div style={{ maxWidth: 900, padding: "20px 24px 80px" }}>
+      <div style={{ padding: "20px 24px 80px" }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
           <h1 style={{ margin: "4px 0", fontSize: 22, fontWeight: 800 }}>
             🔥 GitHub 每週熱門專案{rangeLabel && ` ${rangeLabel}`}

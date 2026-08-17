@@ -360,7 +360,7 @@ export default function ChannelProfileView({ uid, onClose, onOpenChannel, initia
       <div style={{ width: "100%", aspectRatio: "7 / 1", minHeight: 100, maxHeight: 220, ...bannerStyle, marginTop: 6 }} />
 
       {/* Header */}
-      <div style={{ padding: "0 24px", maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ padding: "0 24px" }}>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 18, flexWrap: "wrap", marginTop: -36 }}>
           {profile.avatarImage
             ? <img src={profile.avatarImage} alt={profile.nickname} style={{ width: 100, height: 100, borderRadius: "50%", objectFit: "cover", border: "4px solid var(--bg)", flexShrink: 0, background: "var(--panel)" }} />

@@ -237,7 +237,7 @@ export default function VideoHub({ onOpenChannel, onOpenVideo, viewerUid }) {
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-      <div style={{ padding: "20px 24px 0", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "20px 24px 0" }}>
         <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
           <input
             value={searchText}
@@ -255,7 +255,7 @@ export default function VideoHub({ onOpenChannel, onOpenVideo, viewerUid }) {
         </div>
       </div>
 
-      <div style={{ padding: "0 24px 32px", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ padding: "0 24px 32px" }}>
         {isSearching ? (
           <>
             {searchLoading && <div style={{ textAlign: "center", color: "var(--text-faint)", padding: "40px 0" }}>載入中...</div>}

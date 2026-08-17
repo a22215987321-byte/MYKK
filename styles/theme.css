@@ -53,11 +53,18 @@ input, textarea {
 
   --page-bg: var(--bg);
   --panel-blur: none;
-  --shell-bg: var(--bg);
+  /* --bg (#f4f3f9) and --panel-alt (#f7f6fc) are only ~1% apart in
+     lightness — fine for their original use (subtle inner surface
+     differences) but the floating "big block" gutter needs to visibly read
+     as a distinct recessed tone behind the cards (same role shadow-window's
+     much-darker --bg plays against its --panel/--panel-alt below), so the
+     shell specifically gets its own deeper neutral instead of reusing --bg. */
+  --shell-bg: #d3d0e6;
   --shell-blur: none;
-  --shell-margin: 0px;
+  --shell-margin: 12px;
   --shell-radius: 0px;
   --shell-shadow: none;
+  --panel-gap: 12px;
 
   /* Height of ChatMobileTabBar (see components/ChatMobileTabBar.js). Pages
      that mount it via MobileTabBarLayout (outside ChatRoom's own shell,
@@ -67,20 +74,24 @@ input, textarea {
      each page's stylesheet, so a future resize only needs one edit. */
   --mobile-tabbar-h: 56px;
 
-  /* Per-column "floating panel" tokens (sidebar / center column / calendar).
-     Every one of these defaults to a no-op that reproduces the existing
-     edge-to-edge dashboard look exactly — only html[data-theme="shadow-window"]
-     below gives them real values. Lets ChatRoom.js/NavItem.js/CalendarMemo.js
-     read a single set of variables instead of branching on the theme id
-     themselves, and keeps every other theme pixel-identical to before. */
-  --col-border: none;
-  --col-border-right: 1px solid var(--panel);
-  --col-border-left: 1px solid var(--panel);
-  --col-radius: 0px;
-  --col-shadow: none;
+  /* Per-column "floating panel" tokens (sidebar / center column / calendar /
+     the two middle tab blocks A+B). Style 1 (this block), pastel-pearl and
+     shadow-window all give these real values so the four background "big
+     blocks" look and behave the same way across all three visible themes —
+     only the actual color numbers differ per theme, never the gap/radius/
+     shadow structure. Lets ChatRoom.js/NavItem.js/CalendarMemo.js read a
+     single set of variables instead of branching on the theme id themselves.
+     (neon keeps the old no-op values in its own block below since it's still
+     reachable via the OS-dark-mode auto-pick fallback even though hidden
+     from the theme picker.) */
+  --col-border: 1px solid var(--border);
+  --col-border-right: 1px solid var(--border);
+  --col-border-left: 1px solid var(--border);
+  --col-radius: 18px;
+  --col-shadow: var(--card-shadow);
   --col-blur: none;
   --col-margin: 0px;
-  --resize-handle-display: block;
+  --resize-handle-display: none;
   --panel-gradient-img: none;
   /* --force-panel-bg / --force-panel-blur are deliberately left undefined
      here (not even set to "none") — an undefined custom property makes
@@ -268,6 +279,26 @@ html[data-theme="neon"] body {
   background-image: var(--bg-pattern);
 }
 
+/* neon is hidden from the theme picker but still reachable as the
+   OS-dark-mode auto-pick fallback (see ThemeToggle.js), so it needs its own
+   copy of the old no-op floating-panel tokens now that :root's defaults were
+   changed to real values for style 1 — keeps neon pixel-identical to before
+   instead of silently inheriting the new gapped/rounded block layout. */
+html[data-theme="neon"] {
+  --shell-margin: 0px;
+  --shell-radius: 0px;
+  --shell-shadow: none;
+  --panel-gap: 0px;
+  --col-border: none;
+  --col-border-right: 1px solid var(--panel);
+  --col-border-left: 1px solid var(--panel);
+  --col-radius: 0px;
+  --col-shadow: none;
+  --col-blur: none;
+  --col-margin: 0px;
+  --resize-handle-display: block;
+}
+
 html[data-theme="glass"] {
   /* Style 3 — glassmorphism, frosted glass on a warm gradient */
   --bg: #eef1f7;
@@ -419,11 +450,31 @@ html[data-theme="pastel-pearl"] {
 
   --page-bg: var(--bg);
   --panel-blur: none;
-  --shell-bg: var(--bg);
+  /* Same reasoning as style 1: --bg/--panel-alt sit too close together to
+     read as a distinct gutter behind the floating cards, so the shell gets
+     its own deeper tone — derived via color-mix from whichever accent
+     palette is active (like --accent-subtle etc. below) so it automatically
+     stays in-family across all 6 pastel-pearl palettes instead of being one
+     hardcoded hex. */
+  --shell-bg: color-mix(in srgb, var(--accent) 15%, #d9d2c5);
   --shell-blur: none;
-  --shell-margin: 0px;
+  --shell-margin: 12px;
   --shell-radius: 0px;
   --shell-shadow: none;
+  --panel-gap: 12px;
+
+  /* Same floating "big block" structure as style 1/shadow-window (sidebar /
+     friends panel / block A / block B each become their own rounded card
+     with a real gap between them) — only --border/--card-shadow differ,
+     already defined above for this theme. */
+  --col-border: 1px solid var(--border);
+  --col-border-right: 1px solid var(--border);
+  --col-border-left: 1px solid var(--border);
+  --col-radius: 18px;
+  --col-shadow: var(--card-shadow);
+  --col-blur: none;
+  --col-margin: 0px;
+  --resize-handle-display: none;
 
   /* Every pastel accent below is light, so content on top of it must stay
      dark — unlike the saturated accents in the other 3 themes. */
