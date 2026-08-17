@@ -3170,23 +3170,30 @@ export default function ChatApp({ user }) {
            那個額外加陰影，像從列子裡浮起來。 */
         .cr-blocktabs {
           display: flex; align-items: center; overflow-x: auto; flex-shrink: 0; scrollbar-width: thin;
-          gap: 6px; padding: 8px 8px 7px; background: var(--panel);
-          border-bottom: 1px solid var(--border-soft, var(--panel));
+          gap: 8px; padding: 10px 10px 9px;
+          background: linear-gradient(180deg, var(--panel) 0%, var(--panel-alt) 100%);
+          box-shadow: inset 0 -1px 0 var(--border-soft, var(--panel));
         }
         .cr-blocktabs.drop-target { background: var(--accent-subtle); }
         .cr-blocktab {
-          display: flex; align-items: center; gap: 6px; flex: 0 1 160px; min-width: 96px;
-          padding: 7px 12px; white-space: nowrap; overflow: hidden; cursor: pointer;
+          position: relative;
+          display: flex; align-items: center; gap: 6px; flex: 0 1 168px; min-width: 100px;
+          padding: 8px 14px; white-space: nowrap; overflow: hidden; cursor: pointer;
           border: 1px solid var(--border-soft, var(--border)); background: var(--panel-alt);
-          border-radius: var(--radius-md, 10px);
+          border-radius: var(--radius-lg, 14px);
           color: var(--text-muted); font-size: 12px;
-          transition: background 0.15s, color 0.15s, box-shadow 0.15s, border-color 0.15s;
+          box-shadow: var(--card-shadow);
+          transition: background 0.15s, color 0.15s, box-shadow 0.15s, border-color 0.15s, transform 0.15s;
         }
-        .cr-blocktab:hover { background: var(--accent-hover); border-color: var(--accent-border, var(--border)); }
+        .cr-blocktab:hover { background: var(--accent-hover); border-color: var(--accent-border, var(--border)); transform: translateY(-1px); }
         .cr-blocktab.act {
           background: var(--accent-active); color: var(--text); font-weight: 600;
           border-color: var(--accent-border, transparent);
-          box-shadow: var(--card-shadow, 0 2px 10px rgba(0,0,0,0.08));
+        }
+        .cr-blocktab.act::after {
+          content: ""; position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px;
+          border-radius: 2px 2px 0 0;
+          background: linear-gradient(90deg, var(--accent), var(--accent-2));
         }
         .cr-blocktab-icon { flex-shrink: 0; font-size: 13px; }
         .cr-blocktab-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
