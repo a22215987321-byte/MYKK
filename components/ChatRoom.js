@@ -917,7 +917,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
-      <div className="cr-modal-full" style={{ background: "var(--panel)", borderRadius: 20, width: 460, maxWidth: "92vw", maxHeight: "85vh", overflow: "auto", border: "1px solid var(--border)" }}>
+      <div className="cr-modal-full" style={{ background: "var(--panel)", borderRadius: 20, width: 640, maxWidth: "92vw", maxHeight: "88vh", overflow: "auto", border: "1px solid var(--border)" }}>
         <div style={{
           background: profileBgType === "gradient" ? profileBg : undefined,
           backgroundImage: profileBgType === "image" ? `url(${profileBg})` : undefined,
@@ -1444,7 +1444,65 @@ export default function ChatApp({ user }) {
   const [maximizedBlock, setMaximizedBlock] = useState(null); // null | "A" | "B"
   const toggleMaximizeBlock = (block) => {
     setMaximizedBlock((prev) => (prev === block ? null : block));
+    setHideTabBarBlock(null);
   };
+  // 滿版（100%）看內容時，內容區第一次往下捲動就把分頁列收起來讓出空間，
+  // 收起來之後不管再怎麼上下捲都不會又跳出來——真的要它回來，捲回最頂端
+  // 或是點別的功能／好友群組都會重置。故意不是「往上捲一點就跳出來」，
+  // 因為滑手機/滑鼠滾很常見的動作是「一路往下看貼文，忽然想往上滑看回上
+  // 一則」，這種情況分頁列突然彈出來反而打斷閱讀。50% 分頁列一律都在，
+  // 不受這個影響。
+  const [hideTabBarBlock, setHideTabBarBlock] = useState(null); // null | "A" | "B"
+  // handleMaximizedContentScroll 掛在 ref callback 裡（見下面
+  // registerBlockScroll），只在 DOM 節點真的掛載那一刻跑一次，不是靠
+  // useEffect 依賴陣列——用一個 ref 存最新的 hideTabBarBlock，讓這個只
+  // 建立一次的監聽器每次都讀得到當下的值，不用因為值變了就整個重新綁定。
+  const hideTabBarBlockRef = useRef(null);
+  hideTabBarBlockRef.current = hideTabBarBlock;
+  const handleMaximizedContentScroll = (block) => (e) => {
+    const scrollTop = e.target.scrollTop;
+    const current = hideTabBarBlockRef.current;
+    if (scrollTop <= 0) {
+      if (current === block) setHideTabBarBlock(null);
+    } else if (current !== block) {
+      setHideTabBarBlock(block);
+    }
+  };
+  // 捲動事件原生不會冒泡，實際捲動的永遠是內容元件自己內部某個
+  // overflow:auto 的子節點，不是這層外層 wrapper 本身——用 capture
+  // phase（第三個參數 true）在事件往下傳遞、抵達真正目標之前先攔截，
+  // 不管是哪一層子節點在捲、也不用內容元件自己配合加 onScroll。
+  //
+  // 一開始用 useRef+useEffect（依賴 [hideTabBarBlock]）綁監聽器，結果
+  // 完全沒作用——桌面版 A/B 兩塊的 JSX 要等使用者登入、myProfile 有值
+  // 之後才會渲染，但這個 useEffect 在那之前（登入畫面/註冊表單那個
+  // render）就先跑過一次了，那時候 ref.current 還是 null，之後
+  // hideTabBarBlock 這個值本身沒再變過（一直是 null），依賴陣列沒觸發
+  // effect 重跑，監聽器就永遠掛在 null 上、真正的 DOM 節點掛載之後也沒
+  // 補綁。改成 ref callback：callback 本身用 useCallback 固定住，React
+  // 保證只在這個特定 DOM 節點「真的」掛載的那一刻才會呼叫它、拿到真正
+  // 的節點，不受元件其他部分的渲染時機影響。
+  const registerBlockScroll = (block) => useCallback((el) => {
+    if (el) el.addEventListener("scroll", handleMaximizedContentScroll(block), true);
+  }, [block]);
+  const blockAScrollRef = registerBlockScroll("A");
+  const blockBScrollRef = registerBlockScroll("B");
+  // 滾動條「滾輪滾動中放大」特效——全站通用一個 capture-phase listener，
+  // 不用每個捲動區域各自加。哪個元素在捲（e.target）就給它加
+  // .is-scrolling，停下來 400ms 後自動移掉（配上面 CSS 的
+  // .is-scrolling::-webkit-scrollbar-thumb 規則）。
+  useEffect(() => {
+    const timers = new WeakMap();
+    const onScroll = (e) => {
+      const el = e.target;
+      if (!el || !el.classList) return;
+      el.classList.add("is-scrolling");
+      clearTimeout(timers.get(el));
+      timers.set(el, setTimeout(() => el.classList.remove("is-scrolling"), 400));
+    };
+    document.addEventListener("scroll", onScroll, true);
+    return () => document.removeEventListener("scroll", onScroll, true);
+  }, []);
   // 方塊裡的分頁全部關掉了卻還停在「滿版」狀態會變成另一塊永遠消失、
   // 沒有任何東西可以點回來——渲染時用這個代替 maximizedBlock 本身，
   // 兩塊都清空掉的話自動當作沒有滿版。
@@ -1482,6 +1540,7 @@ export default function ChatApp({ user }) {
       const tabs = blk.tabs.includes(key) ? blk.tabs : [...blk.tabs, key];
       return { ...prev, [target]: { tabs, active: key } };
     });
+    setHideTabBarBlock(null);
   };
   const closeTab = (block, key) => {
     setBlocks((prev) => {
@@ -1495,6 +1554,7 @@ export default function ChatApp({ user }) {
   };
   const activateTab = (block, key) => {
     setBlocks((prev) => ({ ...prev, [block]: { ...prev[block], active: key } }));
+    setHideTabBarBlock(null);
   };
   const moveTabToBlock = (key, fromBlock, toBlock, beforeKey) => {
     if (fromBlock === toBlock) return;
@@ -3201,8 +3261,23 @@ export default function ChatApp({ user }) {
         .cr-blocktab-close:hover { background: var(--border); color: var(--text); }
         .cr-blocktabs-empty { padding: 8px 12px; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
 
+        /* 滾動條「放大」特效——軌道寬度（::-webkit-scrollbar 的 width）
+           永遠固定 4px，不會變，真正在視覺上變寬的是用 box-shadow 往左
+           畫出來的一塊，box-shadow 不吃版面空間、不會觸發 reflow，日後
+           改版面不用擔心滾動條尺寸跟版面卡在同一層互相影響。滑鼠移到
+           滾動條上（:hover）或滑鼠滾輪正在滾動中（.is-scrolling，見下面
+           JS 用 scroll 事件加/移除這個 class）都會觸發放大，方便用滑鼠
+           按住拖曳。 */
         ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb {
+          background: var(--border); border-radius: 4px;
+          transition: box-shadow 0.15s ease;
+        }
+        ::-webkit-scrollbar-thumb:hover,
+        .is-scrolling::-webkit-scrollbar-thumb {
+          box-shadow: -4px 0 0 0 var(--accent);
+        }
+        * { scrollbar-color: var(--border) transparent; scrollbar-width: thin; }
 
         /* ── Global overflow guard ── */
         html, body { overflow-x: hidden; }
@@ -4072,9 +4147,15 @@ export default function ChatApp({ user }) {
                   background: "var(--force-panel-bg, var(--chat-world-transparent, var(--panel-alt)))",
                   backgroundImage: "var(--chat-world-transparent, var(--panel-gradient-img, none))",
                 }}>
-                  <TabBar block="A" tabs={blocks.A.tabs} active={blocks.A.active} meta={TAB_META}
-                    onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />
-                  <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                  <div style={{
+                    flexShrink: 0, overflow: "hidden",
+                    maxHeight: (effectiveMaximizedBlock === "A" && hideTabBarBlock === "A") ? 0 : 200,
+                    transition: "max-height 0.22s ease",
+                  }}>
+                    <TabBar block="A" tabs={blocks.A.tabs} active={blocks.A.active} meta={TAB_META}
+                      onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />
+                  </div>
+                  <div ref={blockAScrollRef} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                     {blocks.A.tabs.length === 0 ? (
                       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>從左側點一個功能開始，或把分頁拖過來這裡</div>
                     ) : blocks.A.tabs.map(key => (
@@ -4094,9 +4175,15 @@ export default function ChatApp({ user }) {
                   background: "var(--force-panel-bg, var(--chat-world-transparent, var(--panel-alt)))",
                   backgroundImage: "var(--chat-world-transparent, var(--panel-gradient-img, none))",
                 }}>
-                  <TabBar block="B" tabs={blocks.B.tabs} active={blocks.B.active} meta={TAB_META}
-                    onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />
-                  <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                  <div style={{
+                    flexShrink: 0, overflow: "hidden",
+                    maxHeight: (effectiveMaximizedBlock === "B" && hideTabBarBlock === "B") ? 0 : 200,
+                    transition: "max-height 0.22s ease",
+                  }}>
+                    <TabBar block="B" tabs={blocks.B.tabs} active={blocks.B.active} meta={TAB_META}
+                      onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />
+                  </div>
+                  <div ref={blockBScrollRef} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                     {blocks.B.tabs.length === 0 ? (
                       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>把分頁拖過來這裡，或從左側點一個功能開始</div>
                     ) : blocks.B.tabs.map(key => (
@@ -4140,7 +4227,9 @@ export default function ChatApp({ user }) {
             日曆備忘錄浮層（calendarOpen 控制的獨立疊層，跟雙方塊分頁系統
             完全脫鉤）。GitHub 熱門現在只是普通分頁，不再需要「開著就把
             整個右欄藏起來」那個特例，右欄一律顯示。 */}
-        <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`} style={{
+        <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`}
+          onClickCapture={() => setHideTabBarBlock(null)}
+          style={{
           width: `var(--cal-w-override, ${calWidth}px)`, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden",
           border: "var(--col-border, none)",
           borderLeft: "var(--col-border-left, 1px solid var(--panel))",

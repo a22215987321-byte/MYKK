@@ -40,26 +40,35 @@ const LANG_COLORS = {
   CSS: "#563d7c", Vue: "#41b883", Dart: "#00B4AB",
 };
 
-// AI 總結拆成三個方塊，左到右排：項目詳細／功能／運用（對應 Firestore 的
-// summaryDetail／summaryFeatures／summaryUsage，排程那邊生成時就已經是
-// 分開的三個欄位，這裡純排版）。每個方塊各自 maxHeight+overflowY:auto，
-// 免得某一塊特別長（deep think 生成的內容篇幅常常不平均）把整排撐爆。
-function SummaryBoxes({ detail, features, usage, maxBoxHeight = 200, fontSize = 13 }) {
-  const cols = [
+// AI 總結——項目詳細／功能／運用（對應 Firestore 的 summaryDetail／
+// summaryFeatures／summaryUsage，排程那邊生成時就已經是分開的三個欄位，
+// 這裡純排版）。版面跟收藏／6月Top100 那邊的 DetailRow 用同一套格式
+// （標籤在上、內容在下、直向一條一條排，不是三個並排的小方塊），
+// 字級大小也統一，不再依照開在哪裡（手風琴／放大/預覽疊層）各自一套
+// 尺寸。
+// scrollEach：手風琴（accordion）context 沒有外層 overflowY:auto 的捲動
+// 容器包著它，所以自己要有高度上限＋自己捲動；放大/預覽疊層已經有外層
+// 容器負責捲動了（跟收藏／6月Top100 那邊的 DetailRow 做法一致，只有
+// 一層捲動，不是每個欄位各自再捲一次），這裡就不用再加高度上限。
+function SummaryBoxes({ detail, features, usage, scrollEach = false }) {
+  const rows = [
     { key: "detail", label: "項目詳細", text: detail },
     { key: "features", label: "功能", text: features },
     { key: "usage", label: "運用", text: usage },
   ];
   if (!detail && !features && !usage) {
-    return <div style={{ fontSize, color: "var(--text)", lineHeight: 1.7 }}>還沒有總結（等下一次每日更新自動生成）</div>;
+    return <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.7 }}>還沒有總結（等下一次每日更新自動生成）</div>;
   }
   return (
-    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-      {cols.map(c => (
-        <div key={c.key} style={{ flex: "1 1 160px", minWidth: 150, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", marginBottom: 4 }}>{c.label}</div>
-          <div style={{ fontSize, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", maxHeight: maxBoxHeight, overflowY: "auto" }}>
-            {c.text || "（無）"}
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {rows.map(r => (
+        <div key={r.key}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase" }}>{r.label}</div>
+          <div style={{
+            fontSize: 14, lineHeight: 1.7, color: "var(--text)", whiteSpace: "pre-wrap",
+            ...(scrollEach ? { maxHeight: 220, overflowY: "auto" } : null),
+          }}>
+            {r.text || "（無）"}
           </div>
         </div>
       ))}
@@ -153,7 +162,7 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
                 </button>
               )}
             </div>
-            <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} maxBoxHeight={160} fontSize={12} />
+            <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} scrollEach />
           </div>
         </div>
       )}
@@ -170,7 +179,7 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
                 style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
             </div>
             <div style={{ overflowY: "auto", minHeight: 0 }}>
-              <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} maxBoxHeight={400} fontSize={14} />
+              <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} />
             </div>
           </div>
         </div>
@@ -197,7 +206,7 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
             </a>
             <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", margin: "14px 0 6px", flexShrink: 0 }}>🤖 AI 總結</div>
             <div style={{ overflowY: "auto", minHeight: 0 }}>
-              <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} maxBoxHeight={260} fontSize={13} />
+              <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} />
             </div>
           </div>
         </div>

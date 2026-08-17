@@ -157,7 +157,12 @@ input, textarea {
   --sendbtn-bg: var(--accent);
 
   --calpanel-margin: 0px;
-  --calpanel-radius: 0px;
+  /* .cr-cal's inline style reads var(--calpanel-radius, var(--col-radius, 0px))
+     — since --calpanel-radius is defined here (not left undefined), that's
+     what wins, and the --col-radius fallback added above never gets reached.
+     Matches shadow-window's own approach below: set this explicitly to the
+     same 18px rather than relying on the fallback chain. */
+  --calpanel-radius: 18px;
   --calday-size: auto;
   --calday-radius: 6px;
   --calday-selected-bg: #1d4ed820;
@@ -484,6 +489,10 @@ html[data-theme="pastel-pearl"] {
   --col-blur: none;
   --col-margin: 0px;
   --resize-handle-display: none;
+  /* Same reason as style 1: .cr-cal's inline style reads --calpanel-radius
+     before falling back to --col-radius, and the base :root value (0px)
+     would otherwise win since it's defined, not absent. */
+  --calpanel-radius: 18px;
 
   /* Every pastel accent below is light, so content on top of it must stay
      dark — unlike the saturated accents in the other 3 themes. */
