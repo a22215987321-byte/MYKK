@@ -88,7 +88,13 @@ input, textarea {
   --col-border-right: 1px solid var(--border);
   --col-border-left: 1px solid var(--border);
   --col-radius: 18px;
-  --col-shadow: var(--card-shadow);
+  /* --card-shadow (7% opacity, 12px blur) is tuned for small elements — a
+     button, a tab chip — sitting right next to other content. These floating
+     blocks are much bigger and, when nearly empty (no tab open yet), have
+     nothing inside them to help the eye find the card edge, so they need a
+     noticeably stronger shadow of their own to read as "floating" at all —
+     same role shadow-window's own (much stronger) --col-shadow plays below. */
+  --col-shadow: 0 8px 24px rgba(40, 36, 80, 0.14);
   --col-blur: none;
   --col-margin: 0px;
   --resize-handle-display: none;
@@ -465,13 +471,16 @@ html[data-theme="pastel-pearl"] {
 
   /* Same floating "big block" structure as style 1/shadow-window (sidebar /
      friends panel / block A / block B each become their own rounded card
-     with a real gap between them) — only --border/--card-shadow differ,
-     already defined above for this theme. */
+     with a real gap between them) — only --border/--col-shadow's color
+     differ, already defined above for this theme. Deliberately NOT reusing
+     --card-shadow here (see style 1's identical comment above): that's tuned
+     for small elements, and a near-empty block with nothing inside it needs
+     a visibly stronger shadow of its own to read as "floating" at all. */
   --col-border: 1px solid var(--border);
   --col-border-right: 1px solid var(--border);
   --col-border-left: 1px solid var(--border);
   --col-radius: 18px;
-  --col-shadow: var(--card-shadow);
+  --col-shadow: 0 8px 24px rgba(63, 60, 57, 0.14);
   --col-blur: none;
   --col-margin: 0px;
   --resize-handle-display: none;

@@ -80,6 +80,26 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
   const [zoomed, setZoomed] = useState(false);
   const [preview, setPreview] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
+  const zoomedNameRef = useRef(null);
+  const previewNameRef = useRef(null);
+
+  // 專案名稱常見連字號，瀏覽器預設雙擊選字只會選到連字號分隔的其中一段，
+  // 不是整個名稱——雙擊直接選整個名稱節點的文字內容，方便使用者 Ctrl+C 複製。
+  const selectWholeName = (ref) => {
+    const el = ref.current;
+    if (!el || typeof window.getSelection !== "function") return;
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
+  // 卡片本身用單擊打開這個全螢幕疊層，疊層背景又是單擊關閉——連續雙擊時，
+  // 第二下的座標剛好落在剛冒出來、蓋住卡片原本位置的背景上，原本會被當成
+  // 「點背景關閉」，方塊等於一開就被自己的雙擊關掉。用 e.detail（瀏覽器
+  // 原生的連續點擊次數）擋掉 >1 的那次，只有真正單獨一下的點擊才關閉。
+  const closeOnBackdropClick = (closeFn) => (e) => { if (e.detail > 1) return; closeFn(); };
 
   return (
     <div
@@ -139,12 +159,13 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
       )}
 
       {zoomed && (
-        <div role="dialog" aria-modal="true" onClick={() => setZoomed(false)}
+        <div role="dialog" aria-modal="true" onClick={closeOnBackdropClick(() => setZoomed(false))}
           style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 760, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+            style={{ maxWidth: 880, width: "100%", maxHeight: "85vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
+              <div ref={zoomedNameRef} onDoubleClick={() => selectWholeName(zoomedNameRef)}
+                style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
               <button onClick={() => setZoomed(false)} aria-label="關閉"
                 style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
             </div>
@@ -160,12 +181,13 @@ function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
           （DEEPTHINK 生成的回答通常比之前的短總結長很多），用固定高度
           +overflowY:auto 讓它自己捲動，不要把整個方塊撐爆。 */}
       {preview && (
-        <div role="dialog" aria-modal="true" onClick={() => setPreview(false)}
+        <div role="dialog" aria-modal="true" onClick={closeOnBackdropClick(() => setPreview(false))}
           style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 700, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+            style={{ maxWidth: 820, width: "100%", maxHeight: "85vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexShrink: 0 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
+              <div ref={previewNameRef} onDoubleClick={() => selectWholeName(previewNameRef)}
+                style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
               <button onClick={() => setPreview(false)} aria-label="關閉"
                 style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
             </div>
@@ -298,10 +320,10 @@ function GithubGridCard({ repo, rank, bookmarked, onToggleBookmark, expanded, on
       </div>
 
       {expanded && (
-        <div role="dialog" aria-modal="true" onClick={() => onToggleExpand(repo)}
+        <div role="dialog" aria-modal="true" onClick={(e) => { if (e.detail > 1) return; onToggleExpand(repo); }}
           style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 640, width: "100%", maxHeight: "82vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
+            style={{ maxWidth: 760, width: "100%", maxHeight: "86vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 22 }}>
               {repo.ownerAvatar
                 ? <img src={repo.ownerAvatar} alt={repo.owner} style={{ width: 44, height: 44, borderRadius: 11, objectFit: "cover", flexShrink: 0 }} />
