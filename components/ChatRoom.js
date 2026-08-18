@@ -3267,17 +3267,23 @@ export default function ChatApp({ user }) {
            改版面不用擔心滾動條尺寸跟版面卡在同一層互相影響。滑鼠移到
            滾動條上（:hover）或滑鼠滾輪正在滾動中（.is-scrolling，見下面
            JS 用 scroll 事件加/移除這個 class）都會觸發放大，方便用滑鼠
-           按住拖曳。 */
+           按住拖曳。
+           平常（沒有捲動、滑鼠也沒移過去）滾動條軌道是透明的——一開始
+           用 var(--border) 常駐顯示，結果一條實心灰線直直貫穿整張白色
+           卡片，看起來像裂痕/瑕疵，不像特效；改成平常透明、真的在用
+           （hover 或滾動中）才浮現顏色，才有「特效」的感覺。 */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb {
-          background: var(--border); border-radius: 4px;
-          transition: box-shadow 0.15s ease;
+          background: transparent; border-radius: 4px;
+          transition: background 0.15s ease, box-shadow 0.15s ease;
         }
         ::-webkit-scrollbar-thumb:hover,
         .is-scrolling::-webkit-scrollbar-thumb {
+          background: var(--border);
           box-shadow: -4px 0 0 0 var(--accent);
         }
-        * { scrollbar-color: var(--border) transparent; scrollbar-width: thin; }
+        * { scrollbar-color: transparent transparent; scrollbar-width: thin; }
+        *:hover { scrollbar-color: var(--border) transparent; }
 
         /* ── Global overflow guard ── */
         html, body { overflow-x: hidden; }
