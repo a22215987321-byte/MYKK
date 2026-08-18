@@ -14,9 +14,9 @@ input, textarea {
   /* Style 1 — light, soft, pastel */
   --bg: #f4f3f9;
   --panel: #ffffff;
-  --panel-alt: #f7f6fc;
+  --panel-alt: #faf9fd;
   --panel-hover: #eef0fb;
-  --border: #e9e7f2;
+  --border: #e8e5f0;
   --border-soft: #f0eef7;
 
   --text: #2b2a3a;
@@ -53,13 +53,10 @@ input, textarea {
 
   --page-bg: var(--bg);
   --panel-blur: none;
-  /* --bg (#f4f3f9) and --panel-alt (#f7f6fc) are only ~1% apart in
-     lightness — fine for their original use (subtle inner surface
-     differences) but the floating "big block" gutter needs to visibly read
-     as a distinct recessed tone behind the cards (same role shadow-window's
-     much-darker --bg plays against its --panel/--panel-alt below), so the
-     shell specifically gets its own deeper neutral instead of reusing --bg. */
-  --shell-bg: #d3d0e6;
+  /* 方塊間隙統一背景色——使用者指定的精確色碼，四個大方塊（側欄／中間
+     A／中間B／好友欄）共用同一個縫隙顏色，不會有的縫一種顏色、有的縫
+     另一種顏色。 */
+  --shell-bg: #f3f1f8;
   --shell-blur: none;
   --shell-margin: 12px;
   --shell-radius: 0px;
