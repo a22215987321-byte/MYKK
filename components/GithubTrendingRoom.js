@@ -40,209 +40,6 @@ const LANG_COLORS = {
   CSS: "#563d7c", Vue: "#41b883", Dart: "#00B4AB",
 };
 
-// AI 總結——項目詳細／功能／運用（對應 Firestore 的 summaryDetail／
-// summaryFeatures／summaryUsage，排程那邊生成時就已經是分開的三個欄位，
-// 這裡純排版）。版面跟收藏／6月Top100 那邊的 DetailRow 用同一套格式
-// （標籤在上、內容在下、直向一條一條排，不是三個並排的小方塊），
-// 字級大小也統一，不再依照開在哪裡（手風琴／放大/預覽疊層）各自一套
-// 尺寸。
-// scrollEach：手風琴（accordion）context 沒有外層 overflowY:auto 的捲動
-// 容器包著它，所以自己要有高度上限＋自己捲動；放大/預覽疊層已經有外層
-// 容器負責捲動了（跟收藏／6月Top100 那邊的 DetailRow 做法一致，只有
-// 一層捲動，不是每個欄位各自再捲一次），這裡就不用再加高度上限。
-function SummaryBoxes({ detail, features, usage, scrollEach = false }) {
-  const rows = [
-    { key: "detail", label: "項目詳細", text: detail },
-    { key: "features", label: "功能", text: features },
-    { key: "usage", label: "運用", text: usage },
-  ];
-  if (!detail && !features && !usage) {
-    return <div style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.7 }}>還沒有總結（等下一次每日更新自動生成）</div>;
-  }
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {rows.map(r => (
-        <div key={r.key}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", marginBottom: 4, textTransform: "uppercase" }}>{r.label}</div>
-          <div style={{
-            fontSize: 14, lineHeight: 1.7, color: "var(--text)", whiteSpace: "pre-wrap",
-            ...(scrollEach ? { maxHeight: 220, overflowY: "auto" } : null),
-          }}>
-            {r.text || "（無）"}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// 單一 repo 卡片——右邊有個下拉鈕，展開會看到 AI 每天生成的總結（DeepSeek，
-// 排程那邊 pages/api/cron/github-trending.js 生成，這裡純顯示），總結區塊
-// 自己還有一顆「放大」鈕，開一個全螢幕疊層把總結文字放大顯示，方便看長一點
-// 的總結。
-//
-// 卡片主體點下去不再直接跳轉 GitHub（怕手滑誤觸就跳走），改成彈一個小方塊
-// 預覽（名稱＋網址），真的要去 GitHub 要在方塊裡再點一次連結。右鍵點卡片
-// 會彈出「收藏」選單，左鍵點裡面那顆按鈕才會真的收藏/取消收藏。
-function RepoCard({ repo, rank, bookmarked, onToggleBookmark }) {
-  const [open, setOpen] = useState(false);
-  const [zoomed, setZoomed] = useState(false);
-  const [preview, setPreview] = useState(false);
-  const [menuPos, setMenuPos] = useState(null);
-  const zoomedNameRef = useRef(null);
-  const previewNameRef = useRef(null);
-
-  // 專案名稱常見連字號，瀏覽器預設雙擊選字只會選到連字號分隔的其中一段，
-  // 不是整個名稱——雙擊直接選整個名稱節點的文字內容，方便使用者 Ctrl+C 複製。
-  const selectWholeName = (ref) => {
-    const el = ref.current;
-    if (!el || typeof window.getSelection !== "function") return;
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  };
-
-  // 卡片本身用單擊打開這個全螢幕疊層，疊層背景又是單擊關閉——連續雙擊時，
-  // 第二下的座標剛好落在剛冒出來、蓋住卡片原本位置的背景上，原本會被當成
-  // 「點背景關閉」，方塊等於一開就被自己的雙擊關掉。用 e.detail（瀏覽器
-  // 原生的連續點擊次數）擋掉 >1 的那次，只有真正單獨一下的點擊才關閉。
-  const closeOnBackdropClick = (closeFn) => (e) => { if (e.detail > 1) return; closeFn(); };
-
-  return (
-    <div
-      onContextMenu={e => { e.preventDefault(); setMenuPos({ x: e.clientX, y: e.clientY }); }}
-      style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-faint)", width: 22, flexShrink: 0, textAlign: "center" }}>{rank}</div>
-        <div onClick={() => setPreview(true)}
-          style={{ display: "flex", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}>
-          {repo.ownerAvatar
-            ? <img src={repo.ownerAvatar} alt={repo.owner} style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
-            : <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--panel-alt)", flexShrink: 0 }} />
-          }
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {repo.fullName}
-              {bookmarked && <span style={{ marginLeft: 6, fontSize: 11 }} title="已收藏">⭐</span>}
-            </div>
-            {repo.description && (
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                {repo.description}
-              </div>
-            )}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, fontSize: 11, color: "var(--text-faint)", flexWrap: "wrap" }}>
-              <span>⭐ {repo.stars.toLocaleString()}</span>
-              {repo.language && (
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: LANG_COLORS[repo.language] || "var(--text-faint)" }} />
-                  {repo.language}
-                </span>
-              )}
-              <span>{timeAgo(repo.createdAt)}</span>
-            </div>
-          </div>
-        </div>
-        <button onClick={() => setOpen(v => !v)} aria-label={open ? "收合AI總結" : "展開AI總結"}
-          style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, width: 28, height: 28, flexShrink: 0, color: "var(--text-muted)", cursor: "pointer", fontSize: 12, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
-          ▾
-        </button>
-      </div>
-
-      {open && (
-        <div style={{ padding: "0 16px 16px" }}>
-          <div style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase" }}>🤖 AI 總結</span>
-              {(repo.summaryDetail || repo.summaryFeatures || repo.summaryUsage) && (
-                <button onClick={() => setZoomed(true)} title="放大"
-                  style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, padding: 2 }}>
-                  🔍
-                </button>
-              )}
-            </div>
-            <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} scrollEach />
-          </div>
-        </div>
-      )}
-
-      {zoomed && (
-        <div role="dialog" aria-modal="true" onClick={closeOnBackdropClick(() => setZoomed(false))}
-          style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 880, width: "100%", maxHeight: "85vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 }}>
-              <div ref={zoomedNameRef} onDoubleClick={() => selectWholeName(zoomedNameRef)}
-                style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
-              <button onClick={() => setZoomed(false)} aria-label="關閉"
-                style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
-            </div>
-            <div style={{ overflowY: "auto", minHeight: 0 }}>
-              <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 點卡片主體彈出的預覽方塊：上面名稱、網址（真的可以點去 GitHub 的
-          連結，不再是點卡片就整個跳走），下面是 AI 總結——內容可能很長
-          （DEEPTHINK 生成的回答通常比之前的短總結長很多），用固定高度
-          +overflowY:auto 讓它自己捲動，不要把整個方塊撐爆。 */}
-      {preview && (
-        <div role="dialog" aria-modal="true" onClick={closeOnBackdropClick(() => setPreview(false))}
-          style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 820, width: "100%", maxHeight: "85vh", display: "flex", flexDirection: "column", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexShrink: 0 }}>
-              <div ref={previewNameRef} onDoubleClick={() => selectWholeName(previewNameRef)}
-                style={{ fontSize: 16, fontWeight: 800, color: "var(--text)" }}>{repo.fullName}</div>
-              <button onClick={() => setPreview(false)} aria-label="關閉"
-                style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
-            </div>
-            <a href={repo.url} target="_blank" rel="noopener noreferrer"
-              style={{ display: "block", flexShrink: 0, fontSize: 13, color: "var(--accent)", wordBreak: "break-all", textDecoration: "none", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px" }}>
-              {repo.url} →
-            </a>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", margin: "14px 0 6px", flexShrink: 0 }}>🤖 AI 總結</div>
-            <div style={{ overflowY: "auto", minHeight: 0 }}>
-              <SummaryBoxes detail={repo.summaryDetail} features={repo.summaryFeatures} usage={repo.summaryUsage} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 右鍵收藏選單：貼在滑鼠點下去的座標，點外面關掉。 */}
-      {menuPos && (
-        <>
-          <div onClick={() => setMenuPos(null)} style={{ position: "fixed", inset: 0, zIndex: 3099 }} />
-          <div style={{
-            position: "fixed", left: menuPos.x, top: menuPos.y, zIndex: 3100,
-            background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10,
-            boxShadow: "var(--card-shadow)", overflow: "hidden", minWidth: 120,
-          }}>
-            <button onClick={() => { onToggleBookmark(repo); setMenuPos(null); }}
-              style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "10px 14px", background: "none", border: "none", color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer" }}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
-              onMouseLeave={e => e.currentTarget.style.background = "none"}>
-              {bookmarked ? "❌ 取消收藏" : "⭐ 收藏"}
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function Field({ label, value }) {
-  return (
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", marginBottom: 3 }}>{label}</div>
-      <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{value || "（無）"}</div>
-    </div>
-  );
-}
-
 function DetailRow({ label, children }) {
   return (
     <div>
@@ -252,13 +49,17 @@ function DetailRow({ label, children }) {
   );
 }
 
-// 收藏／6月Top100 共用的網格卡片——一行3個小方塊，點擊會彈出一個獨立的
-// 置中詳情彈窗（跟每日熱門榜的預覽彈窗、AI Office 的結果彈窗同一種模式），
-// 不是原地在網格裡展開（那個排版試過，使用者反應像表格、很難讀）。彈窗
-// 內容照使用者指定的格式由上到下直排：連結／用途／主要語言／授權／星數／
-// 為何值得關注，不分左右欄。用途／為何值得關注是現點現生成（見
-// /api/github/summarize-repo.js），生成一次後由呼叫端寫回 Firestore 快取，
-// 之後同一個 repo 不用再生成一次。
+// 熱門／收藏／6月Top100 三個分頁共用同一套卡片——一行3個小方塊，點擊會
+// 彈出一個獨立的置中詳情彈窗，不是原地在網格裡展開（那個排版試過，使用者
+// 反應像表格、很難讀）。彈窗內容照使用者指定的格式由上到下直排：連結／
+// 用途／主要語言／授權／星數／為何值得關注，不分左右欄。用途／為何值得
+// 關注是現點現生成（見 /api/github/summarize-repo.js），那支 API 自己有
+// 一份全站共用的快取（siteData/githubRepoSummaries），同一個 repo不管
+// 被哪個使用者、在熱門／收藏／Top100哪個分頁點開，全部只會真的生成一次，
+// 之後都是直接讀快取——生成完這裡再另外寫回呼叫端自己的文件（收藏寫回
+// githubBookmarks 該筆文件、Top100/熱門寫回 siteData 對應文件），純粹是
+// 讓同一次瀏覽裡再次點開同一張卡片不用連快取文件都再查一次，不影響「只
+// 生成一次」這件事本身。
 function GithubGridCard({ repo, rank, bookmarked, onToggleBookmark, expanded, onToggleExpand, generating, pinnable, onPin }) {
   const [menuPos, setMenuPos] = useState(null);
   const nameRef = useRef(null);
@@ -297,7 +98,7 @@ function GithubGridCard({ repo, rank, bookmarked, onToggleBookmark, expanded, on
               {repo.fullName}
               {bookmarked && <span style={{ marginLeft: 5, fontSize: 11 }} title="已收藏">⭐</span>}
             </div>
-            <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <span>⭐ {repo.stars?.toLocaleString?.() ?? repo.stars}</span>
               {repo.language && (
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -305,6 +106,7 @@ function GithubGridCard({ repo, rank, bookmarked, onToggleBookmark, expanded, on
                   {repo.language}
                 </span>
               )}
+              {repo.createdAt && <span>{timeAgo(repo.createdAt)}</span>}
             </div>
           </div>
         </div>
@@ -356,6 +158,11 @@ function GithubGridCard({ repo, rank, bookmarked, onToggleBookmark, expanded, on
                 <DetailRow label="主要語言">{repo.language || "未標示"}</DetailRow>
                 <DetailRow label="授權">{repo.license || "未標示"}</DetailRow>
                 <DetailRow label="星數">{repo.stars?.toLocaleString?.() ?? repo.stars}</DetailRow>
+                {repo.createdAt && (
+                  <DetailRow label="建立時間">
+                    {new Date(repo.createdAt).toLocaleDateString("zh-TW", { year: "numeric", month: "numeric", day: "numeric" })}（{timeAgo(repo.createdAt)}）
+                  </DetailRow>
+                )}
                 <DetailRow label="為何值得關注">{repo.summaryWhyNotable || "（無）"}</DetailRow>
               </div>
             )}
@@ -368,10 +175,13 @@ function GithubGridCard({ repo, rank, bookmarked, onToggleBookmark, expanded, on
 
 const MONTH_KEY = "2026-06";
 
-// 每天自動更新一次的GitHub熱門新專案（過去7天內建立、星星數最高的10個）——
+// 每天自動更新一次的GitHub熱門新專案（過去7天內建立、星星數最高的30個）——
 // 資料是 pages/api/cron/github-trending.js 這支排程每天抓一次寫進 Firestore
 // 的快取，這裡單純讀，不會自己去打GitHub API（一堆使用者同時看這頁的話，
-// 沒登入的GitHub API一分鐘只能打10次，馬上就會被擋）。
+// 沒登入的GitHub API一分鐘只能打10次，馬上就會被擋）。這個分頁跟收藏／
+// 6月Top100 共用同一套 GithubGridCard／DetailRow 格式（見上面那個元件的
+// 註解），排程那邊也不再自己先跑一輪 AI 生成——用途／為何值得關注一律現點
+// 現生成、全站共用快取，跟其他兩個分頁完全一致。
 //
 // 「6月Top100」是另一份獨立資料——2026年6月整月建立、星星數最高的100個，
 // 一次性抓好放 siteData/githubTop100_2026-06（見
@@ -379,7 +189,7 @@ const MONTH_KEY = "2026-06";
 //
 // 收藏是每個使用者自己的，存在 githubBookmarks/{uid}/items/{repoId}——存的
 // 是收藏當下的完整 repo 內容（不是只存個 id 回頭查 siteData），因為熱門榜
-// 每天會被排程整批覆蓋，被收藏的專案隔天可能就掉出前10名，這樣收藏頁才
+// 每天會被排程整批覆蓋，被收藏的專案隔天可能就掉出前30名，這樣收藏頁才
 // 還看得到完整資料。
 export default function GithubTrendingRoom({ uid }) {
   const [data, setData] = useState(null);
@@ -389,6 +199,7 @@ export default function GithubTrendingRoom({ uid }) {
   const [tab, setTab] = useState("hot"); // "hot" | "bookmarks" | "top100"
   const [bookmarks, setBookmarks] = useState([]);
   const [bookmarksReady, setBookmarksReady] = useState(false);
+  const [expandedHotId, setExpandedHotId] = useState(null);
   const [expandedBookmarkId, setExpandedBookmarkId] = useState(null);
   const [expandedTop100Id, setExpandedTop100Id] = useState(null);
   const [generatingId, setGeneratingId] = useState(null);
@@ -437,10 +248,10 @@ export default function GithubTrendingRoom({ uid }) {
       if (bookmarkedIds.has(repoId)) {
         await deleteDoc(doc(db, "githubBookmarks", uid, "items", repoId));
       } else {
-        const { id, name, fullName, owner, ownerAvatar, description, url, stars, language, license, createdAt, summaryDetail, summaryFeatures, summaryUsage, summaryPurpose, summaryWhyNotable } = repo;
+        const { id, name, fullName, owner, ownerAvatar, description, url, stars, language, license, createdAt, summaryPurpose, summaryWhyNotable } = repo;
         await setDoc(doc(db, "githubBookmarks", uid, "items", repoId), {
           id, name, fullName, owner, ownerAvatar, description: description || "", url, stars, language: language || "", license: license || "",
-          createdAt: createdAt || "", summaryDetail: summaryDetail || "", summaryFeatures: summaryFeatures || "", summaryUsage: summaryUsage || "",
+          createdAt: createdAt || "",
           summaryPurpose: summaryPurpose || "", summaryWhyNotable: summaryWhyNotable || "",
           bookmarkedAt: serverTimestamp(),
         });
@@ -506,6 +317,19 @@ export default function GithubTrendingRoom({ uid }) {
     }
   };
 
+  const toggleHotExpand = (repo) => {
+    if (expandedHotId === repo.id) { setExpandedHotId(null); return; }
+    setExpandedHotId(repo.id);
+    if (!repo.summaryPurpose && !repo.summaryWhyNotable) {
+      void generateSummary(repo, async (result) => {
+        const updatedRepos = (data?.repos || []).map(r => r.id === repo.id
+          ? { ...r, summaryPurpose: result.purpose || "", summaryWhyNotable: result.whyNotable || "" }
+          : r);
+        await setDoc(doc(db, "siteData", "githubTrending"), { ...data, repos: updatedRepos }, { merge: true });
+      });
+    }
+  };
+
   const repos = data?.repos || [];
   const monthRepos = monthData?.repos || [];
   const rangeLabel = data?.since && data?.updatedAt
@@ -546,10 +370,12 @@ export default function GithubTrendingRoom({ uid }) {
               還沒有資料，等下一次自動更新（每天一次）
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
               {repos.map((repo, i) => (
-                <RepoCard key={repo.id} repo={repo} rank={i + 1}
-                  bookmarked={bookmarkedIds.has(String(repo.id))} onToggleBookmark={toggleBookmark} />
+                <GithubGridCard key={repo.id} repo={repo} rank={i + 1}
+                  bookmarked={bookmarkedIds.has(String(repo.id))}
+                  expanded={expandedHotId === repo.id} onToggleExpand={toggleHotExpand}
+                  generating={generatingId === repo.id} onToggleBookmark={toggleBookmark} />
               ))}
             </div>
           )
