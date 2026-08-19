@@ -81,17 +81,21 @@ input, textarea {
      (neon keeps the old no-op values in its own block below since it's still
      reachable via the OS-dark-mode auto-pick fallback even though hidden
      from the theme picker.) */
-  --col-border: 1px solid var(--border);
-  --col-border-right: 1px solid var(--border);
-  --col-border-left: 1px solid var(--border);
+  /* User-specified gutter (#F3F1F8) / block (#FAF9FD) / border (#E8E5F0)
+     are only a few shades apart from each other — reads fine once a block
+     has real content in it (avatars, text, cards all give the eye an edge
+     to latch onto), but an EMPTY block (no tab open, just the faint
+     placeholder text) has nothing else to anchor on, so the flat border
+     color alone isn't enough to read as a distinct card. Don't touch the
+     3 literal colors themselves — instead give col-border more visible
+     definition by mixing it toward --text for contrast, and lean harder on
+     the shadow, which is what actually keeps an empty block reading as
+     "floating" when the fill colors are this close together. */
+  --col-border: 1.5px solid color-mix(in srgb, var(--border) 70%, var(--text) 30%);
+  --col-border-right: 1.5px solid color-mix(in srgb, var(--border) 70%, var(--text) 30%);
+  --col-border-left: 1.5px solid color-mix(in srgb, var(--border) 70%, var(--text) 30%);
   --col-radius: 18px;
-  /* --card-shadow (7% opacity, 12px blur) is tuned for small elements — a
-     button, a tab chip — sitting right next to other content. These floating
-     blocks are much bigger and, when nearly empty (no tab open yet), have
-     nothing inside them to help the eye find the card edge, so they need a
-     noticeably stronger shadow of their own to read as "floating" at all —
-     same role shadow-window's own (much stronger) --col-shadow plays below. */
-  --col-shadow: 0 8px 24px rgba(40, 36, 80, 0.14);
+  --col-shadow: 0 8px 28px rgba(40, 36, 80, 0.22);
   --col-blur: none;
   --col-margin: 0px;
   --resize-handle-display: none;
