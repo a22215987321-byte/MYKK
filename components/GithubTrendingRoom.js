@@ -194,6 +194,8 @@ const MONTH_KEY = "2026-06";
 export default function GithubTrendingRoom({ uid }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [availableDates, setAvailableDates] = useState([]); // 新到舊排序，"2026-08-19" 這種字串
+  const [selectedDate, setSelectedDate] = useState(null); // null＝跟著最新一天走
   const [monthData, setMonthData] = useState(null);
   const [monthLoading, setMonthLoading] = useState(true);
   const [tab, setTab] = useState("hot"); // "hot" | "bookmarks" | "top100"
@@ -204,8 +206,27 @@ export default function GithubTrendingRoom({ uid }) {
   const [expandedTop100Id, setExpandedTop100Id] = useState(null);
   const [generatingId, setGeneratingId] = useState(null);
 
+  // 排程現在把每天的熱門榜存成當天一份獨立快照（siteData/githubTrending_
+  // YYYY-MM-DD），不是每天覆蓋同一份文件——這裡先讀「有哪些日期有資料」
+  // 的索引，預設跟著最新一天走，使用者也可以自己選看之前（例如上星期）
+  // 的榜單。
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "siteData", "githubTrending"), snap => {
+    const unsub = onSnapshot(doc(db, "siteData", "githubTrendingDates"), snap => {
+      const dates = snap.exists() ? (snap.data().dates || []) : [];
+      setAvailableDates([...dates].sort().reverse());
+    }, err => {
+      console.error("[GithubTrendingRoom] dates snapshot failed", err);
+    });
+    return unsub;
+  }, []);
+
+  const effectiveDate = selectedDate || availableDates[0] || null;
+
+  useEffect(() => {
+    // 還沒讀到任何日期索引之前（例如舊資料還沒被新版排程跑過一次），
+    // 退回讀不分日期的「最新一份」，避免使用者畫面整個空著。
+    const targetDoc = effectiveDate ? `githubTrending_${effectiveDate}` : "githubTrending";
+    const unsub = onSnapshot(doc(db, "siteData", targetDoc), snap => {
       setData(snap.exists() ? snap.data() : null);
       setLoading(false);
     }, err => {
@@ -213,7 +234,7 @@ export default function GithubTrendingRoom({ uid }) {
       setLoading(false);
     });
     return unsub;
-  }, []);
+  }, [effectiveDate]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "siteData", `githubTop100_${MONTH_KEY}`), snap => {
@@ -320,12 +341,16 @@ export default function GithubTrendingRoom({ uid }) {
   const toggleHotExpand = (repo) => {
     if (expandedHotId === repo.id) { setExpandedHotId(null); return; }
     setExpandedHotId(repo.id);
+    // 正常情況這裡的 repo 早就已經有 summaryPurpose／summaryWhyNotable（排程
+    // 那邊先生成好了），這個 generateSummary 分支只有排程那個 repo 生成失敗、
+    // 或還在讀新版排程資料轉換期間才會真的用到，算補救管道，不是常態。
     if (!repo.summaryPurpose && !repo.summaryWhyNotable) {
       void generateSummary(repo, async (result) => {
         const updatedRepos = (data?.repos || []).map(r => r.id === repo.id
           ? { ...r, summaryPurpose: result.purpose || "", summaryWhyNotable: result.whyNotable || "" }
           : r);
-        await setDoc(doc(db, "siteData", "githubTrending"), { ...data, repos: updatedRepos }, { merge: true });
+        const targetDoc = effectiveDate ? `githubTrending_${effectiveDate}` : "githubTrending";
+        await setDoc(doc(db, "siteData", targetDoc), { ...data, repos: updatedRepos }, { merge: true });
       });
     }
   };
@@ -348,7 +373,7 @@ export default function GithubTrendingRoom({ uid }) {
           )}
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
           {[["hot", "🔥 熱門"], ["bookmarks", "⭐ 收藏"], ["top100", "🏆 6月 Top100"]].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{
@@ -359,6 +384,16 @@ export default function GithubTrendingRoom({ uid }) {
               {label}{key === "bookmarks" && bookmarks.length > 0 ? ` (${bookmarks.length})` : ""}
             </button>
           ))}
+          {/* 每天一份獨立快照，不是覆蓋同一份文件——這裡選看哪一天的榜單，
+              預設是清單裡最新的一天。 */}
+          {tab === "hot" && availableDates.length > 0 && (
+            <select value={effectiveDate || ""} onChange={e => setSelectedDate(e.target.value)}
+              style={{ border: "1px solid var(--border)", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", background: "var(--panel)", color: "var(--text)" }}>
+              {availableDates.map((d, i) => (
+                <option key={d} value={d}>{formatShortDate(d)}{i === 0 ? "（最新）" : ""}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {tab === "hot" && (
