@@ -51,7 +51,12 @@ input, textarea {
   --glow-shadow: none;
   --bg-pattern: none;
 
-  --page-bg: var(--bg);
+  /* body 的底色跟 .cr-shell 縫隙同一個 token，不是分開的 --bg——.cr-shell
+     四邊的 margin 之外（瀏覽器視窗最邊緣那一圈）跟四個方塊「中間」的縫隙其實
+     是同一片背景，只是被 shell 的 margin 切成看起來像兩塊，顏色一定要完全
+     一樣，不然最外圈會跟方塊間縫隙有一圈可以看出來的色差，讀起來就像「背景
+     沒有鋪滿到最邊」。 */
+  --page-bg: var(--shell-bg);
   --panel-blur: none;
   /* 方塊間隙統一背景色——使用者指定的精確色碼，四個大方塊（側欄／中間
      A／中間B／好友欄）共用同一個縫隙顏色，不會有的縫一種顏色、有的縫
@@ -460,7 +465,12 @@ html[data-theme="pastel-pearl"] {
   --glow-shadow: none;
   --bg-pattern: none;
 
-  --page-bg: var(--bg);
+  /* body's own background has to be the exact same token as the shell's
+     gutter (see style 1's identical comment) — body paints the ring just
+     outside .cr-shell's margin, --shell-bg paints the gaps between the
+     blocks inside it; if they're two different tokens that ring reads as a
+     seam where "the background stops short of the true edge". */
+  --page-bg: var(--shell-bg);
   --panel-blur: none;
   /* Same reasoning as style 1: --bg/--panel-alt sit too close together to
      read as a distinct gutter behind the floating cards, so the shell gets
