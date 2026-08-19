@@ -39,12 +39,12 @@ export default function Document() {
             the file content alone often doesn't refetch on already-visited
             devices. Bump this version string any time the logo changes
             again, otherwise returning visitors keep seeing the old one. */}
-        <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
-        <link rel="icon" href="/icon-192.png?v=2" sizes="192x192" type="image/png" />
-        <link rel="icon" href="/icon-512.png?v=2" sizes="512x512" type="image/png" />
-        <link rel="shortcut icon" href="/favicon.svg?v=2" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
-        <link rel="manifest" href="/manifest.json?v=2" />
+        <link rel="icon" href="/favicon.svg?v=3" type="image/svg+xml" />
+        <link rel="icon" href="/icon-192.png?v=3" sizes="192x192" type="image/png" />
+        <link rel="icon" href="/icon-512.png?v=3" sizes="512x512" type="image/png" />
+        <link rel="shortcut icon" href="/favicon.svg?v=3" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
+        <link rel="manifest" href="/manifest.json?v=3" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Evonchat" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -54,7 +54,7 @@ export default function Document() {
         <meta property="og:url" content="https://www.evonchat.com" />
         <meta property="og:title" content="Evon Chat — 社交聊天平台" />
         <meta property="og:description" content="即時聊天、好友系統、群組、打賞排行榜，一站式社交體驗" />
-        <meta property="og:image" content="https://www.evonchat.com/evonchat.png?v=2" />
+        <meta property="og:image" content="https://www.evonchat.com/evonchat.png?v=3" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta property="og:locale" content="zh_HK" />
@@ -64,7 +64,7 @@ export default function Document() {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Evon Chat — 社交聊天平台" />
         <meta name="twitter:description" content="即時聊天、好友系統、群組、打賞排行榜，一站式社交體驗" />
-        <meta name="twitter:image" content="https://www.evonchat.com/evonchat.png?v=2" />
+        <meta name="twitter:image" content="https://www.evonchat.com/evonchat.png?v=3" />
       </Head>
       <body>
         <Main />
