@@ -4236,10 +4236,11 @@ export default function ChatApp({ user }) {
         <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`}
           onClickCapture={() => setHideTabBarBlock(null)}
           style={{
-          width: `var(--cal-w-override, ${calWidth}px)`, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden",
+          width: `var(--cal-w-override, ${calWidth}px)`, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden",
           border: "var(--col-border, none)",
           borderLeft: "var(--col-border-left, 1px solid var(--panel))",
           borderRadius: "var(--calpanel-radius, var(--col-radius, 0px))",
+          boxShadow: "var(--col-shadow, none)",
           margin: "var(--calpanel-margin, 0px)",
           transition: resizingPanel === "cal" ? undefined : "width 0.2s ease",
           backgroundColor: "var(--force-panel-bg, var(--chat-world-transparent, var(--panel-alt)))",

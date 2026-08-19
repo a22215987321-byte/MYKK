@@ -100,7 +100,12 @@ input, textarea {
   --col-border-right: 1.5px solid color-mix(in srgb, var(--border) 70%, var(--text) 30%);
   --col-border-left: 1.5px solid color-mix(in srgb, var(--border) 70%, var(--text) 30%);
   --col-radius: 18px;
-  --col-shadow: 0 8px 28px rgba(40, 36, 80, 0.22);
+  /* 0 offset, blur only — a downward-offset shadow pools under the block
+     and barely reaches above it, so the bottom edge reads as a clear line
+     while the top edge (just the thin border, no shadow reinforcement)
+     all but disappears. Symmetric blur keeps equal visual weight on all 4
+     sides so every edge of the "floating" card is equally readable. */
+  --col-shadow: 0 0 22px rgba(40, 36, 80, 0.24);
   --col-blur: none;
   --col-margin: 0px;
   --resize-handle-display: none;
@@ -496,7 +501,10 @@ html[data-theme="pastel-pearl"] {
   --col-border-right: 1px solid var(--border);
   --col-border-left: 1px solid var(--border);
   --col-radius: 18px;
-  --col-shadow: 0 8px 24px rgba(63, 60, 57, 0.14);
+  /* Same reasoning as style 1's identical comment — 0 offset, blur only,
+     so the shadow surrounds the block evenly instead of pooling under it
+     and leaving the top edge with nothing but the thin border to read by. */
+  --col-shadow: 0 0 20px rgba(63, 60, 57, 0.16);
   --col-blur: none;
   --col-margin: 0px;
   --resize-handle-display: none;
