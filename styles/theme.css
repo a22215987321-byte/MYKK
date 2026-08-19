@@ -104,8 +104,15 @@ input, textarea {
      and barely reaches above it, so the bottom edge reads as a clear line
      while the top edge (just the thin border, no shadow reinforcement)
      all but disappears. Symmetric blur keeps equal visual weight on all 4
-     sides so every edge of the "floating" card is equally readable. */
-  --col-shadow: 0 0 22px rgba(40, 36, 80, 0.24);
+     sides so every edge of the "floating" card is equally readable.
+     Blur kept tight (roughly the 12px shell-margin/panel-gap) rather than
+     a wide 22px spread — at an inner corner (sidebar↔center, center↔cal)
+     two blocks' shadows overlap and blend into one soft gap tone, but at
+     an OUTER corner (sidebar's left, cal's right — nothing but the 12px
+     shell margin next to it) there's only one shadow with nothing to
+     blend into, so a wide blur reads as an isolated rounded color blob
+     sitting in the corner instead of a subtle edge cue. */
+  --col-shadow: 0 0 10px rgba(40, 36, 80, 0.20);
   --col-blur: none;
   --col-margin: 0px;
   --resize-handle-display: none;
@@ -503,8 +510,11 @@ html[data-theme="pastel-pearl"] {
   --col-radius: 18px;
   /* Same reasoning as style 1's identical comment — 0 offset, blur only,
      so the shadow surrounds the block evenly instead of pooling under it
-     and leaving the top edge with nothing but the thin border to read by. */
-  --col-shadow: 0 0 20px rgba(63, 60, 57, 0.16);
+     and leaving the top edge with nothing but the thin border to read by.
+     Blur kept tight for the same reason as style 1: a wide blur has
+     nothing to blend into at an outer corner (sidebar's left, cal's
+     right) and reads as an isolated color blob instead of a soft edge. */
+  --col-shadow: 0 0 10px rgba(63, 60, 57, 0.14);
   --col-blur: none;
   --col-margin: 0px;
   --resize-handle-display: none;
