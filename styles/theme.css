@@ -314,6 +314,12 @@ html[data-theme="neon"] body {
    changed to real values for style 1 — keeps neon pixel-identical to before
    instead of silently inheriting the new gapped/rounded block layout. */
 html[data-theme="neon"] {
+  /* :root 的 --shell-bg 是淺色預設的淺紫 #f3f1f8，neon 從來沒蓋掉它——
+     平常看不出來（margin/gap 全 0，不透明面板鋪好鋪滿），但 body 的
+     --page-bg 也是跟著 --shell-bg 走的，所以這個深色主題的最底層其實
+     一直是一片淺紫，捲動回彈、面板來不及鋪滿的瞬間就會露出來。指回
+     自己的 --bg，最底層跟主題同色。 */
+  --shell-bg: var(--bg);
   --shell-margin: 0px;
   --shell-radius: 0px;
   --shell-shadow: none;

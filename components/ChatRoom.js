@@ -3943,8 +3943,21 @@ export default function ChatApp({ user }) {
             // 手機版單欄直向堆疊；桌面版左右並排兩塊分頁大方塊（見下面 isMobile
             // 分支），所以這裡的 flexDirection 要跟著切。
             flexDirection: isMobile ? "column" : "row", minWidth: 0, minHeight: 0,
-            // Same reasoning as .cr-shell above, including --force-shell-bg.
-            background: "var(--force-shell-bg, var(--chat-world-transparent, var(--bg)))",
+            // 桌面版 .cr-main 是純排版容器（A/B 兩塊圓角方塊 + gap），自己不漆
+            // 背景——它是直角的、又剛好墊在兩塊圓角方塊正後面，以前漆的是
+            // var(--bg)，跟 .cr-shell 縫隙用的 --shell-bg 是兩個不同 token：
+            // 淺色預設差一兩階（#f4f3f9 vs #f3f1f8），柔和珠光直接是近白 vs
+            // 深米色，所以 A↔B 中間的縫、A/B 靠內側的四個圓角外圍，全都露出
+            // 一塊跟其他縫隙色不同的直角色塊（幽影深窗當年就是同一個問題，
+            // 用 --force-shell-bg 把 shell/main 強制同色修掉，另外兩個主題
+            // 一直沒跟上）。改成 transparent 後，所有縫隙一律透出 .cr-shell
+            // 那一層——force-shell-bg／世界照片透明化／--shell-bg 的整條邏輯
+            // 只由 shell 一層負責，縫隙色從此單一來源。
+            // 手機版例外：.cr-main 是滿版單欄的「內容底色」本體（好友清單
+            // 那些列自己沒背景），必須照舊漆 var(--bg) 那條 fallback 鏈。
+            background: isMobile
+              ? "var(--force-shell-bg, var(--chat-world-transparent, var(--bg)))"
+              : "transparent",
           }}>
           {isMobile ? (
             activeFriendId || activeGroupId ? (
