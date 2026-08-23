@@ -1,6 +1,5 @@
 {
   "crons": [
-    { "path": "/api/cron/github-trending", "schedule": "0 0 * * *" },
     { "path": "/api/cron/office-schedules", "schedule": "10 0 * * *" }
   ]
 }

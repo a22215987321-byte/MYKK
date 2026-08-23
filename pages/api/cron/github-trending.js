@@ -31,8 +31,15 @@ import { summarizeRepoWithAI } from "../../../lib/githubSummarize";
 // 所以還在 maxDuration=60s 的預算內（快取命中的repo不用等這兩段，幾乎
 // 是瞬間）。
 //
-// 排程設定見專案根目錄 vercel.json 的 crons 區塊（Vercel Cron，每天觸發
-// 一次）。CRON_SECRET 是選填的——如果之後想鎖住這個網址不讓外人亂打，去
+// ⚠️ 2026-08-23：每日排程已停用——使用者表示最近不看這個功能，不想繼續
+// 消耗 DeepSeek 額度／GitHub API 配額／Vercel 執行次數。做法是把
+// vercel.json crons 裡的 /api/cron/github-trending 那一行拿掉，這支端點
+// 本身完整保留，可以手動打（POST 或 GET 這個網址）補跑某一天的資料。
+// 要恢復每日自動更新，把那一行加回 vercel.json 即可：
+//   { "path": "/api/cron/github-trending", "schedule": "0 0 * * *" }
+// 前端「GitHub 熱門」分頁不受影響，仍讀得到停用前已生成的歷史快照。
+//
+// CRON_SECRET 是選填的——如果之後想鎖住這個網址不讓外人亂打，去
 // Vercel 環境變數加一個 CRON_SECRET，這裡才會真的檢查；沒設的話這個端點
 // 目前是開放的（風險很低：不管誰打，最多就是多耗用一次GitHub/DeepSeek
 // API額度，不會洩漏任何使用者資料）。
