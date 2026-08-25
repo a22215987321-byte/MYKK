@@ -210,6 +210,15 @@ html[data-theme="shadow-window"] {
   --col-blur: blur(18px);
   --col-margin: 0px;
 
+  /* 卡片「內部」的三個面板（.cr-chat-header／.cr-chat-panel／.cr-input-bar）
+     在這個主題是各自獨立的浮動小窗，邊框陰影跟大方塊共用同一組值；其他
+     主題（淺色預設/柔和珠光）整張卡片是一體的，內部面板不該有自己的框——
+     所以它們讀的是這組 --innerpanel-*，只在這裡（和玻璃主題）有定義，
+     其他主題 fallback 到 none。不要讓內部面板直接讀 --col-*，那樣淺色
+     主題的大方塊一開邊框，內部就跟著長出直角盒子。 */
+  --innerpanel-border: var(--col-border);
+  --innerpanel-shadow: var(--col-shadow);
+
   --navcard-bg: rgba(255, 255, 255, 0.04);
   --navcard-border: rgba(255, 255, 255, 0.08);
   --navcard-radius: 14px;
@@ -383,6 +392,9 @@ html[data-theme="glass"] {
   --col-shadow: var(--card-shadow);
   --col-blur: var(--panel-blur);
   --col-margin: 0px;
+  /* 同 shadow-window 的註解：玻璃主題的內部面板也是獨立浮動小窗。 */
+  --innerpanel-border: var(--col-border);
+  --innerpanel-shadow: var(--col-shadow);
 
   --force-panel-bg: var(--panel);
   --force-panel-blur: var(--panel-blur) saturate(150%);

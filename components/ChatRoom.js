@@ -3312,12 +3312,18 @@ export default function ChatApp({ user }) {
         .cr-main { gap: var(--panel-gap, 0px); }
 
         /* Chat message panel — floating "window" for shadow-window, no-op
-           elsewhere (margin/radius/glow all default to 0/none). */
+           elsewhere (margin/radius/glow all default to 0/none).
+           邊框/陰影改讀 --innerpanel-*（只有幽影深窗/玻璃有定義，其他主題
+           fallback 到 none）——以前直接讀 --col-border/--col-shadow，那是
+           「四個大方塊」的 token；淺色預設跟柔和珠光後來為了大方塊補上這
+           兩個 token 的值，這三個卡片內部元件就跟著長出邊框和陰影，但它們
+           的 radius token 在這兩個主題還是 0px，於是每張圓角卡片裡面出現
+           有框有影的直角盒子——就是「圓角外面/裡面包著直角容器」的來源。 */
         .cr-chat-panel {
           margin: var(--chatpanel-margin, 0px);
           border-radius: var(--chatpanel-radius, 0px);
-          border: var(--col-border, none);
-          box-shadow: var(--col-shadow, none);
+          border: var(--innerpanel-border, none);
+          box-shadow: var(--innerpanel-shadow, none);
           background-color: var(--force-panel-bg, transparent);
           background-image: var(--chatpanel-glow, none), var(--chat-world-tint, transparent), var(--chat-world-bg, none);
           backdrop-filter: var(--force-panel-blur, none);
@@ -3349,14 +3355,14 @@ export default function ChatApp({ user }) {
         .cr-chat-header {
           margin: var(--toolbar-panel-margin, 0px);
           border-radius: var(--toolbar-panel-radius, 0px);
-          border: var(--col-border, none);
-          box-shadow: var(--col-shadow, none);
+          border: var(--innerpanel-border, none);
+          box-shadow: var(--innerpanel-shadow, none);
         }
         .cr-input-bar {
           margin: var(--inputbar-panel-margin, 0px);
           border-radius: var(--inputbar-panel-radius, 0px);
-          border: var(--col-border, none);
-          box-shadow: var(--col-shadow, none);
+          border: var(--innerpanel-border, none);
+          box-shadow: var(--innerpanel-shadow, none);
           min-height: var(--inputbar-height, auto);
         }
 
