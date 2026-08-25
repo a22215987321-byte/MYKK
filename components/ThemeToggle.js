@@ -15,6 +15,8 @@ const THEMES = [
   { id: "glass", label: "🥂 玻璃質感", hidden: true },
   { id: "pastel-pearl", label: "🪞 柔和珠光" },
   { id: "shadow-window", label: "🌙 幽影深窗" },
+  // 從零重建的版面，第一階段只確立四張大卡（見 theme.css 的 Style 6）。
+  { id: "clean-cards", label: "◻️ 簡約四卡" },
 ];
 const VISIBLE_THEMES = THEMES.filter(t => !t.hidden);
 

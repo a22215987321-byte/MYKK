@@ -677,6 +677,82 @@ html[data-theme="shadow-window"] {
   --shell-shadow: none;
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Style 6 — 簡約四卡：從零開始的乾淨版面，第一階段只確立「四張大卡」。
+
+   設計前提跟其他主題相反：這裡的四張卡完全不用邊框、不用陰影，只靠
+   畫布(--shell-bg)與卡面(--panel-alt)的色差把彼此分開。沒有邊框就不
+   可能出現「直角邊框撞上 18px 圓角」那類問題——其他主題長期的直角色
+   塊，成因都是內層區塊繼承了大卡的 --col-border/--col-shadow，而它們
+   自己的 radius 是 0px。這裡把 --col-border/--col-shadow 直接設成
+   none，內層無論讀 --col-* 還是 --innerpanel-*，結果都是沒有框、沒
+   有影，從源頭消除。
+
+   幾何(margin/gap/radius)刻意跟現有主題完全一致，所以四張卡的大小和
+   位置跟你原本看到的一模一樣，只有外觀不同。
+
+   這是第一階段，只管四張大卡；卡片內部的細節（分頁列、訊息泡泡、按鈕
+   等）之後再一項一項加回來，不要一次補滿。
+   ───────────────────────────────────────────────────────────────────── */
+html[data-theme="clean-cards"] {
+  /* ── 版面幾何：跟 :root/柔和珠光/幽影深窗 完全相同，位置尺寸不變 ── */
+  --shell-margin: 12px;
+  --panel-gap: 12px;
+  --shell-radius: 0px;
+  --shell-shadow: none;
+  --col-radius: 18px;
+  --col-margin: 0px;
+  --resize-handle-display: none;
+
+  /* ── 四張大卡：無邊框、無陰影、無模糊 ──
+     這三行是這個主題的核心。不要為了「讓卡片更明顯」而把它們改回有值，
+     那會讓內層區塊再次長出直角框——要更明顯請改下面的色差。 */
+  --col-border: none;
+  --col-border-right: none;
+  --col-border-left: none;
+  --col-shadow: none;
+  --col-blur: none;
+
+  /* ── 顏色：畫布明顯比卡面深，四張卡才會讀成四個獨立物件 ──
+     畫布 #aeb7c2 (174,183,194) vs 卡面 #f8f7f5 (248,247,245)，差約 74
+     階。柔和珠光當初畫布跟卡片只差 1-2 階，那正是四張卡糊成一片的原因；
+     這裡刻意拉開到不可能誤認的程度（實測比較過 32 階的暖灰 #d8d6d0 和
+     暖褐 #bfb5a8，都不如這個冷灰明確）。
+     冷灰配暖白是刻意的：卡面帶暖調、畫布帶冷調，除了明度差還有色溫差，
+     即使在色偏或低對比的螢幕上也分得出來。
+     --panel 跟 --panel-alt 設成同色，卡片內的分頁列漸層才會是平的，不會
+     在卡片上緣切出一條深淺帶。 */
+  --shell-bg: #aeb7c2;
+  --page-bg: var(--shell-bg);
+  --bg: var(--shell-bg);
+  --panel: #f8f7f5;
+  --panel-alt: #f8f7f5;
+  --panel-hover: #eeece8;
+  --border: #e2dfd9;
+  --border-soft: #edebe6;
+  --panel-blur: none;
+  --shell-blur: none;
+  --panel-gradient-img: none;
+  --bg-pattern: none;
+
+  --text: #2e2c2a;
+  --text-muted: #6b6762;
+  --text-faint: #857f78;
+  --text-dim: #857f78;
+  --text-subtle: #2e2c2a;
+
+  --accent: #5b7c99;
+  --accent-2: #7a9bb5;
+  --accent-text: #ffffff;
+  --accent-active: #e6ecf1;
+  --accent-hover: #f0f2f4;
+
+  /* 小卡片（貼文、資料夾 rail 等）也先不要陰影，保持第一階段的乾淨。 */
+  --card-shadow: none;
+  --glow-border: none;
+  --glow-shadow: none;
+}
+
 body {
   margin: 0;
   background-color: var(--page-bg);
