@@ -26,6 +26,7 @@ import VideoHub from "./VideoHub";
 import ChannelProfileView from "./ChannelProfileView";
 import GroupInfoView from "./GroupInfoView";
 import FriendInfoView from "./FriendInfoView";
+import { linkifyNodes } from "./LinkifiedText";
 import {
   bumpPrivateChatSummary as bumpPrivateChatSummaryLib,
   bumpGroupChatSummary as bumpGroupChatSummaryLib,
@@ -127,10 +128,12 @@ function isSoloStickerToken(text) {
   return matches.length === 1 && text.trim() === matches[0][0];
 }
 
+// 訊息文字：貼圖代碼換成圖片，網址換成可點的連結（linkifyNodes）。
+// 兩者互不干擾——貼圖代碼是 [[sticker:id]]，不會出現在網址裡。
 function renderMessageText(text) {
   if (!text) return text;
   const matches = [...text.matchAll(STICKER_TOKEN_RE)];
-  if (matches.length === 0) return text;
+  if (matches.length === 0) return linkifyNodes(text, "msg");
 
   if (isSoloStickerToken(text)) {
     const src = STICKER_SRC_BY_ID[matches[0][1]];
@@ -142,14 +145,14 @@ function renderMessageText(text) {
   const parts = [];
   let last = 0;
   matches.forEach((m, i) => {
-    if (m.index > last) parts.push(text.slice(last, m.index));
+    if (m.index > last) parts.push(...linkifyNodes(text.slice(last, m.index), `seg${last}`));
     const src = STICKER_SRC_BY_ID[m[1]];
     parts.push(src
       ? <img key={i} src={src} alt="" style={{ height: "1.5em", width: "1.5em", objectFit: "contain", verticalAlign: "middle", margin: "0 1px" }} />
       : m[0]);
     last = m.index + m[0].length;
   });
-  if (last < text.length) parts.push(text.slice(last));
+  if (last < text.length) parts.push(...linkifyNodes(text.slice(last), `seg${last}`));
   return parts;
 }
 

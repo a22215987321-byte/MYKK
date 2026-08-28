@@ -17,16 +17,26 @@ import { Avatar, CommentSection } from "./PostComments";
 import SharePostModal from "./SharePostModal";
 import PortalPopover from "./PortalPopover";
 import { VISIBILITY_OPTIONS, visibilityMeta, canViewPost } from "../lib/postVisibility";
+import { splitLinks } from "../lib/linkify";
+import { linkAnchor } from "./LinkifiedText";
 
 const HASHTAG_RE = /#[\p{L}\p{N}_]+/gu;
+// 只從「不是網址」的片段抓標籤：https://x.com/a#section 的 #section 是網址的
+// fragment，不是使用者下的標籤，不該跑到貼文上方的標籤列去。
 function extractHashtags(text) {
   if (!text) return [];
-  return [...new Set((text.match(HASHTAG_RE) || []))];
+  const tags = [];
+  splitLinks(text).forEach(tk => {
+    if (tk.type === "link") return;
+    tags.push(...(tk.value.match(HASHTAG_RE) || []));
+  });
+  return [...new Set(tags)];
 }
 
 // 輕量 markdown：只處理 **粗體**、# 標籤高亮、## / ### 標題、- 清單，
 // 不引入額外套件，滿足「AI 貼文不要顯示醜陋 ** 符號」的需求就好。
-function renderInline(str, keyPrefix) {
+// 這一層只看粗體和 # 標籤，網址已經在 renderInline 先切走了。
+function renderRich(str, keyPrefix) {
   const parts = [];
   const re = /(\*\*[^*]+\*\*|#[\p{L}\p{N}_]+)/gu;
   let last = 0, m, i = 0;
@@ -41,6 +51,18 @@ function renderInline(str, keyPrefix) {
     last = re.lastIndex;
   }
   if (last < str.length) parts.push(str.slice(last));
+  return parts;
+}
+
+// 一定要「先切網址、再對剩下的純文字做粗體／# 標籤」。反過來的話，
+// https://x.com/a#section 裡的 #section 會先被 HASHTAG_RE 當成標籤切走，
+// 連結就斷成兩截了。
+function renderInline(str, keyPrefix) {
+  const parts = [];
+  splitLinks(str).forEach((tk, ti) => {
+    if (tk.type === "link") parts.push(linkAnchor(tk, `${keyPrefix}-u${ti}`));
+    else parts.push(...renderRich(tk.value, `${keyPrefix}-${ti}`));
+  });
   return parts;
 }
 

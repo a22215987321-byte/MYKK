@@ -4,6 +4,7 @@ import {
   collection, addDoc, onSnapshot, query, orderBy, serverTimestamp,
 } from "firebase/firestore";
 import { formatDate, formatFullDate } from "../lib/format";
+import LinkifiedText from "./LinkifiedText";
 
 // Feed.js 跟 ChannelProfileView.js（影片留言）共用同一份大頭貼 + 留言區塊，
 // 原本只有 Feed.js 自己一份，這裡抽出來避免兩邊各自長出不同的留言 bug。
@@ -61,7 +62,7 @@ export function CommentSection({ postId, myProfile }) {
           <Avatar avatar={c.userAvatar} avatarImage={c.userAvatarImage} color={c.userColor} size={28} />
           <div style={{ background: "var(--panel-alt)", borderRadius: 10, padding: "6px 10px", flex: 1 }}>
             <span style={{ fontWeight: 700, fontSize: 12, color: "var(--text-muted)", marginRight: 6 }}>{c.userNickname}</span>
-            <span style={{ fontSize: 13, color: "var(--text)" }}>{c.text}</span>
+            <span style={{ fontSize: 13, color: "var(--text)", wordBreak: "break-word" }}><LinkifiedText text={c.text} /></span>
             <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }} title={formatFullDate(c.createdAt)}>{formatDate(c.createdAt)}</div>
           </div>
         </div>
