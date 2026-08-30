@@ -67,6 +67,7 @@ import LoadingState from "./LoadingState";
 import PortalPopover from "./PortalPopover";
 import FloatingAiChat from "./FloatingAiChat";
 import FloatingAudioPlayer from "./FloatingAudioPlayer";
+import AudioRoom from "./AudioRoom";
 import useIsMobile from "../lib/useIsMobile";
 import { QUICK_REACTIONS, STICKER_SRC_BY_ID } from "../data/chat/gesturePacks";
 import { ChevronLeft, ChevronRight, CalendarDays, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
@@ -1582,9 +1583,24 @@ export default function ChatApp({ user }) {
       return { ...prev, [block]: { ...prev[block], tabs: nextTabs } };
     });
   };
+  // 分頁被拖到兩塊分頁列以外的地方放開＝「拖出來」。目前只有音頻分頁支援：
+  // 關掉那個分頁，改用貼邊的浮動播放器繼續播（FloatingAudioPlayer 本來就是
+  // 掛在 .cr-shell 外面、切功能頁不中斷的獨立圖層，正好就是「拖出來變成一個
+  // 獨立小視窗」要的東西）。其他分頁維持原本行為：拖到空白處放開什麼都不做。
+  //
+  // 已經有東西在播就沿用那份 audioQueue，不要重設 startIndex 打斷正在播的歌；
+  // 還沒播過任何東西就開一個空佇列，浮動播放器會自己顯示空狀態。
+  const detachTab = useCallback((key, fromBlock) => {
+    if (key !== "audio") return;
+    closeTab(fromBlock, key);
+    setAudioQueue((prev) => prev || { tracks: [], startIndex: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const tabDrag = useTabDragController({
     onMoveTab: moveTabToBlock,
     onReorderTab: reorderTabWithinBlock,
+    onDetachTab: detachTab,
   });
 
   // Mobile / sidebar states
@@ -1600,8 +1616,11 @@ export default function ChatApp({ user }) {
   // 側欄功能方塊按住拖曳調整順序——桌面版限定（手機版側欄是完全不同的簡化排法）。
   // 動態消息／公共大廳固定在最上面當錨點，其餘全部（原本分在三個資料夾裡的
   // 項目也拆出來攤平）都在同一份順序清單裡，彼此都可以互相拖曳交換位置。
+  // 新增項目直接加進這份 defaultOrder 就好，不用換 storageKey——useSidebarLayout
+  // 載入時會算出 missing（defaultOrder 裡還沒被放進 layout 或任何資料夾的 key）
+  // 補在最後面，已經存過排序的使用者不會漏掉新功能，也不會被重設既有順序。
   const sidebarLayout = useSidebarLayout("cr-sidebar-v1", "cr-order-top-v3", [
-    "leaderboard", "calendar", "videoHub",
+    "leaderboard", "calendar", "videoHub", "audio",
     "upgrade", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion",
     "englishPron", "ieltsBand4", "englishMcq", "vocab",
     "spanish", "spanishCourse", "spanishPron", "spanishGrammar", "spanishVerbs", "spanishMcq",
@@ -2544,6 +2563,7 @@ export default function ChatApp({ user }) {
     leaderboard: { icon: "🏆", label: "排行榜" },
     calendar: { icon: "📅", label: "行事曆" },
     videoHub: { icon: "▶", label: "影片" },
+    audio: { icon: "🎵", label: "音頻" },
     upgrade: { icon: "👑", label: "升級會員" },
     cinema: { icon: "🎬", label: "電影院" },
     imageEditor: { icon: "🖼️", label: "圖片編輯" },
@@ -2568,6 +2588,9 @@ export default function ChatApp({ user }) {
   // ChatMoreMenu.js 吃的是 state.showX / setters.setShowX 這種形狀的 20 個
   // prop（不能改它的檔案），這裡組一個相容層餵給它，底層還是同一份
   // mobileActiveKey——20 個 key 全部機械性比照，用迴圈產生避免手key漏改。
+  // 注意：這裡刻意沒有 "audio"。ChatMoreMenu.js 是寫死的項目清單（那個檔案
+  // 不能改），加進來只會產生一組沒人讀的 showAudio/setShowAudio。音頻功能
+  // 目前是桌面版限定，手機版要另外處理。
   const MORE_MENU_KEYS = ["leaderboard", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion", "upgrade",
     "englishPron", "ieltsBand4", "englishMcq", "vocab", "spanish", "spanishCourse", "spanishPron", "spanishGrammar",
     "spanishVerbs", "spanishMcq", "customVocab", "dict", "githubTrending"];
@@ -2596,6 +2619,10 @@ export default function ChatApp({ user }) {
     videoHub: (
       <NavItem icon={<span style={{ color: "#fff", fontSize: 15 }}>▶</span>} iconBg="linear-gradient(135deg,#ef4444,#b91c1c)" label="影片" sublabel="搜尋創作者頻道"
         active={isTabActive("videoHub")} onClick={() => openTab("videoHub")} />
+    ),
+    audio: (
+      <NavItem icon={<span style={{ color: "#fff", fontSize: 15 }}>🎵</span>} iconBg="linear-gradient(135deg,#8b5cf6,#6366f1)" label="音頻" sublabel="收藏的音樂"
+        active={isTabActive("audio")} onClick={() => openTab("audio")} />
     ),
     upgrade: (
       <NavItem icon="👑" iconImg="/icons/upgrade.png" iconBg="linear-gradient(135deg,#7c3aed,#4338ca)" label="升級會員" sublabel="解鎖完整 AI 體驗"
@@ -2984,6 +3011,12 @@ export default function ChatApp({ user }) {
           <CalendarMemo uid={uid} />
         </div>
       </div>
+    ),
+    // 音頻收藏——本來只能從個人頁的收藏分頁翻到最下面才找得到，抽成一級功能頁。
+    // 點清單裡任何一首一樣是交給全域的 FloatingAudioPlayer 播（onPlayAudioQueue），
+    // 所以就算把這個分頁關掉、或切去別的功能，音樂都不會斷。
+    audio: (
+      <AudioRoom uid={uid} onPlayAudioQueue={playAudioQueue} />
     ),
     videoHub: (
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>

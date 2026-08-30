@@ -19,7 +19,12 @@ import { useCallback, useRef, useState } from "react";
 //
 // 這個 hook 只需要在 ChatRoom.js 呼叫一次（因為命中測試要同時看得到兩塊
 // 的分頁列），回傳的 controller 物件傳給兩份 <TabBar/>。
-export function useTabDragController({ onMoveTab, onReorderTab }) {
+// onDetachTab（選填）：拖曳放開時，游標不在任何一塊的分頁列命中範圍內，
+// 就呼叫 onDetachTab(key, fromBlock)——「把分頁拖出去」的語意。回傳 true
+// 代表呼叫端真的接手處理了（例如音頻分頁改成浮動播放器），這時原本的分頁
+// 就不再留在原地；回傳 falsy（或根本沒傳這個 prop）就維持原本行為：拖到
+// 空白處放開＝什麼都不做，分頁留在原位。
+export function useTabDragController({ onMoveTab, onReorderTab, onDetachTab }) {
   const [dragState, setDragState] = useState(null); // {key, fromBlock, label, icon, x, y, w, h} —只在拖曳開始/結束時設定一次，過程中的位置改由 ghostRef 直接寫 DOM
   const [dropTarget, setDropTarget] = useState(null); // {block, beforeKey} | null
   const tabRefs = useRef(new Map());   // key -> {el, block}
@@ -108,13 +113,17 @@ export function useTabDragController({ onMoveTab, onReorderTab }) {
           } else {
             onMoveTab(key, fromBlock, currentDrop.block, currentDrop.beforeKey);
           }
+        } else {
+          // 放開時不在任何分頁列的命中範圍內＝把分頁拖出去了。有沒有人接手
+          // 由呼叫端決定（目前只有音頻分頁會接，變成浮動播放器）。
+          onDetachTab?.(key, fromBlock);
         }
       }
     };
 
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
-  }, [onMoveTab, onReorderTab]);
+  }, [onMoveTab, onReorderTab, onDetachTab]);
 
   const wasJustDragged = useCallback((key) => {
     if (justDraggedRef.current === key) { justDraggedRef.current = null; return true; }

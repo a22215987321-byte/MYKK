@@ -489,7 +489,10 @@ const AUDIO_ROW_GAP = 8;
 // 跳位。用 track id（不是 index）記目前排序跟目前播放中的是哪一首，這樣
 // 拖曳重排的時候不會因為 index 對不上而播錯歌。放開手才會呼叫 onReorder
 // 把最終順序存回 Firestore（只有本人查看自己收藏時才會傳這個 prop）。
-function AudioQueuePlayer({ tracks, onPlayAudioQueue, onReorder }) {
+// export 出去讓側欄的「音頻」功能頁（components/AudioRoom.js）直接重用同一份
+// 元件——使用者要的是「跟收藏分頁裡一模一樣」，複製一份 UI 會立刻開始各自
+// 長歪，共用同一個元件才保證兩邊行為永遠一致。
+export function AudioQueuePlayer({ tracks, onPlayAudioQueue, onReorder }) {
   const audioRef = useRef(null);
   const [order, setOrder] = useState(() => tracks.map(t => t.id));
   const orderRef = useRef(order);
@@ -719,7 +722,8 @@ const PLAYBACK_MODES = [
   { id: "shuffle", label: "隨機播放", icon: "🔀", ready: false },
   { id: "repeatAll", label: "整份收藏循環", icon: "🔁", ready: false },
 ];
-function PlaybackModeMenu({ value, onChange }) {
+// 同 AudioQueuePlayer：export 給 AudioRoom.js 重用，兩邊共用同一顆播放模式選單。
+export function PlaybackModeMenu({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const current = PLAYBACK_MODES.find(m => m.id === value) || PLAYBACK_MODES[0];
