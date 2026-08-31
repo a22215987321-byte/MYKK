@@ -60,6 +60,14 @@ const OfficeMode = dynamic(() => import("./office/OfficeMode"), {
   ssr: false,
   loading: () => <LoadingState label="載入 AI Office..." minHeight="100%" />,
 });
+// 手機版首頁清單（群組＋好友）——原本是寫在下面 isMobile 分支裡的一大段 JSX，
+// 抽成獨立檔案做物理隔離，之後改手機版不會再開到這個桌機手機共用的檔案。
+// 用 dynamic() 而不是靜態 import 有兩個理由：桌面版使用者不用下載這包；以及
+// MobileHomeList.js 會反向 import 本檔的 getStatus/AvatarImg/UnreadBadge/
+// isGroupAvatarImage 這 4 個共用純函式，靜態 import 會形成模組載入期的循環
+// 相依，dynamic() 讓本檔沒有對它的靜態相依，環根本不會產生。
+// 不給 loading——這段是本來就即時顯示的清單，塞一個載入畫面會是行為變動。
+const MobileHomeList = dynamic(() => import("./MobileHomeList"), { ssr: false });
 import AiCompanionCreator from "./AiCompanionCreator";
 import UpgradeMembership, { UpgradeHighlights } from "./UpgradeMembership";
 import EmojiStickerPicker from "./EmojiStickerPicker";
@@ -109,7 +117,7 @@ function toMillis(ts) {
   return Number.isFinite(t) ? t : null;
 }
 
-function getStatus(status) {
+export function getStatus(status) {
   switch (status) {
     case "online": return { label: "線上",    color: "#22c55e" };
     case "away":   return { label: "離開", color: "#eab308" };
@@ -159,7 +167,7 @@ function renderMessageText(text) {
 
 // Avatar helper
 
-function AvatarImg({ avatarImage, avatar, color, size = 36 }) {
+export function AvatarImg({ avatarImage, avatar, color, size = 36 }) {
   if (avatarImage) {
     return <img src={avatarImage} alt="頭像" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, display: "block" }} />;
   }
@@ -681,7 +689,7 @@ function ActiveFolderHeader({ folder, onBack, onRename, onDelete }) {
 
 // 側欄好友/群組項目上的未讀角標——0 不顯示，1-99 顯示數字，超過顯示「99+」。
 // 疊在頭像/圖示右上角，跟左下角既有的線上狀態小圓點分開，不會互相遮住。
-function UnreadBadge({ count }) {
+export function UnreadBadge({ count }) {
   if (!count) return null;
   return (
     <span style={{
@@ -697,7 +705,7 @@ function UnreadBadge({ count }) {
 
 // 群組頭像跟 avatar emoji 共用同一個欄位（預設 "👥"，上傳後變成 R2 圖片網址）——
 // 用這個判斷目前存的是要當文字顯示的 emoji，還是要當 <img src> 顯示的圖片網址。
-function isGroupAvatarImage(avatar) {
+export function isGroupAvatarImage(avatar) {
   return typeof avatar === "string" && avatar.startsWith("http");
 }
 
@@ -4009,126 +4017,29 @@ export default function ChatApp({ user }) {
             ) : (
               mobileHomeSubview === 'list' ? (
               /* 手機版「首頁」分頁的預設內容：群組＋好友清單（＋置頂的
-                 # 公共大廳 入口），點群組/好友進去看對話，點公共大廳
-                 切到下面那個對話畫面。這段內容本來是放在手機抽屜裡，現在
-                 抽屜改放功能頁了，這裡搬過來直接當主內容顯示。 */
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-                {pendingInCount > 0 && (
-                  <button onClick={() => setShowFriendReqs(true)}
-                    style={{ margin: "12px 16px 0", display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#dc2626,#b91c1c)", border: "none", borderRadius: 14, padding: "10px 12px", color: "#fff", cursor: "pointer", width: "calc(100% - 32px)", textAlign: "left" }}>
-                    <span style={{ fontSize: 18 }}>🔔</span>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>你有 {pendingInCount} 個好友請求</div>
-                      <div style={{ fontSize: 11, opacity: 0.8 }}>點擊查看並處理</div>
-                    </div>
-                  </button>
-                )}
-
-                <div style={{ padding: "12px 16px 8px" }}>
-                  <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                    <Search size={16} style={{ position: "absolute", left: 14, color: "var(--text-dim)", pointerEvents: "none" }} />
-                    <input type="text" placeholder="搜尋好友..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                      style={{ width: "100%", height: 44, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: "0 14px 0 38px", color: "var(--text)", fontSize: 15, outline: "none", boxSizing: "border-box" }} />
-                  </div>
-                </div>
-
-                <div style={{ padding: "4px 16px 0" }}>
-                  <button onClick={() => { resetAllViews(); setMobileHomeSubview('hall'); }}
-                    style={{ width: "100%", minHeight: 64, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderRadius: 14, border: "none", background: "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg,var(--accent-2),#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <MessageCircle size={22} color="#fff" />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text)" }}># 公共大廳</div>
-                      <div style={{ fontSize: 13, color: "var(--text-muted)" }}>和大家聊天吧</div>
-                    </div>
-                  </button>
-                </div>
-
-                <div className="cr-nav-hdr">
-                  <span className="cr-nav-hdr-label">群組 {myGroups.length}</span>
-                  <button onClick={() => setShowCreateGroup(true)} title="建立群組" className="cr-nav-icon-btn">
-                    <Plus size={16} />
-                  </button>
-                </div>
-                <div style={{ padding: "0 16px 4px" }}>
-                  {myGroups.map(group => {
-                    const isActive = activeGroupId === group.id;
-                    return (
-                      <button key={group.id} onClick={() => { resetAllViews(); setActiveGroupId(group.id); }}
-                        className={`fb ${isActive ? "act" : ""}`}>
-                        <div style={{ position: "relative", flexShrink: 0 }}>
-                          <div className="cr-fb-icon">
-                            {isGroupAvatarImage(group.avatar)
-                              ? <img src={group.avatar} alt={group.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit", display: "block" }} />
-                              : (group.avatar || (group.name ? group.name.slice(0, 1).toUpperCase() : "👥"))}
-                          </div>
-                          <UnreadBadge count={group.unreadCount?.[uid]} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="cr-fb-name">{group.name}</div>
-                          <div className="cr-fb-sub">{(group.members || []).length} 人</div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="cr-nav-hdr">
-                  <span className="cr-nav-hdr-label">好友 {myFriends.length}</span>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    {pendingInCount > 0 && (
-                      <button onClick={() => setShowFriendReqs(true)} title="好友請求" style={{ background: "#ef4444", border: "none", borderRadius: 20, padding: "2px 8px", color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-                        🔔 {pendingInCount}
-                      </button>
-                    )}
-                    <button onClick={() => setShowFriendSearch(true)} title="加好友" className="cr-nav-icon-btn">
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                </div>
-                <div style={{ padding: "0 16px 8px" }}>
-                  {myFriends.length === 0 && !searchQuery && (
-                    <div style={{ textAlign: "center", padding: "20px 12px", color: "var(--text-dim)", fontSize: 13 }}>
-                      <div style={{ fontSize: 32, marginBottom: 8 }}>👋</div>
-                      還沒有好友<br />
-                      <button onClick={() => setShowFriendSearch(true)} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, marginTop: 6 }}>點擊搜尋好友</button>
-                    </div>
-                  )}
-                  {myFriends.map(friend => {
-                    const isActive = activeFriendId === friend.uid;
-                    return (
-                      <button key={friend.uid} onClick={() => { if (longPressFiredRef.current) { longPressFiredRef.current = false; return; } resetAllViews(); setActiveFriendId(friend.uid); }}
-                        onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, friend }); }}
-                        onTouchStart={e => {
-                          longPressFiredRef.current = false;
-                          const touch = e.touches[0];
-                          const x = touch.clientX, y = touch.clientY;
-                          longPressTimerRef.current = setTimeout(() => {
-                            longPressFiredRef.current = true;
-                            setContextMenu({ x, y, friend });
-                          }, 500);
-                        }}
-                        onTouchEnd={() => clearTimeout(longPressTimerRef.current)}
-                        onTouchMove={() => clearTimeout(longPressTimerRef.current)}
-                        className={`fb ${isActive ? "act" : ""}`}
-                        style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}>
-                        <div style={{ position: "relative", flexShrink: 0 }}>
-                          <AvatarImg avatarImage={friend.avatarImage} avatar={friend.avatar} color={friend.color} size={48} />
-                          <span style={{ position: "absolute", bottom: 1, right: 1, width: 12, height: 12, borderRadius: "50%", background: getStatus(friend.status).color, border: "2px solid var(--panel-alt)" }} />
-                          <UnreadBadge count={privateUnread[friend.uid]} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="cr-fb-name">{friend.nickname}</div>
-                          <div className="cr-fb-sub">
-                            {friend.statusText || getStatus(friend.status).label}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                 # 公共大廳 入口）。這一整段 JSX 已抽到 components/MobileHomeList.js
+                 做物理隔離（見檔案頂部 dynamic() 宣告），純搬移、行為未變。 */
+              <MobileHomeList
+                pendingInCount={pendingInCount}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                myGroups={myGroups}
+                myFriends={myFriends}
+                activeGroupId={activeGroupId}
+                activeFriendId={activeFriendId}
+                uid={uid}
+                privateUnread={privateUnread}
+                setShowFriendReqs={setShowFriendReqs}
+                setShowFriendSearch={setShowFriendSearch}
+                setShowCreateGroup={setShowCreateGroup}
+                setActiveGroupId={setActiveGroupId}
+                setActiveFriendId={setActiveFriendId}
+                setContextMenu={setContextMenu}
+                setMobileHomeSubview={setMobileHomeSubview}
+                resetAllViews={resetAllViews}
+                longPressFiredRef={longPressFiredRef}
+                longPressTimerRef={longPressTimerRef}
+              />
             ) : (
             <>
               <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
