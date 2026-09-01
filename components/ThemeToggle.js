@@ -277,17 +277,27 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
         title="設定"
         aria-label="設定選單"
         style={mode === "floating" ? {
-          display: "flex", alignItems: "center", justifyContent: "center",
-          width: 38, height: 38, background: "var(--panel)", border: "1px solid var(--border)",
-          borderRadius: "var(--radius-md)", boxShadow: "var(--card-shadow)",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          height: 42, padding: "0 14px", background: "var(--panel)", border: "1px solid var(--border)",
+          borderRadius: 999, boxShadow: "var(--card-shadow)",
           backdropFilter: "var(--panel-blur)", WebkitBackdropFilter: "var(--panel-blur)",
-          color: "var(--text)", fontSize: 17, cursor: "pointer",
+          color: "var(--text)", fontSize: 14, fontWeight: 600, cursor: "pointer",
+          whiteSpace: "nowrap",
         } : {
           background: "none", border: "none", color: "var(--text-faint)",
           cursor: "pointer", fontSize: 16, padding: 4, borderRadius: 6,
         }}
       >
-        ⚙️
+        {mode === "floating" ? (
+          /* 未登入（登入頁）才會走到這裡——顯示目前風格名稱的膠囊鈕，比原本
+             一顆 ⚙️ 更清楚知道按下去是切換佈景。選單內容完全沒變，還是同一份
+             4 種風格＋柔和珠光 6 種配色，讀寫的也是同一個 theme state。 */
+          <>
+            <span aria-hidden="true">{(THEMES.find(t => t.id === theme)?.label || "☀️ 淺色預設").slice(0, 2)}</span>
+            <span>{(THEMES.find(t => t.id === theme)?.label || "☀️ 淺色預設").slice(2).trim()}</span>
+            <span aria-hidden="true" style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
+          </>
+        ) : "⚙️"}
       </button>
 
       {open && (

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import ChatRoom from '../components/ChatRoom';
 import LoadingState from '../components/LoadingState';
+import AuthScreen from '../components/AuthScreen';
 import { auth, db, googleProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { saveAccount, consumePendingLoginEmail } from '../lib/accountSwitcher';
@@ -463,98 +464,22 @@ export default function Home() {
   }
 
   // ── Login / Register ──
+  // UI 全部移到 components/AuthScreen.js（純畫面），這裡只負責把既有的 state
+  // 與 handler 傳下去——authentication 流程、Firebase 呼叫、登入後的 setStep
+  // 都沒有變動。
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <img src="/logo.png?v=3" alt="" aria-hidden="true" width={64} height={64} style={{ borderRadius: 16, marginBottom: 12 }} />
-          <h1 style={{ color: 'var(--text)', fontSize: 24, fontWeight: 700, margin: 0 }}>聊天社交平台</h1>
-          <p style={{ color: 'var(--text-faint)', fontSize: 14, marginTop: 6 }}>與朋友保持聯繫</p>
-        </div>
-        <div style={{ background: 'var(--panel)', borderRadius: 'var(--radius-lg)', padding: 28, border: '1px solid var(--border)', backdropFilter: 'var(--panel-blur)', WebkitBackdropFilter: 'var(--panel-blur)' }}>
-          {/* Tab switch */}
-          <div role="tablist" aria-label="登入或註冊" style={{ display: 'flex', marginBottom: 20, background: 'var(--panel-alt)', borderRadius: 'var(--radius-md)', padding: 4 }}>
-            {['login','register'].map(t => (
-              <button key={t} role="tab" aria-selected={tab === t} onClick={() => { setTab(t); setAuthError(''); }} style={{
-                flex: 1, padding: '8px 0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                background: tab === t ? 'var(--accent)' : 'transparent',
-                color: tab === t ? '#fff' : 'var(--text-faint)', fontSize: 14, fontWeight: 600,
-              }}>{t === 'login' ? '登入' : '註冊'}</button>
-            ))}
-          </div>
-
-          {/* Avatar picker (register only) */}
-          {tab === 'register' && (
-            <div style={{ marginBottom: 16 }}>
-              <span id="reg-avatar-label" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 6, display: 'block' }}>選擇頭像</span>
-              <div role="group" aria-labelledby="reg-avatar-label" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                {AVATAR_EMOJIS.map(e => (
-                  <button key={e} type="button" onClick={() => setAvatar(e)} aria-label={`頭像 ${e}`} aria-pressed={avatar === e} style={{ width: 38, height: 38, borderRadius: '50%', border: avatar === e ? '2px solid var(--accent)' : '2px solid transparent', background: color, cursor: 'pointer', fontSize: 18 }}>{e}</button>
-                ))}
-              </div>
-              <div role="group" aria-label="選擇頭像底色" style={{ display: 'flex', gap: 6 }}>
-                {COLORS.map(c => (
-                  <button key={c} type="button" onClick={() => setColor(c)} aria-label={`底色 ${c}`} aria-pressed={color === c} style={{ width: 24, height: 24, borderRadius: '50%', background: c, border: color === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer' }} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {tab === 'register' && (
-            <div style={{ marginBottom: 12 }}>
-              <label htmlFor="reg-nickname" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>暱稱</label>
-              <input id="reg-nickname" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="你的暱稱" style={inputStyle} />
-            </div>
-          )}
-
-          <div style={{ marginBottom: 12 }}>
-            <label htmlFor="auth-email" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>電子郵件</label>
-            <input id="auth-email" value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="your@email.com" style={inputStyle} />
-          </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <label htmlFor="auth-password" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>密碼</label>
-            <input id="auth-password" value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="••••••••"
-              onKeyDown={e => e.key === 'Enter' && (tab === 'login' ? handleLogin() : handleRegister())}
-              style={inputStyle} />
-          </div>
-
-          {authError && (
-            <div role="alert" style={{ background: '#450a0a', border: '1px solid #ef4444', borderRadius: 'var(--radius-sm)', padding: '8px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 14 }}>
-              {authError}
-            </div>
-          )}
-
-          <button onClick={tab === 'login' ? handleLogin : handleRegister} disabled={busy} style={{
-            width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-2))',
-            border: 'none', borderRadius: 'var(--radius-md)', padding: '12px', color: '#fff',
-            fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 14, opacity: busy ? 0.7 : 1,
-          }}>
-            {busy ? '處理中...' : (tab === 'login' ? '登入' : '建立帳號')}
-          </button>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>或</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-          </div>
-
-          <button onClick={handleGoogleLogin} style={{
-            display: 'flex', alignItems: 'center', gap: 12, background: '#fff',
-            border: 'none', borderRadius: 'var(--radius-md)', padding: '12px 24px', cursor: 'pointer',
-            fontSize: 15, fontWeight: 600, color: '#1f2937', width: '100%',
-            justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-          }}>
-            <svg width="20" height="20" viewBox="0 0 48 48">
-              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-            </svg>
-            使用 Google 帳號登入
-          </button>
-        </div>
-      </div>
-    </main>
+    <AuthScreen
+      tab={tab} setTab={setTab}
+      email={email} setEmail={setEmail}
+      password={password} setPassword={setPassword}
+      nickname={nickname} setNickname={setNickname}
+      avatar={avatar} setAvatar={setAvatar}
+      color={color} setColor={setColor}
+      authError={authError} setAuthError={setAuthError}
+      busy={busy}
+      onLogin={handleLogin}
+      onRegister={handleRegister}
+      onGoogleLogin={handleGoogleLogin}
+    />
   );
 }
