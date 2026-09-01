@@ -1622,7 +1622,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
 
         {/* Sticky top bar — 左邊是返回鍵，embedded 時右上角另外放一顆明確的
             關閉按鈕（✕），兩顆都會回到動態消息，不會真的離開這個 SPA。 */}
-        <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,23,42,0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 16, padding: "0 16px", height: 52 }}>
+        <header style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 16, padding: "0 16px", height: 52 }}>
           {embedded ? (
             <button onClick={onClose} aria-label="返回動態消息" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", color: "var(--text)", border: "none", background: "transparent", cursor: "pointer", fontSize: 18, transition: "background 0.15s" }}
               onMouseEnter={e => e.currentTarget.style.background = "var(--panel)"}
@@ -1637,7 +1637,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
             </Link>
           )}
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>{profile.nickname}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{profile.nickname}</div>
             <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{visiblePosts.length} 則貼文</div>
           </div>
 
@@ -1645,9 +1645,9 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
 
           {embedded && (
             <button onClick={onClose} aria-label="關閉個人頁面"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)", color: "#f1f5f9", cursor: "pointer", fontSize: 15, flexShrink: 0 }}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.16)"}
-              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}>
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: "50%", background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", cursor: "pointer", fontSize: 15, flexShrink: 0 }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
+              onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
               ✕
             </button>
           )}
@@ -1664,7 +1664,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
                   ? <img src={myProfile.avatarImage} alt="我的頭像" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
                   : <div style={{ width: 28, height: 28, borderRadius: "50%", background: myProfile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{myProfile.avatar || "😊"}</div>
                 }
-                <span style={{ color: "#f1f5f9", fontSize: 10 }}>▾</span>
+                <span style={{ color: "var(--text-muted)", fontSize: 10 }}>▾</span>
               </button>
               {accountMenuOpen && (
                 <>
