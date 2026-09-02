@@ -74,6 +74,9 @@ export default function AuthScreen({
         .as-left {
           position: relative;
           display: flex; flex-direction: column; justify-content: center;
+          /* 水平置中的範圍是這一欄本身（grid 的 55fr），不是整個瀏覽器頁面。 */
+          align-items: center;
+          text-align: center;
           padding: 48px 56px;
           overflow: hidden;
           background:
@@ -81,7 +84,7 @@ export default function AuthScreen({
             radial-gradient(circle at 78% 78%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent 48%),
             var(--panel-alt);
         }
-        .as-brand { display: flex; align-items: center; gap: 16px; margin-bottom: 40px; }
+        .as-brand { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-bottom: 40px; }
         .as-brand img { width: 64px; height: 64px; border-radius: 18px; flex-shrink: 0; }
         .as-brand-name { font-size: 31px; font-weight: 800; letter-spacing: 3px; color: var(--text); line-height: 1.1; }
         .as-brand-sub { font-size: 14px; color: var(--text-muted); margin-top: 4px; letter-spacing: 2px; }
