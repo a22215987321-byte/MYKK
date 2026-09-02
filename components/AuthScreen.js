@@ -26,42 +26,6 @@ function GoogleMark() {
   );
 }
 
-// 左側裝飾：手機外框＋幾顆對話泡泡＋浮動頭像＋背後的柔光色塊。全部用 CSS／
-// 既有的 avatar 圖檔組出來，沒有引用參考圖裡的人物照片。
-function BrandArt() {
-  return (
-    <div className="as-art" aria-hidden="true">
-      <div className="as-blob as-blob-1" />
-      <div className="as-blob as-blob-2" />
-      <div className="as-phone">
-        <div className="as-phone-notch" />
-        <div className="as-phone-head">
-          <img src="/avatar2.png" alt="" className="as-phone-head-av" />
-          <div>
-            <div className="as-phone-title">好友群組</div>
-            <div className="as-phone-sub">8 人在線</div>
-          </div>
-        </div>
-        <div className="as-row">
-          <img src="/avatar3.png" alt="" className="as-av-sm" />
-          <div className="as-bubble">今天過得好嗎？</div>
-        </div>
-        <div className="as-row as-row-end">
-          <div className="as-bubble as-bubble-me">很好啊！你呢？</div>
-        </div>
-        <div className="as-row">
-          <img src="/avatar4.png" alt="" className="as-av-sm" />
-          <div className="as-bubble">一起去喝咖啡吧</div>
-        </div>
-      </div>
-      <img src="/avatar5.png" alt="" className="as-float as-float-1" />
-      <img src="/avatar6.png" alt="" className="as-float as-float-2" />
-      <div className="as-chip as-chip-heart">♥</div>
-      <div className="as-chip as-chip-dots">• • •</div>
-    </div>
-  );
-}
-
 export default function AuthScreen({
   tab, setTab,
   email, setEmail,
@@ -116,62 +80,13 @@ export default function AuthScreen({
             radial-gradient(circle at 78% 78%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent 48%),
             var(--panel-alt);
         }
-        .as-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 26px; }
-        .as-brand img { width: 56px; height: 56px; border-radius: 16px; flex-shrink: 0; }
-        .as-brand-name { font-size: 27px; font-weight: 800; letter-spacing: 3px; color: var(--text); line-height: 1.1; }
-        .as-brand-sub { font-size: 13px; color: var(--text-muted); margin-top: 3px; letter-spacing: 2px; }
-        .as-headline { font-size: clamp(30px, 3.4vw, 46px); font-weight: 800; line-height: 1.25; margin: 0 0 18px; color: var(--text); }
+        .as-brand { display: flex; align-items: center; gap: 16px; margin-bottom: 40px; }
+        .as-brand img { width: 64px; height: 64px; border-radius: 18px; flex-shrink: 0; }
+        .as-brand-name { font-size: 31px; font-weight: 800; letter-spacing: 3px; color: var(--text); line-height: 1.1; }
+        .as-brand-sub { font-size: 14px; color: var(--text-muted); margin-top: 4px; letter-spacing: 2px; }
+        .as-headline { font-size: clamp(34px, 3.8vw, 52px); font-weight: 800; line-height: 1.28; margin: 0 0 24px; color: var(--text); }
         .as-headline span { color: var(--accent); display: block; }
-        .as-sub { font-size: 15px; line-height: 1.9; color: var(--text-muted); margin: 0; }
-
-        /* 左欄裝飾 */
-        .as-art { position: relative; margin-top: 34px; height: 300px; }
-        .as-blob { position: absolute; border-radius: 50%; filter: blur(46px); }
-        .as-blob-1 { width: 230px; height: 230px; left: -40px; top: 10px; background: color-mix(in srgb, var(--accent) 34%, transparent); }
-        .as-blob-2 { width: 190px; height: 190px; right: 20px; bottom: -10px; background: color-mix(in srgb, var(--accent-2) 30%, transparent); }
-        .as-phone {
-          position: absolute; left: 50%; transform: translateX(-50%) rotate(-3deg);
-          top: 0; width: 210px; padding: 16px 12px 14px;
-          background: var(--panel); border: 1px solid var(--border);
-          border-radius: 26px; box-shadow: 0 18px 42px color-mix(in srgb, var(--text) 16%, transparent);
-        }
-        .as-phone-notch { width: 46px; height: 4px; border-radius: 3px; background: var(--border); margin: 0 auto 12px; }
-        .as-phone-head { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
-        .as-phone-head-av { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
-        .as-phone-title { font-size: 12px; font-weight: 700; color: var(--text); }
-        .as-phone-sub { font-size: 10px; color: var(--text-faint); }
-        .as-row { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 8px; }
-        .as-row-end { justify-content: flex-end; }
-        .as-av-sm { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-        .as-bubble {
-          background: var(--panel-alt); border: 1px solid var(--border);
-          border-radius: 12px 12px 12px 4px; padding: 7px 10px; font-size: 11px; color: var(--text);
-        }
-        .as-bubble-me {
-          background: linear-gradient(135deg, var(--accent), var(--accent-2));
-          color: var(--accent-text, #fff); border: none; border-radius: 12px 12px 4px 12px;
-        }
-        .as-float {
-          position: absolute; border-radius: 50%; object-fit: cover;
-          border: 3px solid var(--panel);
-          box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 18%, transparent);
-        }
-        .as-float-1 { width: 62px; height: 62px; left: 6px; top: 74px; }
-        .as-float-2 { width: 68px; height: 68px; right: 8px; bottom: 46px; }
-        .as-chip {
-          position: absolute; display: flex; align-items: center; justify-content: center;
-          border-radius: 16px 16px 16px 5px;
-          box-shadow: 0 10px 22px color-mix(in srgb, var(--text) 14%, transparent);
-        }
-        .as-chip-heart {
-          width: 46px; height: 42px; right: 26px; top: 30px; font-size: 19px;
-          background: linear-gradient(135deg, var(--accent), var(--accent-2));
-          color: var(--accent-text, #fff);
-        }
-        .as-chip-dots {
-          width: 56px; height: 40px; right: 54px; top: 104px; font-size: 13px; letter-spacing: 1px;
-          background: var(--panel); color: var(--text-faint); border: 1px solid var(--border);
-        }
+        .as-sub { font-size: 16px; line-height: 2; color: var(--text-muted); margin: 0; }
 
         /* 右欄：登入卡 */
         .as-right {
@@ -236,7 +151,6 @@ export default function AuthScreen({
         /* 平板：左欄縮小 */
         @media (max-width: 1100px) {
           .as-left { padding: 40px 36px; }
-          .as-art { height: 250px; }
           .as-card { padding: 34px 30px 30px; }
         }
         /* 手機：改單欄，左欄只留品牌，裝飾整個拿掉避免溢出 */
@@ -255,7 +169,6 @@ export default function AuthScreen({
           .as-headline { font-size: 25px; margin-bottom: 10px; }
           .as-headline span { display: inline; }
           .as-sub { font-size: 14px; line-height: 1.7; }
-          .as-art { display: none; }
           .as-right { padding: 22px 16px 34px; }
           .as-card { border: none; box-shadow: none; background: transparent; padding: 4px 0 0; max-width: 460px; }
           .as-title { font-size: 23px; }
@@ -280,7 +193,6 @@ export default function AuthScreen({
           <br />
           讓每一次對話都更有溫度
         </p>
-        <BrandArt />
       </section>
 
       {/* ── 右欄：登入／註冊卡 ── */}

@@ -270,7 +270,14 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
 
   return (
     <div ref={menuRef} style={mode === "floating"
-      ? { position: "fixed", top: 12, right: 12, zIndex: 9999 }
+      // floating 模式是「固定在瀏覽器視窗上的 UI 控制元件」，不是頁面內容的
+      // 一部分——捲動時必須一直待在視窗右上角。它掛在 pages/_app.js 最外層、
+      // 跟 <Component> 同層，不在任何頁面容器裡面，所以 fixed 是相對視窗定位。
+      // ⚠️ 注意：如果之後有人在 html／body／#__next 任一層加上 transform、
+      // filter、backdrop-filter、perspective、will-change 或 contain，那一層
+      // 會變成 fixed 的 containing block，這顆按鈕就會開始跟著頁面捲動。改那
+      // 幾層的樣式前請先確認這裡。
+      ? { position: "fixed", top: 12, right: 12, zIndex: 2147483000 }
       : { position: "relative", display: "inline-flex" }}>
       <button
         onClick={() => setOpen(v => !v)}
