@@ -1522,6 +1522,16 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
     if (idx >= 0) { setLightboxList(list); setMediaLightboxIndex(idx); }
   };
 
+  // 浮在封面上的返回鍵——只有圖示，沒有方塊背景也沒有邊框。drop-shadow 是
+  // 為了讓它在任何一張使用者自訂封面照片上都還看得見，不是背景色塊。
+  const backBtnStyle = {
+    display: "flex", alignItems: "center", justifyContent: "center",
+    width: 34, height: 34, background: "none", border: "none", padding: 0,
+    color: "var(--text)", fontSize: 22, lineHeight: 1, cursor: "pointer",
+    textDecoration: "none", pointerEvents: "auto",
+    filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.45))",
+  };
+
   return (
     <>
       {embedded ? (
@@ -1620,72 +1630,17 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
 
       <div className={embedded ? "pp-root pv-embedded" : "pp-root"} style={{ minHeight: embedded ? "100%" : "100vh", background: "var(--panel-alt)", color: "var(--text)", fontFamily: "var(--font-body)", boxSizing: "border-box" }}>
 
-        {/* Sticky top bar — 左邊是返回鍵，embedded 時右上角另外放一顆明確的
-            關閉按鈕（✕），兩顆都會回到動態消息，不會真的離開這個 SPA。 */}
-        <header style={{ position: "sticky", top: 0, zIndex: 50, background: "var(--panel-alt)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", gap: 16, padding: "0 16px", height: 52 }}>
+        {/* 頂部只留返回鍵，沒有橫條。原本這裡是一條 52px 高、有底色和下邊框
+            的 sticky 標題列（暱稱＋貼文數＋關閉鈕＋帳號選單），夾在分頁列和
+            封面橫幅中間，視覺上多一層切斷。整條拿掉之後封面直接接在分頁列
+            下面，返回鍵改成浮在封面上的純圖示。
+            height:0 + overflow:visible 讓它不佔版面高度（封面因此貼到最上面），
+            但保留 sticky，捲到下面時返回鍵仍然固定在左上角可以按。 */}
+        <header style={{ position: "sticky", top: 0, zIndex: 50, height: 0, overflow: "visible", display: "flex", alignItems: "flex-start", padding: "10px 0 0 10px", pointerEvents: "none" }}>
           {embedded ? (
-            <button onClick={onClose} aria-label="返回動態消息" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", color: "var(--text)", border: "none", background: "transparent", cursor: "pointer", fontSize: 18, transition: "background 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--panel)"}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-              ←
-            </button>
+            <button onClick={onClose} aria-label="返回動態消息" style={backBtnStyle}>←</button>
           ) : (
-            <Link href="/" aria-label="返回聊天室" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", color: "var(--text)", textDecoration: "none", fontSize: 18, background: "transparent", transition: "background 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--panel)"}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-              ←
-            </Link>
-          )}
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{profile.nickname}</div>
-            <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{visiblePosts.length} 則貼文</div>
-          </div>
-
-          <div style={{ flex: 1 }} />
-
-          {embedded && (
-            <button onClick={onClose} aria-label="關閉個人頁面"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: "50%", background: "var(--panel)", border: "1px solid var(--border)", color: "var(--text)", cursor: "pointer", fontSize: 15, flexShrink: 0 }}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
-              onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
-              ✕
-            </button>
-          )}
-
-          {/* Quick account menu — this is the logged-in viewer's own
-              settings (e.g. notification sound volume), not something about
-              whichever profile happens to be open, so it uses myProfile and
-              shows regardless of isOwner. */}
-          {myProfile && (
-            <div style={{ position: "relative" }}>
-              <button onClick={() => setAccountMenuOpen(v => !v)} aria-label="帳號選項" aria-expanded={accountMenuOpen}
-                style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 20 }}>
-                {myProfile.avatarImage
-                  ? <img src={myProfile.avatarImage} alt="我的頭像" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
-                  : <div style={{ width: 28, height: 28, borderRadius: "50%", background: myProfile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{myProfile.avatar || "😊"}</div>
-                }
-                <span style={{ color: "var(--text-muted)", fontSize: 10 }}>▾</span>
-              </button>
-              {accountMenuOpen && (
-                <>
-                  <div onClick={() => setAccountMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
-                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 8, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 91, minWidth: 220, padding: 14 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 10 }}>快速設定</div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text)", marginBottom: 6 }}>
-                      <span>🔊 新訊息音量</span>
-                      <span style={{ color: "var(--text-faint)" }}>{notifVolume}%</span>
-                    </div>
-                    <input type="range" min={0} max={100} value={notifVolume}
-                      onChange={e => changeNotifVolume(Number(e.target.value))}
-                      style={{ width: "100%" }} aria-label="新訊息通知音量" />
-                    <button onClick={() => playNotificationSound()}
-                      style={{ marginTop: 10, width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 0", color: "var(--text)", fontSize: 12, cursor: "pointer" }}>
-                      🔔 測試音效
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <Link href="/" aria-label="返回聊天室" style={backBtnStyle}>←</Link>
           )}
         </header>
 
