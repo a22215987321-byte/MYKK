@@ -1975,9 +1975,34 @@ export default function ChatApp({ user }) {
     cinemaCommentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [cinemaComments]);
 
+  // 訊息區捲到底。「剛切進一個對話」跟「同一個對話來了新訊息」要用不同做法：
+  //
+  // 原本兩種情況都用 behavior:"smooth"。剛打開對話時訊息一次全部進來，瀏覽器
+  // 要從最上面平滑捲到最底，是一段很長的動畫；而頭像、貼圖、圖片訊息是之後
+  // 才載入的，載完高度就變了，動畫當初算好的目標位置於是過期，捲到一半就停
+  // 住——結果每次打開對話都落在中間某處，不是最新訊息。
+  //
+  // 切對話時改成 auto（瞬間跳，沒有動畫就沒有「動畫途中高度變了」的問題），
+  // 而且跳完之後再用 rAF 和兩個 timeout 補跳幾次，把晚一步載入的圖片撐開的
+  // 高度一起吃掉。同一個對話裡收到新訊息時維持 smooth，那是短距離捲動、也
+  // 需要動畫讓人注意到有新訊息。
+  const activeConvKey = activeGroupId ? "g:" + activeGroupId
+    : activeFriendId ? "f:" + activeFriendId
+    : "hall";
+  const lastConvKeyRef = useRef(null);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [hallMessages, privateMessages, groupMessages]);
+    const el = messagesEndRef.current;
+    if (!el) return;
+    const toBottom = (behavior) => el.scrollIntoView({ behavior, block: "end" });
+    const switched = lastConvKeyRef.current !== activeConvKey;
+    lastConvKeyRef.current = activeConvKey;
+    if (!switched) { toBottom("smooth"); return; }
+    toBottom("auto");
+    const raf = requestAnimationFrame(() => toBottom("auto"));
+    const t1 = setTimeout(() => toBottom("auto"), 250);
+    const t2 = setTimeout(() => toBottom("auto"), 700);
+    return () => { cancelAnimationFrame(raf); clearTimeout(t1); clearTimeout(t2); };
+  }, [hallMessages, privateMessages, groupMessages, activeConvKey]);
 
   useEffect(() => {
     const onVisibility = () => {
