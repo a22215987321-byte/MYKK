@@ -54,6 +54,10 @@ const AiCompanionRoom = dynamic(() => import("./AiCompanionRoom"), {
   ssr: false,
   loading: () => <LoadingState label="載入 AI 夥伴..." minHeight="100%" />,
 });
+// 專案檔案庫（參考 Claude 專案裡 Files 的 UI/UX）——一樣吃到 react-markdown，
+// 而且是浮層、只有真的點開才需要，比照上面兩個延遲載入。沒給 loading 畫面是
+// 因為它整個就是一個 modal，還沒載好時不該先閃一個空框出來。
+const ProjectFilesPanel = dynamic(() => import("./ProjectFilesPanel"), { ssr: false });
 // AI OFFICE（見 components/office/OfficeMode.js）——裡面用到 pixi.js/spine
 // 動畫引擎，體積不小，一樣延遲載入、只有真的切到這個模式才下載。
 const OfficeMode = dynamic(() => import("./office/OfficeMode"), {
@@ -1425,6 +1429,9 @@ export default function ChatApp({ user }) {
   // its chunk) until "aiCompanion" is actually in blocks.A.tabs/blocks.B.tabs
   // or mobileActiveKey — the tab system itself is the lazy-mount gate now.
   const [showCompanionCreator, setShowCompanionCreator] = useState(false);
+  // 專案檔案庫浮層。跟其他功能不一樣，它不是分頁（tab）而是蓋在畫面上的
+  // 單一浮層，所以走 showX 這條路，不進 openTab。
+  const [showProjectFiles, setShowProjectFiles] = useState(false);
   // 影片瀏覽入口：搜尋/瀏覽頻道（VideoHub）跟打開某個頻道的個人頁面（沿用
   // ProfileView，直接跳到它的「影片」分頁）共用這一個 view，videoHubUid 是
   // null 時顯示搜尋/熱門頻道清單，有值時顯示那個人的頻道頁。
@@ -1628,7 +1635,7 @@ export default function ChatApp({ user }) {
   // 載入時會算出 missing（defaultOrder 裡還沒被放進 layout 或任何資料夾的 key）
   // 補在最後面，已經存過排序的使用者不會漏掉新功能，也不會被重設既有順序。
   const sidebarLayout = useSidebarLayout("cr-sidebar-v1", "cr-order-top-v3", [
-    "leaderboard", "calendar", "videoHub", "audio",
+    "leaderboard", "calendar", "projectFiles", "videoHub", "audio",
     "upgrade", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion",
     "englishPron", "ieltsBand4", "englishMcq", "vocab",
     "spanish", "spanishCourse", "spanishPron", "spanishGrammar", "spanishVerbs", "spanishMcq",
@@ -2616,6 +2623,10 @@ export default function ChatApp({ user }) {
   // IIFE 裡）是因為資料夾內容現在是獨立的浮動面板，跟側欄本身的清單不是
   // 同一個圖層，兩邊都要能用同一份 topItems。
   const topItems = {
+    projectFiles: (
+      <NavItem icon="📁" iconBg="linear-gradient(135deg,#475569,#1e293b)" label="專案檔案" sublabel="文件閱讀・編輯"
+        active={showProjectFiles} onClick={() => setShowProjectFiles(true)} />
+    ),
     leaderboard: (
       <NavItem icon="🏆" iconImg="/icons/leaderboard.png" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名"
         active={isTabActive("leaderboard")} onClick={() => openTab("leaderboard")} />
@@ -3564,6 +3575,7 @@ export default function ChatApp({ user }) {
       {showCreateGroup && <CreateGroupModal friends={myFriends} onClose={() => setShowCreateGroup(false)} onCreate={handleCreateGroup} />}
       {showDonateModal && <DonateModal myProfile={myProfile} onClose={() => setShowDonateModal(false)} />}
       {showCompanionCreator && <AiCompanionCreator myProfile={myProfile} onClose={() => setShowCompanionCreator(false)} />}
+      {showProjectFiles && <ProjectFilesPanel user={user} onClose={() => setShowProjectFiles(false)} />}
 
       {/* Right-click context menu */}
       {contextMenu && (
