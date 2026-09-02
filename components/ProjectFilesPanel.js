@@ -1,6 +1,14 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import dynamic from "next/dynamic";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+
+// 所見即所得編輯器體積不小（ProseMirror），而且只有真的切到「編輯」才需要，
+// 所以延遲載入，不讓它拖慢面板本身打開的速度。
+const RichTextEditor = dynamic(() => import("./RichTextEditor"), {
+  ssr: false,
+  loading: () => <div className="pf-blank" style={{ padding: 24 }}>載入編輯器…</div>,
+});
 import {
   collection, doc, addDoc, updateDoc, deleteDoc,
   onSnapshot, query, where, serverTimestamp,
@@ -58,6 +66,31 @@ function extOf(name) {
 // 太長就用 … 截斷——三段各自一列會讓列表變成一片資訊牆。
 function metaOf(f) {
   return [extOf(f.name), fmtSize(f.size), fmtRelative(f.updatedAt || f.createdAt)].join(" · ");
+}
+
+// 文件格式：新檔一律存 HTML（format:"html"）。沒有 format 欄位的是換成富文本
+// 編輯器之前存的 Markdown，打開時用 marked 轉成 HTML 就地升級，存檔時補上
+// format:"html"，所以不需要另外跑一次資料轉檔。
+function isHtmlDoc(f) {
+  return f?.format === "html";
+}
+
+// 讀出來要餵進編輯器／預覽的 HTML。舊的 Markdown 檔在這裡轉。
+function toHtml(f) {
+  const raw = f?.content || "";
+  if (!raw.trim()) return "";
+  if (isHtmlDoc(f)) return raw;
+  try { return marked.parse(raw, { async: false, breaks: true }); }
+  catch { return raw; }
+}
+
+// 內容是編輯器自己產生的，但仍然過一次消毒——萬一有人手動改資料庫、或未來
+// 開放匯入 HTML，這裡是最後一道防線。SSR 時 DOMPurify 沒有 window 可用，
+// 直接回傳原字串（伺服器端不會渲染這個面板，見上面的 ssr:false）。
+function cleanHtml(html) {
+  if (typeof window === "undefined") return html;
+  try { return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } }); }
+  catch { return html; }
 }
 
 function byteLen(text) {
@@ -136,7 +169,10 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
     if (!p) return;
     try {
       await updateDoc(doc(db, "projectFiles", p.id), {
-        content: p.text, size: byteLen(p.text), updatedAt: serverTimestamp(),
+        content: p.text, size: byteLen(p.text),
+        // 一存檔就標記成 HTML——舊的 Markdown 檔被編輯過一次之後就完成升級。
+        format: "html",
+        updatedAt: serverTimestamp(),
       });
       setSaveState("saved");
     } catch { setSaveState("idle"); toast("儲存失敗"); }
@@ -156,7 +192,8 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
   async function openFile(f) {
     await flushSave();
     setSelectedId(f.id);
-    setDraft(f.content || "");
+    // 舊的 Markdown 檔在這裡轉成 HTML；已經是 HTML 的原樣帶入。
+    setDraft(toHtml(f));
     setMode("read");
     setSaveState("idle");
   }
@@ -204,7 +241,8 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
     if (usedBytes + size > PROJECT_CAPACITY_BYTES) { toast("已達專案容量上限"); return null; }
     try {
       const ref = await addDoc(collection(db, "projectFiles"), {
-        uid: user.uid, projectId, name, folder, content, size,
+        // 面板裡新建的檔案一律是 HTML 格式（編輯器產出的就是 HTML）。
+        uid: user.uid, projectId, name, folder, content, size, format: "html",
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
       if (folder) setExpanded((prev) => new Set(prev).add(folder));
@@ -234,6 +272,8 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
       const size = byteLen(content);
       try {
         await addDoc(collection(db, "projectFiles"), {
+          // 上傳進來的是 .md/.txt/.json 這類純文字，刻意不標 format——
+          // 打開時 toHtml 會用 marked 轉換，第一次編輯存檔才升級成 html。
           uid: user.uid, projectId, name: file.name, folder: "", content, size,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         });
@@ -393,13 +433,21 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
             <div className="pf-right">
               {mode === "read" ? (
                 <div className="pf-doc">
-                  {selected.content?.trim()
-                    ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{selected.content}</ReactMarkdown>
-                    : <p className="pf-blank">這份文件還是空的——切到「編輯」開始寫。</p>}
+                  {(() => {
+                    // 編輯中的內容以 draft 為準，這樣切回閱讀模式立刻看到剛打的字，
+                    // 不用等 Firestore 那一趟回來。
+                    const body = (selectedId === selected.id && draft) ? draft : toHtml(selected);
+                    if (!body.trim()) {
+                      return <p className="pf-blank">這份文件還是空的——切到「編輯」開始寫。</p>;
+                    }
+                    // 新格式是 HTML，直接渲染；還沒被編輯過的舊 Markdown 檔
+                    // toHtml 已經轉好了，所以這裡一律走 HTML 這條路。
+                    return <div dangerouslySetInnerHTML={{ __html: cleanHtml(body) }} />;
+                  })()}
                 </div>
               ) : (
-                <textarea className="pf-editor" value={draft} spellCheck={false}
-                  onChange={(e) => onDraftChange(e.target.value)}
+                <RichTextEditor value={draft}
+                  onChange={onDraftChange}
                   onBlur={flushSave} />
               )}
             </div>
@@ -514,10 +562,6 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
         .pf-doc th, .pf-doc td { border: 1px solid var(--border); padding: 6px 10px; }
         .pf-blank { color: var(--text-faint); }
 
-        .pf-editor { width: 100%; height: 100%; min-height: 300px; box-sizing: border-box;
-          background: none; border: none; outline: none; resize: none; color: var(--text);
-          font-family: Georgia, "Times New Roman", "Noto Serif TC", "Songti TC", "PMingLiU", serif;
-          font-size: 16.5px; line-height: 1.78; }
 
         .pf-list::-webkit-scrollbar, .pf-right::-webkit-scrollbar { width: 6px; }
         .pf-list::-webkit-scrollbar-track, .pf-right::-webkit-scrollbar-track { background: transparent; }
