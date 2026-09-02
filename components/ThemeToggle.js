@@ -204,6 +204,12 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
   // Once logged in, the sidebar's own settings button takes over — avoid two settings buttons on screen.
   if (mode === "floating" && loggedIn) return null;
 
+  // "card" 模式跟 "floating" 長得一模一樣（同一顆膠囊鈕、同一份選單），差別
+  // 只在定位方式：floating 用 position:fixed 貼在瀏覽器視窗角落，card 用
+  // position:relative 留在呼叫端的容器裡。登入頁用 card，讓風格鈕跟登入／
+  // 註冊卡屬於同一個區塊、右緣對齊，而不是浮在視窗角落。
+  const isPill = mode === "floating" || mode === "card";
+
   const selectTheme = (id) => {
     setTheme(id);
     applyTheme(id);
@@ -269,7 +275,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
   const showPaletteGrid = open && theme === "pastel-pearl";
 
   return (
-    <div ref={menuRef} style={mode === "floating"
+    <div ref={menuRef} className={mode === "floating" ? "theme-toggle-floating" : undefined} style={mode === "floating"
       // floating 模式是「固定在瀏覽器視窗上的 UI 控制元件」，不是頁面內容的
       // 一部分——捲動時必須一直待在視窗右上角。它掛在 pages/_app.js 最外層、
       // 跟 <Component> 同層，不在任何頁面容器裡面，所以 fixed 是相對視窗定位。
@@ -278,12 +284,14 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
       // 會變成 fixed 的 containing block，這顆按鈕就會開始跟著頁面捲動。改那
       // 幾層的樣式前請先確認這裡。
       ? { position: "fixed", top: 12, right: 12, zIndex: 2147483000 }
+      : mode === "card"
+      ? { position: "relative", display: "inline-flex", zIndex: 20 }
       : { position: "relative", display: "inline-flex" }}>
       <button
         onClick={() => setOpen(v => !v)}
         title="設定"
         aria-label="設定選單"
-        style={mode === "floating" ? {
+        style={isPill ? {
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           height: 42, padding: "0 14px", background: "var(--panel)", border: "1px solid var(--border)",
           borderRadius: 999, boxShadow: "var(--card-shadow)",
@@ -295,7 +303,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
           cursor: "pointer", fontSize: 16, padding: 4, borderRadius: 6,
         }}
       >
-        {mode === "floating" ? (
+        {isPill ? (
           /* 未登入（登入頁）才會走到這裡——顯示目前風格名稱的膠囊鈕，比原本
              一顆 ⚙️ 更清楚知道按下去是切換佈景。選單內容完全沒變，還是同一份
              4 種風格＋柔和珠光 6 種配色，讀寫的也是同一個 theme state。 */
@@ -312,8 +320,8 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
           style={{
             position: "absolute",
             ...(openUp
-              ? { bottom: mode === "floating" ? 46 : 26 }
-              : { top: mode === "floating" ? 46 : 26 }),
+              ? { bottom: isPill ? 50 : 26 }
+              : { top: isPill ? 50 : 26 }),
             right: 0,
             minWidth: showPaletteGrid && !isMobile ? 220 : 190,
             background: "var(--panel)",

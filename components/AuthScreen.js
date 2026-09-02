@@ -11,6 +11,7 @@
 //   - 忘記密碼：全專案沒有 sendPasswordResetEmail／任何 reset 流程
 //   - 隱私政策／使用條款：pages/ 底下沒有這些頁面
 import { useState } from "react";
+import ThemeToggle from "./ThemeToggle";
 
 const AVATAR_EMOJIS = ["😊", "👨‍💻", "📚", "🏃", "🎮", "🎨", "🍜", "🌸", "🦊", "🐼", "🎧", "⚡"];
 const COLORS = ["#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#ef4444", "#06b6d4", "#84cc16"];
@@ -90,9 +91,21 @@ export default function AuthScreen({
 
         /* 右欄：登入卡 */
         .as-right {
-          display: flex; align-items: center; justify-content: center;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
           padding: 40px 32px;
+          gap: 16px;
         }
+        /* 風格鈕跟登入卡同一區塊、同一個寬度基準，靠右對齊卡片右緣——不是
+           浮在瀏覽器視窗角落的獨立元件。 */
+        .as-toolbar {
+          width: 100%; max-width: 530px;
+          display: flex; justify-content: flex-end;
+        }
+        /* _app.js 會全域渲染一顆 position:fixed 的風格鈕（未登入時才出現，
+           等於只有這一頁）。登入頁改用上面 .as-toolbar 裡那顆，所以把全域那顆
+           藏起來，避免同時出現兩顆。這段 <style> 只在本元件掛載時存在，離開
+           登入頁後全域那顆自動恢復。 */
+        .theme-toggle-floating { display: none !important; }
         .as-card {
           width: 100%; max-width: 530px;
           background: var(--panel);
@@ -157,9 +170,9 @@ export default function AuthScreen({
         @media (max-width: 860px) {
           .as-root { grid-template-columns: 1fr; }
           .as-left {
-            /* 上內距要留出右上角主題膠囊鈕（ThemeToggle floating，fixed top:12
-               height:42）的高度，否則手機版會蓋住 EVONCHAT 字樣。 */
-            padding: 68px 22px 22px;
+            /* 風格鈕已經移進右欄的 .as-toolbar，不再浮在視窗角落，所以這裡
+               不用再為它預留上內距。 */
+            padding: 30px 22px 22px;
             text-align: center;
             background: var(--panel-alt);
           }
@@ -169,7 +182,8 @@ export default function AuthScreen({
           .as-headline { font-size: 25px; margin-bottom: 10px; }
           .as-headline span { display: inline; }
           .as-sub { font-size: 14px; line-height: 1.7; }
-          .as-right { padding: 22px 16px 34px; }
+          .as-right { padding: 16px 16px 34px; gap: 12px; }
+          .as-toolbar { max-width: 460px; }
           .as-card { border: none; box-shadow: none; background: transparent; padding: 4px 0 0; max-width: 460px; }
           .as-title { font-size: 23px; }
         }
@@ -197,6 +211,9 @@ export default function AuthScreen({
 
       {/* ── 右欄：登入／註冊卡 ── */}
       <section className="as-right">
+        <div className="as-toolbar">
+          <ThemeToggle mode="card" />
+        </div>
         <div className="as-card">
           <h2 className="as-title">{isLogin ? "歡迎回來 👋" : "建立你的帳戶 ✨"}</h2>
           <p className="as-card-sub">
