@@ -14,9 +14,10 @@ import {
   onSnapshot, query, where, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import useIsMobile from "../lib/useIsMobile";
 import { toast } from "../lib/toast";
 import {
-  Folder, FolderOpen, FileText, ChevronRight, ChevronDown,
+  Folder, FolderOpen, FileText, ChevronRight, ChevronDown, ChevronLeft,
   Search, X, Trash2, Eye, Pencil, Info,
 } from "lucide-react";
 
@@ -124,6 +125,7 @@ function FileRow({ file, indent, selected, onOpen, onDelete }) {
 }
 
 export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID, onClose }) {
+  const isMobile = useIsMobile();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
@@ -299,7 +301,8 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
   return (
     <div className="pf-overlay"
       onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
-      <div className="pf-panel" style={{ width: wide ? "min(90vw, 1180px)" : "min(92vw, 640px)" }}>
+      <div className={"pf-panel" + (isMobile && wide ? " pf-m-preview" : "")}
+        style={{ width: wide ? "min(90vw, 1180px)" : "min(92vw, 640px)" }}>
 
         <div className="pf-titlebar">
           <div className="pf-tb-left"
@@ -321,6 +324,14 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
 
           {wide && (
             <div className="pf-tb-right">
+              {/* 手機版一次只放得下一欄，選了檔案就把列表換成預覽，所以需要一顆
+                  返回鍵回到列表。桌面版兩欄同時在，不需要，故只在手機版渲染。 */}
+              {isMobile && (
+                <button className="pf-iconbtn" title="返回列表"
+                  onClick={async () => { await flushSave(); setSelectedId(null); }}>
+                  <ChevronLeft size={20} strokeWidth={1.8} />
+                </button>
+              )}
               <div className="pf-tb-file">
                 <div className="pf-tb-name">{selected.name}</div>
                 <div className="pf-meta">{metaOf(selected)}</div>
@@ -569,14 +580,37 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
           background: rgba(120,120,130,0.42); border-radius: 999px; }
 
         @media (max-width: 720px) {
-          .pf-panel { width: 100% !important; height: 92vh; }
-          .pf-titlebar { height: 58px; }
+          /* 手機版滿版，而且一次只顯示一欄——螢幕寬度放不下 37% 列表 + 預覽。
+             沒選檔案時顯示列表，選了就整個換成預覽（靠 .pf-m-preview 切換），
+             回列表用標題列左邊那顆返回鍵。 */
+          .pf-panel { width: 100% !important; height: 100dvh; max-height: 100dvh;
+            border-radius: 0; border: none; }
+          .pf-titlebar { height: 56px; }
           .pf-title { font-size: 22px; }
-          .pf-tb-left { width: 100% !important; border-right: none !important; }
+          .pf-tb-left { width: 100% !important; border-right: none !important; padding: 0 12px; }
           .pf-tb-right { display: none; }
           .pf-body { flex-direction: column; }
           .pf-left { width: 100% !important; border-right: none !important; }
           .pf-right { display: none; }
+          .pf-list { padding: 6px 8px; }
+          /* 觸控目標放大：桌面 44px 在手機上偏小 */
+          .pf-row { height: 56px; }
+          .pf-name { font-size: 15px; }
+          .pf-meta { font-size: 12px; }
+          .pf-del { opacity: 1; }
+          .pf-footer { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
+
+          .pf-panel.pf-m-preview .pf-tb-left { display: none; }
+          .pf-panel.pf-m-preview .pf-tb-right { display: flex; width: 100%; padding: 0 8px 0 4px; }
+          .pf-panel.pf-m-preview .pf-left { display: none; }
+          .pf-panel.pf-m-preview .pf-right { display: block; padding: 18px 16px 40px; }
+          .pf-panel.pf-m-preview .pf-tb-name { font-size: 15px; }
+          /* 檔名長時不要把切換鈕和 × 擠出畫面 */
+          .pf-panel.pf-m-preview .pf-tb-file { min-width: 0; overflow: hidden; }
+          .pf-panel.pf-m-preview .pf-tb-name,
+          .pf-panel.pf-m-preview .pf-tb-file .pf-meta {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .pf-panel.pf-m-preview .pf-seg button span { display: none; }
         }
       `}</style>
     </div>

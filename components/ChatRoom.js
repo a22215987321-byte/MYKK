@@ -2632,6 +2632,11 @@ export default function ChatApp({ user }) {
     moreMenuState[`show${cap}`] = mobileActiveKey === k;
     moreMenuSetters[`setShow${cap}`] = (v) => setMobileActiveKey(v ? k : null);
   }
+  // 專案檔案在手機版也要能開。它跟上面那些不一樣——不是 mobileActiveKey 那種
+  // 「換頁」型功能，而是一個蓋在畫面上的浮層，所以沒辦法靠上面的迴圈自動
+  // 產生 state/setter，這裡手動補進去，讓 ChatMoreMenu 用同一套介面叫它。
+  moreMenuState.showProjectFiles = showProjectFiles;
+  moreMenuSetters.setShowProjectFiles = setShowProjectFiles;
 
   // 原本分在「更多功能／英語學習／西班牙語」三個資料夾裡的項目全部攤平出來，
   // 跟排行榜/行事曆/自定詞彙/字典一起放進同一份可拖曳排序清單（key → JSX），
@@ -4292,11 +4297,13 @@ export default function ChatApp({ user }) {
       {/* 浮動 AI 對話小工具——跟側欄「AI 助手」共用同一支鎖（aiChatAllowed），
           不然這裡會變成繞過鎖定的後門。掛在 .cr-shell 外面，不管切到哪個
           功能頁都一直浮在畫面上。開關狀態是受控的（aiFloatOpen）：桌面版的
-          觸發鈕在資料夾 rail 上方（見 .cr-folder-rail 那段），手機版沒有那條
-          rail，所以 FloatingAiChat 自己在 isMobile 時還是會畫出一顆貼在左下角
-          的圓形觸發鈕（showTrigger）。 */}
+          觸發鈕在資料夾 rail 上方（見 .cr-folder-rail 那段）。
+          showTrigger 固定傳 false：手機版原本會由 FloatingAiChat 自己畫一顆貼在
+          左下角的圓形觸發鈕，現在拿掉了——「AI 助手」本來就已經在手機版功能頁
+          清單裡（ChatMoreMenu 的 aiChat 那項），浮動鈕等於同一個功能的第二個
+          入口，而且會一直壓在畫面上擋內容。桌面版本來就沒有這顆鈕，不受影響。 */}
       {aiChatAllowed && (
-        <FloatingAiChat user={user} db={db} open={aiFloatOpen} onOpenChange={setAiFloatOpen} showTrigger={isMobile} />
+        <FloatingAiChat user={user} db={db} open={aiFloatOpen} onOpenChange={setAiFloatOpen} showTrigger={false} />
       )}
 
       {/* 浮動音頻播放器——貼右邊，一樣掛在 .cr-shell 外面，切到別的功能頁

@@ -6,6 +6,12 @@ export default function ChatMoreMenu({ state, setters, onOpen }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--panel-alt)", overflowY: "auto", minHeight: 0 }}>
       <div style={{ padding: "10px 10px 6px" }}>
+        {/* 專案檔案：跟其他項目不同，它開的是一個浮層而不是換頁，但介面一致
+            （state.showX / setters.setShowX），呼叫端把兩者手動接進來了。 */}
+        <NavItem icon="📁" iconBg="linear-gradient(135deg,#475569,#1e293b)" label="專案檔案" sublabel="文件閱讀・編輯" mobileTouch
+          active={state.showProjectFiles} onClick={() => onOpen(setters.setShowProjectFiles)} />
+      </div>
+      <div style={{ padding: "0 10px 6px" }}>
         <NavItem icon="🏆" iconBg="linear-gradient(135deg,#f59e0b,#fbbf24,#d97706)" label="排行榜" sublabel="積分排名" mobileTouch
           active={state.showLeaderboard} onClick={() => onOpen(setters.setShowLeaderboard)} />
       </div>
