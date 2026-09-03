@@ -18,7 +18,7 @@ import useIsMobile from "../lib/useIsMobile";
 import { toast } from "../lib/toast";
 import {
   Folder, FolderOpen, FileText, ChevronRight, ChevronDown, ChevronLeft,
-  Search, X, Trash2, Eye, Pencil, Info,
+  Search, X, Trash2, Eye, Pencil, Info, FolderPlus,
 } from "lucide-react";
 
 // 「專案檔案庫」——參考 Claude 專案裡 Files 的 UI/UX。這是給「人」讀的，
@@ -38,6 +38,23 @@ const FILE_MAX_BYTES = 512 * 1024;
 const TEXT_EXT = /\.(md|markdown|txt|json|csv|log|ya?ml)$/i;
 
 const LEFT_W = "37%";
+// 每個使用者最多 5 個資料夾。資料夾跟檔案存在同一個 projectFiles collection，
+// 用 kind:"folder" 區分——這樣不用為它另開一個 collection、也就不用再改一次
+// Firestore 規則。folder 文件一樣帶 size:0，才會通過規則裡的 size 檢查。
+const MAX_FOLDERS = 5;
+
+// 手動拖曳排序後的順序存在 order 欄位。還沒被手動排過的沿用「建立時間新到舊」，
+// 兩者混在一起時有 order 的排前面（使用者明確表達過的意圖優先）。
+function sortRows(rows) {
+  return rows.slice().sort((a, b) => {
+    const ao = typeof a.order === "number" ? a.order : null;
+    const bo = typeof b.order === "number" ? b.order : null;
+    if (ao !== null && bo !== null) return ao - bo;
+    if (ao !== null) return -1;
+    if (bo !== null) return 1;
+    return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
+  });
+}
 
 function fmtSize(n) {
   if (!n) return "0 KB";
@@ -107,19 +124,58 @@ function splitPath(raw) {
   return { folder: s.slice(0, i).trim(), name: s.slice(i + 1).trim() };
 }
 
-function FileRow({ file, indent, selected, onOpen, onDelete }) {
+// 就地改名用的輸入框。抽出來共用，檔案列和資料夾列的改名長得一樣。
+function RenameInput({ value, onCommit, onCancel }) {
+  const [v, setV] = useState(value);
   return (
-    <div className={"pf-row pf-file" + (selected ? " sel" : "")} style={{ paddingLeft: indent }}
-      onClick={() => onOpen(file)}>
+    <input className="pf-rename" autoFocus value={v}
+      onChange={(e) => setV(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") onCommit(v);
+        if (e.key === "Escape") onCancel();
+      }}
+      onBlur={() => onCommit(v)} />
+  );
+}
+
+function FileRow({
+  file, indent, selected, onOpen, onDelete, onContextMenu,
+  renaming, onCommitRename, onCancelRename,
+  dragging, dropEdge, onDragStart, onDragEnd, onDragOverRow, onDropRow,
+}) {
+  return (
+    <div
+      className={"pf-row pf-file"
+        + (selected ? " sel" : "")
+        + (dragging ? " dragging" : "")
+        + (dropEdge === "top" ? " drop-top" : dropEdge === "bottom" ? " drop-bottom" : "")}
+      style={{ paddingLeft: indent }}
+      draggable={!renaming}
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStart(file); }}
+      onDragEnd={onDragEnd}
+      onDragOver={(e) => onDragOverRow(e, file)}
+      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropRow(file); }}
+      onContextMenu={(e) => onContextMenu(e, file)}
+      onClick={() => { if (!renaming) onOpen(file); }}>
       <FileText size={17} strokeWidth={1.6} className="pf-ic" />
       <div className="pf-rowtext">
-        <span className="pf-name">{file.name}</span>
-        <span className="pf-meta">{metaOf(file)}</span>
+        {renaming ? (
+          <RenameInput value={file.name} onCommit={onCommitRename} onCancel={onCancelRename} />
+        ) : (
+          <>
+            <span className="pf-name">{file.name}</span>
+            <span className="pf-meta">{metaOf(file)}</span>
+          </>
+        )}
       </div>
-      <button className="pf-del" title="刪除"
-        onClick={(e) => { e.stopPropagation(); onDelete(file); }}>
-        <Trash2 size={15} strokeWidth={1.6} />
-      </button>
+      {!renaming && (
+        <button className="pf-del" title="刪除"
+          onClick={(e) => { e.stopPropagation(); onDelete(file); }}>
+          <Trash2 size={15} strokeWidth={1.6} />
+        </button>
+      )}
     </div>
   );
 }
@@ -137,6 +193,16 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [folderDocs, setFolderDocs] = useState([]);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [renamingId, setRenamingId] = useState(null);
+  // 右鍵選單。item 可能是檔案也可能是資料夾，靠 kind 分辨。
+  const [ctxMenu, setCtxMenu] = useState(null);
+  // 拖曳中的檔案，以及目前游標落在哪一列的哪一半（決定插在前面還後面）。
+  const [dragItem, setDragItem] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null); // { id, edge } | { folder }
+
   const pickerRef = useRef(null);
   const timerRef = useRef(null);
   const pendingRef = useRef(null);
@@ -153,8 +219,10 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
     );
     return onSnapshot(qy, (snap) => {
       const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      setFiles(rows);
+      // 資料夾跟檔案存在同一個 collection，這裡拆開。排序統一走 sortRows
+      // （手動 order 優先，其餘照建立時間新到舊）。
+      setFolderDocs(sortRows(rows.filter((r) => r.kind === "folder")));
+      setFiles(sortRows(rows.filter((r) => r.kind !== "folder")));
       setLoading(false);
     }, () => { setLoading(false); toast("檔案載入失敗"); });
   }, [user?.uid, projectId]);
@@ -221,20 +289,142 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
   }, [files, q]);
 
   const tree = useMemo(() => {
-    const folders = new Map();
+    const byName = new Map();
+    // 先放進「真的被建立出來的」資料夾，這樣空資料夾也會顯示。
+    for (const d of folderDocs) byName.set(d.name, { doc: d, items: [] });
     const root = [];
     for (const f of filtered) {
       if (f.folder) {
-        if (!folders.has(f.folder)) folders.set(f.folder, []);
-        folders.get(f.folder).push(f);
+        // 舊資料可能有「資料夾/檔名」推導出來、但沒有對應 folder 文件的情況，
+        // 這種補一個沒有 doc 的項目進去，不會平白消失。
+        if (!byName.has(f.folder)) byName.set(f.folder, { doc: null, items: [] });
+        byName.get(f.folder).items.push(f);
       } else root.push(f);
     }
-    return { folders: [...folders.entries()], root };
-  }, [filtered]);
+    const needle = q.trim();
+    const entries = [...byName.entries()]
+      // 搜尋時把完全沒有命中檔案的資料夾收起來，不要留一排空殼干擾結果
+      .filter(([name, v]) => !needle || v.items.length > 0 || name.toLowerCase().includes(needle.toLowerCase()));
+    return { folders: entries, root };
+  }, [filtered, folderDocs, q]);
 
   const usedBytes = files.reduce((n, f) => n + (f.size || 0), 0);
   const pct = Math.min(100, (usedBytes / PROJECT_CAPACITY_BYTES) * 100);
   const pctLabel = pct > 0 && pct < 1 ? "<1" : String(Math.round(pct));
+
+  // ── 資料夾 ──
+  async function createFolder(raw) {
+    const name = raw.trim().replace(/\//g, "");
+    setCreatingFolder(false);
+    setNewFolderName("");
+    if (!name) return;
+    if (folderDocs.length >= MAX_FOLDERS) { toast("資料夾最多 " + MAX_FOLDERS + " 個"); return; }
+    if (folderDocs.some((d) => d.name === name)) { toast("已經有同名資料夾"); return; }
+    try {
+      await addDoc(collection(db, "projectFiles"), {
+        uid: user.uid, projectId, kind: "folder", name,
+        // size:0 是必要的——Firestore 規則會檢查 size 是 int，資料夾也要有
+        size: 0,
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      });
+      setExpanded((prev) => new Set(prev).add(name));
+    } catch { toast("建立資料夾失敗"); }
+  }
+
+  async function removeFolder(folder) {
+    const inside = files.filter((f) => f.folder === folder.name);
+    const msg = inside.length
+      ? "刪除資料夾「" + folder.name + "」？裡面的 " + inside.length + " 個檔案會移回最外層，不會被刪除。"
+      : "刪除資料夾「" + folder.name + "」？";
+    if (!window.confirm(msg)) return;
+    try {
+      // 先把檔案搬出來再刪資料夾，順序反過來的話中途失敗會留下孤兒檔案
+      await Promise.all(inside.map((f) =>
+        updateDoc(doc(db, "projectFiles", f.id), { folder: "", updatedAt: serverTimestamp() })));
+      await deleteDoc(doc(db, "projectFiles", folder.id));
+    } catch { toast("刪除資料夾失敗"); }
+  }
+
+  // ── 重新命名（檔案與資料夾共用）──
+  async function commitRename(item, raw) {
+    const next = raw.trim();
+    setRenamingId(null);
+    if (!next || next === item.name) return;
+    try {
+      if (item.kind === "folder") {
+        if (folderDocs.some((d) => d.name === next && d.id !== item.id)) { toast("已經有同名資料夾"); return; }
+        await updateDoc(doc(db, "projectFiles", item.id), { name: next, updatedAt: serverTimestamp() });
+        // 資料夾改名之後，裡面每個檔案的 folder 欄位要跟著改，否則它們會變孤兒
+        await Promise.all(files.filter((f) => f.folder === item.name).map((f) =>
+          updateDoc(doc(db, "projectFiles", f.id), { folder: next, updatedAt: serverTimestamp() })));
+        setExpanded((prev) => {
+          const nx = new Set(prev);
+          if (nx.delete(item.name)) nx.add(next);
+          return nx;
+        });
+      } else {
+        await updateDoc(doc(db, "projectFiles", item.id), { name: next.replace(/\//g, ""), updatedAt: serverTimestamp() });
+      }
+    } catch { toast("重新命名失敗"); }
+  }
+
+  // ── 拖曳：搬進資料夾 ／ 調整順序 ──
+  async function moveToFolder(file, folderName) {
+    if ((file.folder || "") === folderName) return;
+    try {
+      await updateDoc(doc(db, "projectFiles", file.id), {
+        folder: folderName, updatedAt: serverTimestamp(),
+      });
+      if (folderName) setExpanded((prev) => new Set(prev).add(folderName));
+    } catch { toast("移動失敗"); }
+  }
+
+  // 把 list 重新排好之後，整串重寫 order（0,1,2…）。清單都很短，一次寫完
+  // 比只改被拖動的那一個穩——不用擔心 order 值互相打架或出現小數。
+  async function persistOrder(list) {
+    try {
+      await Promise.all(list.map((f, i) =>
+        updateDoc(doc(db, "projectFiles", f.id), { order: i, updatedAt: serverTimestamp() })));
+    } catch { toast("排序儲存失敗"); }
+  }
+
+  async function reorderWithin(list, moving, targetId, edge) {
+    const from = list.findIndex((f) => f.id === moving.id);
+    let to = list.findIndex((f) => f.id === targetId);
+    if (from < 0 || to < 0 || moving.id === targetId) return;
+    const next = list.slice();
+    next.splice(from, 1);
+    if (from < to) to -= 1;
+    if (edge === "bottom") to += 1;
+    next.splice(to, 0, moving);
+    await persistOrder(next);
+  }
+
+  function onDragOverRow(e, row) {
+    if (!dragItem || dragItem.id === row.id) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const r = e.currentTarget.getBoundingClientRect();
+    const edge = (e.clientY - r.top) < r.height / 2 ? "top" : "bottom";
+    setDropTarget((prev) => (prev && prev.id === row.id && prev.edge === edge)
+      ? prev : { id: row.id, edge });
+  }
+
+  async function onDropRow(row) {
+    const moving = dragItem;
+    const target = dropTarget;
+    setDragItem(null);
+    setDropTarget(null);
+    if (!moving || !target || moving.id === row.id) return;
+    // 跨資料夾拖曳：先歸位到目標所在的資料夾，再照落點排序
+    if ((moving.folder || "") !== (row.folder || "")) {
+      await moveToFolder(moving, row.folder || "");
+    }
+    const siblings = (row.folder ? tree.folders.find(([n]) => n === row.folder)?.[1].items : tree.root) || [];
+    // 跨資料夾拖進來時 moving 還不在這串 siblings 裡，先補進去再排
+    const list = siblings.some((f) => f.id === moving.id) ? siblings : [moving, ...siblings];
+    await reorderWithin(list, moving, row.id, target.edge);
+  }
 
   async function createDoc(rawPath, content) {
     const { folder, name } = splitPath(rawPath);
@@ -314,6 +504,11 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
               <Search size={18} strokeWidth={1.6} />
             </button>
             <button className="pf-textbtn" onClick={() => { setCreating(true); setNewName(""); }}>Add</button>
+            <button className="pf-iconbtn" title={folderDocs.length >= MAX_FOLDERS ? ("資料夾已達上限 " + MAX_FOLDERS + " 個") : "新增資料夾"}
+              disabled={folderDocs.length >= MAX_FOLDERS}
+              onClick={() => { setCreatingFolder(true); setNewFolderName(""); }}>
+              <FolderPlus size={18} strokeWidth={1.6} />
+            </button>
             <button className="pf-textbtn pf-upload" onClick={() => pickerRef.current?.click()}>上傳</button>
             {!wide && (
               <button className="pf-iconbtn" title="關閉" onClick={handleClose}>
@@ -380,21 +575,65 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
                 </div>
               )}
 
-              {tree.folders.map(([name, items]) => {
+              {creatingFolder && (
+                <div className="pf-row pf-folder pf-newrow">
+                  <Folder size={17} strokeWidth={1.6} className="pf-ic" />
+                  <input autoFocus value={newFolderName} placeholder="資料夾名稱"
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") createFolder(newFolderName);
+                      if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
+                    }}
+                    onBlur={() => createFolder(newFolderName)} />
+                </div>
+              )}
+
+              {tree.folders.map(([name, entry]) => {
                 const open = expanded.has(name);
+                const items = entry.items;
+                const fdoc = entry.doc;
+                const isDropTarget = dropTarget?.folder === name;
                 return (
                   <div key={"d:" + name}>
-                    <div className="pf-row pf-folder" onClick={() => toggleFolder(name)}>
+                    <div
+                      className={"pf-row pf-folder" + (isDropTarget ? " drop-in" : "")}
+                      onClick={() => { if (renamingId !== fdoc?.id) toggleFolder(name); }}
+                      onContextMenu={(e) => {
+                        if (!fdoc) return;
+                        e.preventDefault();
+                        setCtxMenu({ x: e.clientX, y: e.clientY, item: fdoc });
+                      }}
+                      onDragOver={(e) => {
+                        if (!dragItem) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setDropTarget((prev) => (prev && prev.folder === name) ? prev : { folder: name });
+                      }}
+                      onDragLeave={() => setDropTarget((prev) => (prev?.folder === name ? null : prev))}
+                      onDrop={async (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        const moving = dragItem;
+                        setDragItem(null); setDropTarget(null);
+                        if (moving) await moveToFolder(moving, name);
+                      }}>
                       {open
                         ? <FolderOpen size={17} strokeWidth={1.6} className="pf-ic" />
                         : <Folder size={17} strokeWidth={1.6} className="pf-ic" />}
                       <div className="pf-rowtext">
-                        <span className="pf-name">{name}</span>
-                        <span className="pf-meta">{items.length} 個項目</span>
+                        {renamingId === fdoc?.id ? (
+                          <RenameInput value={name}
+                            onCommit={(v) => commitRename(fdoc, v)}
+                            onCancel={() => setRenamingId(null)} />
+                        ) : (
+                          <>
+                            <span className="pf-name">{name}</span>
+                            <span className="pf-meta">{items.length} 個項目</span>
+                          </>
+                        )}
                       </div>
-                      {open
+                      {renamingId !== fdoc?.id && (open
                         ? <ChevronDown size={16} strokeWidth={1.6} className="pf-chev" />
-                        : <ChevronRight size={16} strokeWidth={1.6} className="pf-chev" />}
+                        : <ChevronRight size={16} strokeWidth={1.6} className="pf-chev" />)}
                     </div>
                     {open && items.map((f, i) => {
                       const prev = items[i - 1];
@@ -403,7 +642,17 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
                         <div key={f.id}>
                           {sep && <div className="pf-sep" />}
                           <FileRow file={f} indent={36} selected={f.id === selectedId}
-                            onOpen={openFile} onDelete={removeFile} />
+                            onOpen={openFile} onDelete={removeFile}
+                            onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, item: f }); }}
+                            renaming={renamingId === f.id}
+                            onCommitRename={(v) => commitRename(f, v)}
+                            onCancelRename={() => setRenamingId(null)}
+                            dragging={dragItem?.id === f.id}
+                            dropEdge={dropTarget?.id === f.id ? dropTarget.edge : null}
+                            onDragStart={setDragItem}
+                            onDragEnd={() => { setDragItem(null); setDropTarget(null); }}
+                            onDragOverRow={onDragOverRow}
+                            onDropRow={onDropRow} />
                         </div>
                       );
                     })}
@@ -418,7 +667,17 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
                   <div key={f.id}>
                     {sep && <div className="pf-sep" />}
                     <FileRow file={f} indent={12} selected={f.id === selectedId}
-                      onOpen={openFile} onDelete={removeFile} />
+                      onOpen={openFile} onDelete={removeFile}
+                      onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, item: f }); }}
+                      renaming={renamingId === f.id}
+                      onCommitRename={(v) => commitRename(f, v)}
+                      onCancelRename={() => setRenamingId(null)}
+                      dragging={dragItem?.id === f.id}
+                      dropEdge={dropTarget?.id === f.id ? dropTarget.edge : null}
+                      onDragStart={setDragItem}
+                      onDragEnd={() => { setDragItem(null); setDropTarget(null); }}
+                      onDragOverRow={onDragOverRow}
+                      onDropRow={onDropRow} />
                   </div>
                 );
               })}
@@ -465,6 +724,34 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
           )}
         </div>
       </div>
+
+      {ctxMenu && (
+        <>
+          {/* 透明遮罩：點任何地方（包含右鍵）都關掉選單，不用另外掛
+              document 層級的事件監聽 */}
+          <div className="pf-ctx-mask"
+            onMouseDown={() => setCtxMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }} />
+          <div className="pf-ctx" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
+            <button onClick={() => { setRenamingId(ctxMenu.item.id); setCtxMenu(null); }}>
+              <Pencil size={14} strokeWidth={1.7} />重新命名
+            </button>
+            {ctxMenu.item.kind !== "folder" && ctxMenu.item.folder && (
+              <button onClick={() => { const it = ctxMenu.item; setCtxMenu(null); moveToFolder(it, ""); }}>
+                <Folder size={14} strokeWidth={1.7} />移出資料夾
+              </button>
+            )}
+            <button className="danger"
+              onClick={() => {
+                const it = ctxMenu.item;
+                setCtxMenu(null);
+                if (it.kind === "folder") removeFolder(it); else removeFile(it);
+              }}>
+              <Trash2 size={14} strokeWidth={1.7} />刪除
+            </button>
+          </div>
+        </>
+      )}
 
       <input ref={pickerRef} type="file" multiple hidden
         accept=".md,.markdown,.txt,.json,.csv,.log,.yml,.yaml" onChange={onPick} />
@@ -536,6 +823,54 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
         .pf-del:hover { background: var(--panel); color: #e11d48; }
 
         .pf-sep { height: 1px; background: var(--border-soft); margin: 0 8px 0 46px; }
+
+        /* ── 拖曳與排序 ──
+           動畫刻意放慢到 200ms 的 ease，不要用彈跳或快閃：這個面板是拿來
+           安靜閱讀文件的，列表如果在指標下面抖來抖去會很吵。列本身只做
+           透明度和位移，沒有縮放，避免相鄰的列被推擠變形。 */
+        .pf-row { transition: background 0.2s ease, opacity 0.2s ease,
+          transform 0.2s ease, box-shadow 0.2s ease; }
+        .pf-row.dragging { opacity: 0.4; transform: scale(0.995); }
+        /* 放置位置用一條 2px 的指示線，不要整列反白——反白會讓人以為是
+           「放進這一列」而不是「插在這一列前/後」。 */
+        .pf-row.drop-top { box-shadow: inset 0 2px 0 0 var(--accent); }
+        .pf-row.drop-bottom { box-shadow: inset 0 -2px 0 0 var(--accent); }
+        /* 拖到資料夾上：這個才是真的「放進去」，所以用整塊底色 + 外框 */
+        .pf-row.pf-folder.drop-in {
+          background: color-mix(in srgb, var(--accent) 14%, transparent);
+          box-shadow: inset 0 0 0 1.5px var(--accent);
+        }
+
+        /* 就地改名的輸入框 */
+        .pf-rename {
+          flex: 1; min-width: 0; height: 28px; box-sizing: border-box;
+          background: var(--panel); border: 1.5px solid var(--accent);
+          border-radius: 7px; padding: 0 8px; color: var(--text);
+          font-size: 14px; font-weight: 600; outline: none;
+        }
+
+        /* 右鍵選單 */
+        .pf-ctx-mask { position: fixed; inset: 0; z-index: 40; }
+        .pf-ctx {
+          position: fixed; z-index: 41; min-width: 152px;
+          background: var(--panel); border: 1px solid var(--border);
+          border-radius: 11px; padding: 5px;
+          box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+          animation: pf-ctx-in 0.14s ease;
+        }
+        @keyframes pf-ctx-in { from { opacity: 0; transform: translateY(-4px); } }
+        .pf-ctx button {
+          display: flex; align-items: center; gap: 9px; width: 100%;
+          border: none; background: none; border-radius: 7px;
+          padding: 8px 10px; color: var(--text); font-size: 13.5px;
+          cursor: pointer; text-align: left;
+        }
+        .pf-ctx button:hover { background: var(--panel-hover); }
+        .pf-ctx button.danger { color: #dc2626; }
+        .pf-ctx button.danger:hover { background: color-mix(in srgb, #dc2626 12%, transparent); }
+
+        .pf-iconbtn:disabled { opacity: 0.35; cursor: default; }
+        .pf-iconbtn:disabled:hover { background: none; }
         .pf-newrow { padding-left: 12px; background: var(--panel-hover); }
         .pf-newrow input { flex: 1; background: none; border: none; outline: none;
           color: var(--text); font-size: 14px; font-weight: 600; min-width: 0; }
