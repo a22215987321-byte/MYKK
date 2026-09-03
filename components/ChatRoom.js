@@ -105,7 +105,6 @@ const PROFILE_GRADIENTS = [
   "radial-gradient(ellipse at 10% 50%, rgba(16,185,129,0.50), transparent 55%), radial-gradient(ellipse at 90% 50%, rgba(6,182,212,0.45), transparent 55%) #001a14",
 ];
 const STATUS_EMOJIS = ["🎵","💻","📖","🏃","🎮","😴","🍕","☕"];
-const AVATAR_EMOJIS = ["😊","👨‍💻","📚","🏃","🎮","🎨","🍜","🌸","🦊","🐼","🎧","⚡"];
 const COLORS = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06b6d4","#84cc16"];
 
 function formatTime(ts) {
@@ -907,7 +906,6 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
   const [statusText, setStatusText] = useState(myProfile.statusText || "");
   const [status,     setStatus]     = useState(myProfile.status || "online");
   const [signature,  setSignature]  = useState(myProfile.signature || "");
-  const [showCreator, setShowCreator] = useState(false);
   const [profileBg,     setProfileBg]     = useState(myProfile.profileBg || "linear-gradient(135deg,var(--accent-hover),#2d1f6e)");
   const [profileBgType, setProfileBgType] = useState(myProfile.profileBgType || "gradient");
   const [bgUploading,   setBgUploading]   = useState(false);
@@ -942,17 +940,10 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
           padding: "28px 28px 0", borderRadius: "20px 20px 0 0", position: "relative",
         }}>
           <button onClick={onClose} className="cr-close-btn" style={{ position: "absolute", top: 14, right: 14, background: "rgba(0,0,0,0.3)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "var(--text-muted)", cursor: "pointer", fontSize: 18 }}>✕</button>
-          {showCreator && <AvatarCreator myProfile={myProfile} onClose={() => setShowCreator(false)} />}
           <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
             <div style={{ position: "relative" }}>
               <AvatarImg avatarImage={myProfile.avatarImage} avatar={avatar} color={color} size={80} />
               <span style={{ position: "absolute", bottom: 2, right: 2, width: 18, height: 18, borderRadius: "50%", background: getStatus(status).color, border: "3px solid var(--panel)" }} />
-              <button onClick={() => setShowCreator(true)} title="更換頭像"
-                style={{ position: "absolute", top: 0, left: 0, width: 80, height: 80, borderRadius: "50%", background: "rgba(0,0,0,0)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.2s" }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = 1; e.currentTarget.style.background = "rgba(0,0,0,0.45)"; }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = 0; e.currentTarget.style.background = "rgba(0,0,0,0)"; }}>
-                <span style={{ fontSize: 22, pointerEvents: "none" }}>📷</span>
-              </button>
             </div>
             <div style={{ paddingBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 20, color: "var(--text)" }}>{nickname}</div>
@@ -984,13 +975,13 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
               <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAvatarUpload} />
             </div>
           </div>
+          {/* 頭像設計器。原本是從這個面板再彈出的第二層 modal（點頭像上的 📷
+              才會開），現在直接內嵌成同一塊面板裡的一個區塊——設定頭像這件事
+              不需要再疊一層視窗。AvatarCreator 收到 embedded 之後不會畫自己的
+              遮罩、外殼和標題列。 */}
           <div style={{ marginBottom: 18 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>頭像 Emoji（可選）</label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {AVATAR_EMOJIS.map(e => (
-                <button key={e} onClick={() => setAvatar(e)} style={{ width: 36, height: 36, borderRadius: "50%", border: avatar === e ? "2px solid var(--accent)" : "2px solid var(--border)", background: color, cursor: "pointer", fontSize: 18 }}>{e}</button>
-              ))}
-            </div>
+            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>🎨 設計我的頭像</label>
+            <AvatarCreator myProfile={myProfile} embedded />
           </div>
           <div style={{ marginBottom: 18 }}>
             <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>頭像顏色</label>

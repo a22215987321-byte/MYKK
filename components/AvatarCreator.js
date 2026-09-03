@@ -123,7 +123,11 @@ function drawGlasses(ctx, color, isFemale) {
   ctx.stroke();
 }
 
-export default function AvatarCreator({ myProfile, onClose }) {
+// embedded=true 時不畫自己的遮罩、外殼和標題列，只吐出內容本體，讓呼叫端
+// 把它當成自己面板裡的一個區塊。做法是把外面兩層 wrapper 改成
+// display:contents——那會讓它們不產生任何視覺方塊，子元素直接排進呼叫端的
+// 版面，比另外複製一份無殼版本乾淨。
+export default function AvatarCreator({ myProfile, onClose, embedded = false }) {
   const [gender,     setGender]     = useState(myProfile.avatarGender     || "male");
   const [hair,       setHair]       = useState(myProfile.avatarHair       || "#111111");
   const [clothes,    setClothes]    = useState(myProfile.avatarClothes    || "#3a9898");
@@ -209,10 +213,16 @@ export default function AvatarCreator({ myProfile, onClose }) {
   );
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+    <div style={embedded
+      ? { display: "contents" }
+      : { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
       <style>{`
         .ac-modal { width: 560px; max-height: 92vh; }
         .ac-body { flex-direction: row; overflow: hidden; }
+        /* 內嵌進別的面板時沒有高度限制，讓內容自然撐開、由外層面板負責捲動，
+           不要在裡面再生一條捲軸。 */
+        .ac-embed-body { border: 1px solid var(--border); border-radius: 14px; }
+        .ac-embed-body .ac-scroll { overflow: visible !important; }
         .ac-left { width: 200px; border-right: 1px solid var(--border); border-bottom: none; }
         @media (max-width: 600px) {
           .ac-modal { width: calc(100% - 20px); max-width: 100%; max-height: calc(100dvh - 20px); border-radius: 16px; }
@@ -221,14 +231,18 @@ export default function AvatarCreator({ myProfile, onClose }) {
           .ac-close-btn { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
         }
       `}</style>
-      <div className="ac-modal" style={{ background: "var(--panel)", borderRadius: 20, overflow: "hidden", border: "1px solid var(--border)", display: "flex", flexDirection: "column", boxSizing: "border-box" }}>
-        {/* Header */}
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 17, color: "var(--text)" }}>🎨 設計我的頭像</div>
-          <button onClick={onClose} className="ac-close-btn" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 22 }}>✕</button>
-        </div>
+      <div className={embedded ? "ac-embed" : "ac-modal"} style={embedded
+        ? { display: "contents" }
+        : { background: "var(--panel)", borderRadius: 20, overflow: "hidden", border: "1px solid var(--border)", display: "flex", flexDirection: "column", boxSizing: "border-box" }}>
+        {/* Header：內嵌時不畫，標題由呼叫端自己的區塊標籤負責 */}
+        {!embedded && (
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 17, color: "var(--text)" }}>🎨 設計我的頭像</div>
+            <button onClick={onClose} className="ac-close-btn" style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 22 }}>✕</button>
+          </div>
+        )}
 
-        <div className="ac-body" style={{ display: "flex", flex: 1 }}>
+        <div className={"ac-body" + (embedded ? " ac-embed-body" : "")} style={{ display: "flex", flex: 1 }}>
           {/* Left: Preview */}
           <div className="ac-left" style={{ padding: "20px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14, flexShrink: 0, background: "var(--panel-alt)" }}>
             <canvas ref={canvasRef} width={200} height={200}
@@ -251,7 +265,7 @@ export default function AvatarCreator({ myProfile, onClose }) {
           </div>
 
           {/* Right: Options */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px 24px" }}>
+          <div className="ac-scroll" style={{ flex: 1, overflowY: "auto", padding: "20px 20px 24px" }}>
             <Section title="髮色">
               <ColorRow opts={HAIR_OPTS} value={hair} onChange={setHair} />
             </Section>
