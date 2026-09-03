@@ -281,13 +281,19 @@ export default function RichTextEditor({ value, onChange, onBlur }) {
         .rte-findmsg { font-size: 12px; color: var(--text-faint); }
 
         .rte-body { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 40px; }
+        /* 字體／字級／字重／行距刻意跟 ProjectFilesPanel 的 .pf-doc 完全一致。
+           在此之前這裡沒有宣告 font-family，會繼承成 --font-body（黑體），而
+           閱讀模式是襯線——同一份文件在兩個模式下長得不一樣，切換時整段文字
+           會跳掉。對齊之後，編輯看到的就是最後讀到的樣子。 */
         .rte-body .ProseMirror { outline: none; min-height: 100%;
-          font-size: 15.5px; line-height: 1.75; color: var(--text); }
+          font-family: Georgia, "Times New Roman", "Noto Serif TC", serif;
+          font-size: 18px; font-weight: 500; line-height: 1.85; color: var(--text); }
         .rte-body .ProseMirror > *:first-child { margin-top: 0; }
         .rte-body .ProseMirror p { margin: 0 0 0.9em; }
-        .rte-body .ProseMirror h1 { font-size: 1.65em; font-weight: 700; margin: 1.3em 0 0.45em; }
-        .rte-body .ProseMirror h2 { font-size: 1.35em; font-weight: 700; margin: 1.25em 0 0.4em; }
-        .rte-body .ProseMirror h3 { font-size: 1.14em; font-weight: 700; margin: 1.2em 0 0.35em; }
+        .rte-body .ProseMirror strong { font-weight: 800; }
+        .rte-body .ProseMirror h1 { font-size: 1.85em; font-weight: 800; margin: 1.3em 0 0.45em; }
+        .rte-body .ProseMirror h2 { font-size: 1.5em; font-weight: 800; margin: 1.25em 0 0.4em; }
+        .rte-body .ProseMirror h3 { font-size: 1.22em; font-weight: 800; margin: 1.2em 0 0.35em; }
         .rte-body .ProseMirror ul { list-style: disc; padding-left: 1.5em; margin: 0 0 0.9em; }
         .rte-body .ProseMirror ol { padding-left: 1.5em; margin: 0 0 0.9em; }
         .rte-body .ProseMirror li { margin-bottom: 0.3em; }

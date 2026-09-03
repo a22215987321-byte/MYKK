@@ -8,6 +8,14 @@ export default function Document() {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+        {/* 專案檔案庫的文件內容區用襯線字（.pf-doc / RichTextEditor）。原本完全
+            靠使用者本機有沒有裝中文襯線字體——沒裝的 Windows 會落到新細明體，
+            筆畫細到看不舒服。這裡把 Noto Serif TC 正式載進來，每台機器一致。
+            只取 500（內文）跟 800（標題／粗體）兩個字重：CJK 字體每多一個字重
+            就多一整套，而 Google Fonts 會用 unicode-range 把 CJK 切成約 100 個
+            分片、只下載實際用到的字，這是控制體積的關鍵。
+            英文不受影響，仍走本機 Georgia。 */}
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;800&display=swap" rel="stylesheet" />
         <meta name="description" content="Evon Chat - 即時社交聊天平台，支援好友、群組、打賞功能" />
         <meta name="theme-color" content="#f4f3f9" />
         <script

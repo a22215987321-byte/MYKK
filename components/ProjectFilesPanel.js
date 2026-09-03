@@ -812,10 +812,16 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
         .pf-chev { color: var(--text-faint); flex-shrink: 0; margin-left: auto; }
         .pf-rowtext { min-width: 0; display: flex; align-items: baseline; gap: 8px; flex: 1;
           overflow: hidden; white-space: nowrap; }
-        .pf-name { font-weight: 600; font-size: 14px; color: var(--text);
+        /* 左欄清單是介面不是內文，維持黑體（--font-body），只加大加粗。 */
+        .pf-name { font-weight: 700; font-size: 15px; color: var(--text);
           overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
-        .pf-meta { font-size: 12.5px; color: var(--text-faint); flex-shrink: 0;
+        .pf-meta { font-size: 13px; font-weight: 500; color: var(--text-faint); flex-shrink: 0;
           overflow: hidden; text-overflow: ellipsis; }
+        /* theme.css 有一條全域規則讓所有 input/textarea 套毛筆手寫體
+           （MoyuBrushTC）。那在訊息輸入框是刻意的，但這個面板的搜尋框、
+           重新命名框、新增檔案框是檔案管理介面，毛筆字既突兀又難讀。
+           只在這個面板作用域內退回一般介面字體，不動全域規則。 */
+        .pf-panel input { font-family: var(--font-body); }
 
         .pf-del { background: none; border: none; color: var(--text-faint); cursor: pointer;
           padding: 5px; border-radius: 7px; display: flex; opacity: 0; flex-shrink: 0; }
@@ -885,13 +891,20 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
           font-size: 12px; color: var(--text-faint); }
 
         .pf-right { flex: 1; min-width: 0; overflow-y: auto; padding: 30px 40px 48px; }
-        .pf-doc { font-family: Georgia, "Times New Roman", "Noto Serif TC", "Songti TC", "PMingLiU", serif;
-          font-size: 16.5px; line-height: 1.78; color: var(--text); max-width: 74ch; }
+        /* 內文字體。中文由 _document.js 載入的 Noto Serif TC 負責（英文仍是
+           本機 Georgia）。刻意不再指名 Songti TC（macOS 專有）與 PMingLiU
+           （新細明體，筆畫細到讀不舒服）——真正的修正是把網頁字體載進來，
+           不要靠使用者本機裝了什麼。
+           weight 500 是 Noto Serif TC 實際有載入的字重，不是瀏覽器合成的假粗；
+           Georgia 沒有 500，CSS 比對規則會讓它退回真實的 400，也不會假粗。 */
+        .pf-doc { font-family: Georgia, "Times New Roman", "Noto Serif TC", serif;
+          font-size: 18px; font-weight: 500; line-height: 1.85; color: var(--text); max-width: 74ch; }
         .pf-doc > *:first-child { margin-top: 0; }
         .pf-doc p { margin: 0 0 1.05em; }
-        .pf-doc h1 { font-size: 1.7em; font-weight: 700; margin: 1.4em 0 0.5em; line-height: 1.3; }
-        .pf-doc h2 { font-size: 1.38em; font-weight: 700; margin: 1.35em 0 0.45em; line-height: 1.35; }
-        .pf-doc h3 { font-size: 1.15em; font-weight: 700; margin: 1.3em 0 0.4em; }
+        .pf-doc strong { font-weight: 800; }
+        .pf-doc h1 { font-size: 1.85em; font-weight: 800; margin: 1.4em 0 0.5em; line-height: 1.3; }
+        .pf-doc h2 { font-size: 1.5em; font-weight: 800; margin: 1.35em 0 0.45em; line-height: 1.35; }
+        .pf-doc h3 { font-size: 1.22em; font-weight: 800; margin: 1.3em 0 0.4em; }
         .pf-doc ul { list-style: disc; padding-left: 1.5em; margin: 0 0 1.05em; }
         .pf-doc ol { padding-left: 1.5em; margin: 0 0 1.05em; }
         .pf-doc li { margin-bottom: 0.4em; }
@@ -930,8 +943,8 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
           .pf-list { padding: 6px 8px; }
           /* 觸控目標放大：桌面 44px 在手機上偏小 */
           .pf-row { height: 56px; }
-          .pf-name { font-size: 15px; }
-          .pf-meta { font-size: 12px; }
+          .pf-name { font-size: 16px; }
+          .pf-meta { font-size: 13px; }
           .pf-del { opacity: 1; }
           .pf-footer { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
 
