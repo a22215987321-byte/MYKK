@@ -285,9 +285,13 @@ export default function RichTextEditor({ value, onChange, onBlur }) {
            在此之前這裡沒有宣告 font-family，會繼承成 --font-body（黑體），而
            閱讀模式是襯線——同一份文件在兩個模式下長得不一樣，切換時整段文字
            會跳掉。對齊之後，編輯看到的就是最後讀到的樣子。 */
+        /* max-width 與 margin:0 auto 跟 .pf-doc 對齊——面板最大化或左欄收合時
+           編輯區也會變得很寬，不限寬的話一行會拉得比閱讀模式長很多，切換模式
+           就會看到整段重新斷行。 */
         .rte-body .ProseMirror { outline: none; min-height: 100%;
           font-family: Georgia, "Times New Roman", "Noto Serif TC", serif;
-          font-size: 18px; font-weight: 500; line-height: 1.85; color: var(--text); }
+          font-size: 18px; font-weight: 500; line-height: 1.85; color: var(--text);
+          max-width: 74ch; margin: 0 auto; }
         .rte-body .ProseMirror > *:first-child { margin-top: 0; }
         .rte-body .ProseMirror p { margin: 0 0 0.9em; }
         .rte-body .ProseMirror strong { font-weight: 800; }

@@ -18,7 +18,7 @@ import useIsMobile from "../lib/useIsMobile";
 import { toast } from "../lib/toast";
 import {
   Folder, FolderOpen, FileText, ChevronRight, ChevronDown, ChevronLeft,
-  Search, X, Trash2, Eye, Pencil, Info, FolderPlus,
+  Search, X, Trash2, Eye, Pencil, Info, FolderPlus, Maximize2, Minimize2,
 } from "lucide-react";
 
 // 「專案檔案庫」——參考 Claude 專案裡 Files 的 UI/UX。這是給「人」讀的，
@@ -42,6 +42,21 @@ const LEFT_W = "37%";
 // 用 kind:"folder" 區分——這樣不用為它另開一個 collection、也就不用再改一次
 // Firestore 規則。folder 文件一樣帶 size:0，才會通過規則裡的 size 檢查。
 const MAX_FOLDERS = 5;
+
+// 面板的版面偏好。key 前綴沿用專案慣例（cr-sidebar-width、cr-msg-font-size…），
+// 這個面板用 pf-。存的是布林，用字串 "1"/"0" 而不是 JSON，跟專案其他地方一致。
+const LS_MAXIMIZED = "pf-maximized";
+const LS_LEFT_COLLAPSED = "pf-left-collapsed";
+
+function readPref(key) {
+  if (typeof window === "undefined") return false;
+  try { return localStorage.getItem(key) === "1"; } catch { return false; }
+}
+
+function writePref(key, value) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(key, value ? "1" : "0"); } catch {}
+}
 
 // 手動拖曳排序後的順序存在 order 欄位。還沒被手動排過的沿用「建立時間新到舊」，
 // 兩者混在一起時有 order 的排前面（使用者明確表達過的意圖優先）。
@@ -203,6 +218,13 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
   const [dragItem, setDragItem] = useState(null);
   const [dropTarget, setDropTarget] = useState(null); // { id, edge } | { folder }
 
+  // 最大化與左欄收合。兩個都寫進 localStorage——最大化如果不記住，使用者每次
+  // 打開面板都得再點一次，跟每次按 F11 是同一個問題，等於沒解決。
+  const [maximized, setMaximizedState] = useState(() => readPref(LS_MAXIMIZED));
+  const [leftCollapsed, setLeftCollapsedState] = useState(() => readPref(LS_LEFT_COLLAPSED));
+  const setMaximized = (v) => { setMaximizedState(v); writePref(LS_MAXIMIZED, v); };
+  const setLeftCollapsed = (v) => { setLeftCollapsedState(v); writePref(LS_LEFT_COLLAPSED, v); };
+
   const pickerRef = useRef(null);
   const timerRef = useRef(null);
   const pendingRef = useRef(null);
@@ -229,6 +251,10 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
 
   const selected = useMemo(() => files.find((f) => f.id === selectedId) || null, [files, selectedId]);
   const wide = !!selected;
+  // 沒選檔案時左欄就是整個面板，收合它沒有意義，所以只有 wide 才給收合控制。
+  // 手機版左右欄本來就是二選一顯示（見 media query），也不適用。
+  const canCollapse = wide && !isMobile;
+  const collapsed = canCollapse && leftCollapsed;
 
   // 把還沒寫進去的編輯內容立刻送出。切換檔案跟關閉面板都要先叫這個，不然
   // debounce 還沒到期的那一版就這樣沒了。
@@ -489,16 +515,33 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
   const isEmpty = !loading && filtered.length === 0 && !creating;
 
   return (
-    <div className="pf-overlay"
+    <div className={"pf-overlay" + (maximized && !isMobile ? " pf-max" : "")}
       onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
-      <div className={"pf-panel" + (isMobile && wide ? " pf-m-preview" : "")}
-        style={{ width: wide ? "min(90vw, 1180px)" : "min(92vw, 640px)" }}>
+      {/* 面板外面再包一層 position:relative 的殼。理由是 .pf-panel 有
+          overflow:hidden，貼在它外緣的展開鈕放在裡面會被裁掉；而 .pf-overlay
+          是 position:fixed，直接把按鈕掛在 overlay 下會以「視窗」為座標系、
+          不是以面板為座標系。包一層只負責定位、不設 overflow 的殼，按鈕就能
+          精準貼在面板邊上。右鍵選單當初也是靠「渲染成 panel 的兄弟節點」逃出
+          overflow:hidden，這裡是同一個手法的延伸。 */}
+      <div className="pf-shell">
+      <div className={"pf-panel" + (isMobile && wide ? " pf-m-preview" : "") + (collapsed ? " pf-collapsed" : "")}
+        style={{ width: maximized && !isMobile ? "100vw" : (wide ? "min(90vw, 1180px)" : "min(92vw, 640px)") }}>
 
         <div className="pf-titlebar">
           <div className="pf-tb-left"
-            style={{ width: wide ? LEFT_W : "100%", borderRight: wide ? "1px solid var(--border-soft)" : "none" }}>
+            style={{
+              width: wide ? LEFT_W : "100%",
+              borderRight: wide ? "1px solid var(--border-soft)" : "none",
+              display: collapsed ? "none" : undefined,
+            }}>
             <div className="pf-title">Files</div>
             <div className="pf-spacer" />
+            {canCollapse && (
+              <button className="pf-iconbtn" title="收合檔案清單"
+                onClick={() => setLeftCollapsed(true)}>
+                <ChevronLeft size={18} strokeWidth={1.6} />
+              </button>
+            )}
             <button className="pf-iconbtn" title="搜尋"
               onClick={() => { setSearchOpen((v) => !v); if (searchOpen) setQ(""); }}>
               <Search size={18} strokeWidth={1.6} />
@@ -510,6 +553,14 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
               <FolderPlus size={18} strokeWidth={1.6} />
             </button>
             <button className="pf-textbtn pf-upload" onClick={() => pickerRef.current?.click()}>上傳</button>
+            {!wide && !isMobile && (
+              <button className="pf-iconbtn" title={maximized ? "還原大小" : "最大化"}
+                onClick={() => setMaximized(!maximized)}>
+                {maximized
+                  ? <Minimize2 size={17} strokeWidth={1.7} />
+                  : <Maximize2 size={17} strokeWidth={1.7} />}
+              </button>
+            )}
             {!wide && (
               <button className="pf-iconbtn" title="關閉" onClick={handleClose}>
                 <X size={18} strokeWidth={1.6} />
@@ -544,6 +595,14 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
                   <Pencil size={15} strokeWidth={1.7} />編輯
                 </button>
               </div>
+              {!isMobile && (
+                <button className="pf-iconbtn" title={maximized ? "還原大小" : "最大化"}
+                  onClick={() => setMaximized(!maximized)}>
+                  {maximized
+                    ? <Minimize2 size={17} strokeWidth={1.7} />
+                    : <Maximize2 size={17} strokeWidth={1.7} />}
+                </button>
+              )}
               <button className="pf-iconbtn" title="關閉" onClick={handleClose}>
                 <X size={18} strokeWidth={1.6} />
               </button>
@@ -553,7 +612,11 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
 
         <div className="pf-body">
           <div className="pf-left"
-            style={{ width: wide ? LEFT_W : "100%", borderRight: wide ? "1px solid var(--border-soft)" : "none" }}>
+            style={{
+              width: wide ? LEFT_W : "100%",
+              borderRight: wide ? "1px solid var(--border-soft)" : "none",
+              display: collapsed ? "none" : undefined,
+            }}>
             {searchOpen && (
               <div className="pf-searchrow">
                 <Search size={15} strokeWidth={1.6} />
@@ -725,6 +788,17 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
         </div>
       </div>
 
+      {/* 左欄收合後的展開鈕。它是 .pf-panel 的兄弟節點、住在 .pf-shell 裡，
+          所以不會被 panel 的 overflow:hidden 裁掉，又能以面板為座標系貼在
+          它的左外緣。 */}
+      {collapsed && (
+        <button className="pf-edge" title="展開檔案清單"
+          onClick={() => setLeftCollapsed(false)}>
+          <ChevronLeft size={18} strokeWidth={2} />
+        </button>
+      )}
+      </div>
+
       {ctxMenu && (
         <>
           {/* 透明遮罩：點任何地方（包含右鍵）都關掉選單，不用另外掛
@@ -759,10 +833,38 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
       <style>{`
         .pf-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex;
           align-items: center; justify-content: center; z-index: 620; padding: 20px; }
+        /* 定位用的殼，只負責讓收合後那顆貼邊按鈕能以「面板」為座標系。
+           自己不設 overflow，所以按鈕超出面板邊界也不會被裁掉。 */
+        .pf-shell { position: relative; display: flex; }
         .pf-panel { background: var(--panel); border: 1px solid var(--border);
           border-radius: var(--radius-lg); box-shadow: 0 24px 60px rgba(0,0,0,0.28);
           display: flex; flex-direction: column; overflow: hidden;
-          height: min(86vh, 820px); transition: width 0.22s ease; }
+          height: min(86vh, 820px); transition: width 0.22s ease, height 0.22s ease; }
+
+        /* ── 最大化 ──
+           預設高度是 min(86vh, 820px)。一般瀏覽器視窗（扣掉分頁列／網址列／
+           書籤列／工作列）可用高度約 845px，算出來只有 727px；F11 全螢幕時
+           可用 1079px 但被 820px 上限卡住，所以使用者覺得「F11 剛好」的其實
+           就是 820px。這裡把 overlay 的 20px padding 一併歸零、面板拉到
+           100dvh，一般視窗下可以給到約 845px——比 F11 還高，而且不用離開
+           瀏覽器。狀態存在 localStorage，點一次就永久維持。 */
+        .pf-overlay.pf-max { padding: 0; }
+        .pf-overlay.pf-max .pf-panel {
+          height: 100dvh; border-radius: 0; border: none; box-shadow: none;
+        }
+
+        /* ── 左欄收合後貼在面板左外緣的展開鈕 ── */
+        .pf-edge {
+          position: absolute; left: -17px; top: 50%; transform: translateY(-50%);
+          width: 34px; height: 34px; border-radius: 50%;
+          background: var(--panel); border: 1px solid var(--border);
+          box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+          display: flex; align-items: center; justify-content: center;
+          color: var(--text-muted); cursor: pointer; z-index: 2;
+          transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+        .pf-edge:hover { background: var(--panel-hover); color: var(--text);
+          transform: translateY(-50%) scale(1.06); }
 
         .pf-titlebar { display: flex; align-items: stretch; height: 66px; flex-shrink: 0;
           border-bottom: 1px solid var(--border-soft); }
@@ -897,8 +999,13 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
            不要靠使用者本機裝了什麼。
            weight 500 是 Noto Serif TC 實際有載入的字重，不是瀏覽器合成的假粗；
            Georgia 沒有 500，CSS 比對規則會讓它退回真實的 400，也不會假粗。 */
+        /* margin:0 auto——最大化或左欄收合時右欄會變得比 74ch 寬很多，文章
+           靠左會整段偏到一邊。預設寬度下右欄實際可用約 663px、74ch 在 18px
+           Georgia 下約 666px，兩者幾乎相等，所以這行對預設外觀是 no-op，
+           只在真的變寬時才發揮作用。 */
         .pf-doc { font-family: Georgia, "Times New Roman", "Noto Serif TC", serif;
-          font-size: 18px; font-weight: 500; line-height: 1.85; color: var(--text); max-width: 74ch; }
+          font-size: 18px; font-weight: 500; line-height: 1.85; color: var(--text);
+          max-width: 74ch; margin: 0 auto; }
         .pf-doc > *:first-child { margin-top: 0; }
         .pf-doc p { margin: 0 0 1.05em; }
         .pf-doc strong { font-weight: 800; }
@@ -931,6 +1038,10 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
           /* 手機版滿版，而且一次只顯示一欄——螢幕寬度放不下 37% 列表 + 預覽。
              沒選檔案時顯示列表，選了就整個換成預覽（靠 .pf-m-preview 切換），
              回列表用標題列左邊那顆返回鍵。 */
+          /* display:contents 讓定位殼在手機版完全不產生方塊，面板直接變回
+             overlay 的子元素，下面 width:100%/height:100dvh 的計算基準才不會
+             被多包的一層改掉。收合鈕在手機版本來就不渲染，不需要定位基準。 */
+          .pf-shell { display: contents; }
           .pf-panel { width: 100% !important; height: 100dvh; max-height: 100dvh;
             border-radius: 0; border: none; }
           .pf-titlebar { height: 56px; }
