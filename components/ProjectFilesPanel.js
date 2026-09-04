@@ -38,6 +38,9 @@ const FILE_MAX_BYTES = 512 * 1024;
 const TEXT_EXT = /\.(md|markdown|txt|json|csv|log|ya?ml)$/i;
 
 const LEFT_W = "37%";
+// 右欄佔的比例，從 LEFT_W 推導出來，兩者永遠同步。收合左欄時面板寬度會乘上
+// 這個比例——目的是讓右側方塊維持原本的寬度，而不是因為左欄消失就整個撐開。
+const RIGHT_RATIO = (100 - parseFloat(LEFT_W)) / 100;
 // 每個使用者最多 5 個資料夾。資料夾跟檔案存在同一個 projectFiles collection，
 // 用 kind:"folder" 區分——這樣不用為它另開一個 collection、也就不用再改一次
 // Firestore 規則。folder 文件一樣帶 size:0，才會通過規則裡的 size 檢查。
@@ -255,6 +258,14 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
   // 手機版左右欄本來就是二選一顯示（見 media query），也不適用。
   const canCollapse = wide && !isMobile;
   const collapsed = canCollapse && leftCollapsed;
+
+  // 收合時把面板縮到「原本右欄的寬度」，而不是讓右欄接收左欄空出來的空間。
+  // 這樣文章的行寬跟收合前完全一樣，只是整個面板被 overlay 置中——收合是
+  // 「把清單收起來」，不該順便改變文章的排版。
+  const baseWidth = maximized && !isMobile
+    ? "100vw"
+    : (wide ? "min(90vw, 1180px)" : "min(92vw, 640px)");
+  const panelWidth = collapsed ? `calc(${baseWidth} * ${RIGHT_RATIO})` : baseWidth;
 
   // 把還沒寫進去的編輯內容立刻送出。切換檔案跟關閉面板都要先叫這個，不然
   // debounce 還沒到期的那一版就這樣沒了。
@@ -525,7 +536,7 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
           overflow:hidden，這裡是同一個手法的延伸。 */}
       <div className="pf-shell">
       <div className={"pf-panel" + (isMobile && wide ? " pf-m-preview" : "") + (collapsed ? " pf-collapsed" : "")}
-        style={{ width: maximized && !isMobile ? "100vw" : (wide ? "min(90vw, 1180px)" : "min(92vw, 640px)") }}>
+        style={{ width: panelWidth }}>
 
         <div className="pf-titlebar">
           <div className="pf-tb-left"
@@ -852,19 +863,35 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
         .pf-overlay.pf-max .pf-panel {
           height: 100dvh; border-radius: 0; border: none; box-shadow: none;
         }
+        /* 最大化 + 收合：面板縮成只有右欄寬、左右兩側露出遮罩，這時候如果還
+           沿用「滿版不要邊框圓角」的設定，會變成一根沒有輪廓的長條。把邊框
+           和左右圓角加回來，讓它讀起來仍然是一個面板。上下仍貼齊視窗邊緣，
+           所以只圓左右兩側的角。 */
+        .pf-overlay.pf-max .pf-panel.pf-collapsed {
+          border: 1px solid var(--border);
+          border-top: none; border-bottom: none;
+          border-radius: var(--radius-lg);
+          box-shadow: 0 24px 60px rgba(0,0,0,0.28);
+        }
 
         /* ── 左欄收合後貼在面板左外緣的展開鈕 ── */
+        /* right:100% 讓按鈕的右緣正好切齊面板左緣——整顆完全在面板外面，
+           不會像 left:-17px 那樣一半在裡一半在外、被邊線從中間切開。
+           貼齊上緣（top 對齊標題列），右側不畫邊框、右側圓角歸零，看起來
+           像是從面板長出來的一片，而不是浮在旁邊的獨立圓鈕。
+           背景用 var(--panel)，跟面板同一個顏色。 */
         .pf-edge {
-          position: absolute; left: -17px; top: 50%; transform: translateY(-50%);
-          width: 34px; height: 34px; border-radius: 50%;
-          background: var(--panel); border: 1px solid var(--border);
-          box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+          position: absolute; right: 100%; top: 14px;
+          width: 32px; height: 40px;
+          border-radius: 10px 0 0 10px;
+          background: var(--panel);
+          border: 1px solid var(--border); border-right: none;
+          box-shadow: -3px 3px 12px rgba(0,0,0,0.16);
           display: flex; align-items: center; justify-content: center;
           color: var(--text-muted); cursor: pointer; z-index: 2;
-          transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+          transition: background 0.2s ease, color 0.2s ease;
         }
-        .pf-edge:hover { background: var(--panel-hover); color: var(--text);
-          transform: translateY(-50%) scale(1.06); }
+        .pf-edge:hover { background: var(--panel-hover); color: var(--text); }
 
         .pf-titlebar { display: flex; align-items: stretch; height: 66px; flex-shrink: 0;
           border-bottom: 1px solid var(--border-soft); }
