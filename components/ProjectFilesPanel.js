@@ -1030,8 +1030,27 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
            靠左會整段偏到一邊。預設寬度下右欄實際可用約 663px、74ch 在 18px
            Georgia 下約 666px，兩者幾乎相等，所以這行對預設外觀是 no-op，
            只在真的變寬時才發揮作用。 */
-        .pf-doc { font-family: Georgia, "Times New Roman", "Noto Serif TC", serif;
+        /* 數字專用字面。Georgia 用的是「舊式數字」（oldstyle figures）：
+           3 4 5 7 9 天生就設計成掉到基線以下、6 8 又比較高。當內文只是隨手
+           提到一個年份還好，但一進表格就整欄高高低低對不齊，量測到最大下沉
+           有 9px。系統版 Georgia 沒有等高數字可以切換（那是商業版 Georgia Pro
+           才有的功能），所以 font-variant-numeric 對它完全無效——唯一的辦法
+           是讓 U+0030-0039 這 10 個字元改由別的字體來畫，字母仍舊走 Georgia。
+           順序是實測挑的：Book Antiqua 的數字高度 33px 跟 Georgia 完全一致，
+           擺在 Georgia 的字母旁邊看不出接縫；Times New Roman 差 1px，但幾乎
+           每台 Windows／Mac 都有，是主力保險；後兩個是 Linux／ChromeOS 上
+           metric 相容的替代品。都沒有的話會落回 Georgia，就是現在的樣子，
+           不會壞掉。
+           （Cambria、Constantia、Palatino 實測也是舊式數字，不能用。） */
+        @font-face {
+          font-family: "PfLiningNum";
+          src: local("Book Antiqua"), local("Times New Roman"),
+               local("Tinos"), local("Liberation Serif");
+          unicode-range: U+0030-0039;
+        }
+        .pf-doc { font-family: "PfLiningNum", Georgia, "Times New Roman", "Noto Serif TC", serif;
           font-size: 18px; font-weight: 500; line-height: 1.85; color: var(--text);
+          font-variant-numeric: lining-nums;
           max-width: 74ch; margin: 0 auto; }
         .pf-doc > *:first-child { margin-top: 0; }
         .pf-doc p { margin: 0 0 1.05em; }
@@ -1052,7 +1071,10 @@ export default function ProjectFilesPanel({ user, projectId = DEFAULT_PROJECT_ID
           overflow-x: auto; margin: 0 0 1.05em; }
         .pf-doc pre code { background: none; padding: 0; }
         .pf-doc table { border-collapse: collapse; margin: 0 0 1.05em; font-size: 0.92em; }
-        .pf-doc th, .pf-doc td { border: 1px solid var(--border); padding: 6px 10px; }
+        /* tabular-nums 讓每個數字佔一樣寬——表格欄位才會上下切齊。只加在
+           儲存格，內文不加：等寬數字在句子裡會讓 1 的左右空得很明顯。 */
+        .pf-doc th, .pf-doc td { border: 1px solid var(--border); padding: 6px 10px;
+          font-variant-numeric: lining-nums tabular-nums; }
         .pf-blank { color: var(--text-faint); }
 
 
