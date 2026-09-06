@@ -6,6 +6,7 @@ import AuthScreen from '../components/AuthScreen';
 import { auth, db, googleProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { saveAccount, consumePendingLoginEmail } from '../lib/accountSwitcher';
+import { findOwnerUid, linkOwnerToNewUser } from '../lib/autoFriend';
 
 const AUTH_TIMEOUT_MS = 12000;
 
@@ -354,13 +355,20 @@ export default function Home() {
     setBusy(true);
     try {
       const { user: u } = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      // 新帳號預設就跟站長是好友，站長才能直接私訊傳東西過去。查不到站長
+      // 就是空陣列，跟以前一樣，註冊不會因此失敗。
+      const ownerUid = await findOwnerUid(email.trim());
       await setDoc(doc(db, 'users', u.uid), {
         nickname: nickname.trim(), avatar, color,
         bio: '', status: 'online', statusText: '',
-        email: email.trim(), friends: [], pendingIn: [], pendingOut: [],
+        email: email.trim(),
+        friends: ownerUid ? [ownerUid] : [], pendingIn: [], pendingOut: [],
         avatarImage: '/avatar1.png',
         createdAt: serverTimestamp(),
       });
+      // 必須等自己的 users 文件建好才寫站長那一側，否則站長的好友清單裡會
+      // 短暫出現一個查不到暱稱和頭像的 uid。
+      await linkOwnerToNewUser(ownerUid, u.uid);
       setStep('chat');
     } catch (e) { setAuthError(getErrorMessage(e.code)); }
     finally { setBusy(false); }
@@ -376,13 +384,17 @@ export default function Home() {
     if (!setupNickname.trim() || !user) return;
     setBusy(true);
     try {
+      // 跟密碼註冊同樣處理——Google 首次登入也是新帳號。
+      const ownerUid = await findOwnerUid(user.email || '');
       await setDoc(doc(db, 'users', user.uid), {
         nickname: setupNickname.trim(), avatar: setupAvatar, color: setupColor,
         bio: '', status: 'online', statusText: '',
-        email: user.email || '', friends: [], pendingIn: [], pendingOut: [],
+        email: user.email || '',
+        friends: ownerUid ? [ownerUid] : [], pendingIn: [], pendingOut: [],
         avatarImage: '/avatar1.png',
         createdAt: serverTimestamp(),
       });
+      await linkOwnerToNewUser(ownerUid, user.uid);
       setStep('chat');
     } catch (e) { console.error(e); }
     finally { setBusy(false); }

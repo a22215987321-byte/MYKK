@@ -82,12 +82,51 @@ import FloatingAudioPlayer from "./FloatingAudioPlayer";
 import AudioRoom from "./AudioRoom";
 import useIsMobile from "../lib/useIsMobile";
 import { QUICK_REACTIONS, STICKER_SRC_BY_ID } from "../data/chat/gesturePacks";
-import { ChevronLeft, ChevronRight, CalendarDays, LogOut, Plus, Search, Newspaper, MessageCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, LogOut, Plus, Search, Newspaper, MessageCircle, FileText, Download } from "lucide-react";
 import {
   doc, collection, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
   query, orderBy, limitToLast, serverTimestamp,
   arrayUnion, arrayRemove, getDocs, where, limit, getDoc, increment,
 } from "firebase/firestore";
+
+// -- 聊天室的檔案附件 --
+// 原本三個傳送函式（私訊／群組／大廳）都只收圖片和影片，想傳一份文件給朋友
+// 完全沒有辦法。R2 那一側其實什麼都收（/api/upload 對類型沒有任何限制），
+// 擋住的只是 <input accept>，所以這裡把文件類型放進來。
+//
+// 刻意不含壓縮檔和執行檔：這是一般人互傳東西的地方，不該變成散佈可執行內容
+// 的管道。要放寬就改 DOC_EXT 和 CHAT_FILE_ACCEPT 這兩行，判斷只有這一處。
+const DOC_EXT = /\.(md|markdown|txt|json|csv|log|ya?ml|pdf|docx?|xlsx?|pptx?)$/i;
+const DOC_MAX_BYTES = 25 * 1024 * 1024;
+const CHAT_FILE_ACCEPT =
+  "image/*,video/*,.md,.markdown,.txt,.json,.csv,.log,.yml,.yaml,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx";
+
+function fmtBytes(n) {
+  if (typeof n !== "number" || n < 0) return "";
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return Math.round(n / 1024) + " KB";
+  return (n / 1024 / 1024).toFixed(1) + " MB";
+}
+
+// accept 只是選檔視窗的預設篩選，使用者切到「所有檔案」照樣選得到任何東西，
+// 所以真正的把關在這裡，不在 accept。
+function rejectChatFile(file) {
+  if (file.type.startsWith("image/") || file.type.startsWith("video/")) return null;
+  if (!DOC_EXT.test(file.name)) return "不支援這種檔案類型";
+  if (file.size > DOC_MAX_BYTES) return "檔案太大（上限 25MB）";
+  return null;
+}
+
+// 把上傳完的檔案轉成訊息欄位。圖片和影片繼續用原本的 imageUrl / videoUrl 兩個
+// 欄位，一個字都不動——舊訊息才不會壞；其他類型走 fileUrl 這條新路。
+function chatFileFields(file, url) {
+  if (file.type.startsWith("video/")) return { fields: { imageUrl: "", videoUrl: url }, label: "[影片]" };
+  if (file.type.startsWith("image/")) return { fields: { imageUrl: url, videoUrl: "" }, label: "[圖片]" };
+  return {
+    fields: { imageUrl: "", videoUrl: "", fileUrl: url, fileName: file.name, fileSize: file.size },
+    label: "[檔案] " + file.name,
+  };
+}
 
 const EMOJI_QUICK  = QUICK_REACTIONS;
 const PROFILE_GRADIENTS = [
@@ -749,7 +788,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
     if (!collectionPath) return;
     if (!confirm("確認撤回此訊息？")) return;
     try {
-      await updateDoc(doc(db, ...collectionPath), { recalled: true, text: "此訊息已撤回", imageUrl: "", videoUrl: "" });
+      await updateDoc(doc(db, ...collectionPath), { recalled: true, text: "此訊息已撤回", imageUrl: "", videoUrl: "", fileUrl: "", fileName: "", fileSize: 0 });
     } catch (e) {
       toast("撤回失敗，請重試");
     }
@@ -865,6 +904,31 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
                 )}
                 {msg.imageUrl && (
                   <img src={msg.imageUrl} alt="圖片" style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
+                )}
+                {/* 檔案附件。R2 的網址跨網域，跨網域時瀏覽器會忽略 download 屬性
+                    ——但這類文件回來的 Content-Type 不是瀏覽器能內嵌顯示的類型，
+                    所以還是會觸發下載。download 留著是為了將來若改成自家網域時
+                    能指定存檔名稱。 */}
+                {msg.fileUrl && (
+                  <a href={msg.fileUrl} download={msg.fileName || ""} target="_blank" rel="noopener noreferrer"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, maxWidth: 260,
+                      padding: "10px 12px", borderRadius: "var(--radius-md)",
+                      background: "var(--panel-alt)", border: "1px solid var(--border)",
+                      textDecoration: "none", color: "var(--text)",
+                    }}>
+                    <FileText size={20} strokeWidth={1.7} style={{ flexShrink: 0, opacity: 0.75 }} />
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{ display: "block", fontSize: 13.5, fontWeight: 600,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {msg.fileName || "檔案"}
+                      </span>
+                      <span style={{ display: "block", fontSize: 11.5, color: "var(--text-faint)" }}>
+                        {fmtBytes(msg.fileSize)}
+                      </span>
+                    </span>
+                    <Download size={17} strokeWidth={1.7} style={{ flexShrink: 0, opacity: 0.75 }} />
+                  </a>
                 )}
                 {renderMessageText(msg.text)}
               </>
@@ -2106,11 +2170,11 @@ export default function ChatApp({ user }) {
     setHallUploading(true);
     try {
       const url = await uploadToR2(file);
-      const isVideo = file.type.startsWith("video/");
+      const { fields } = chatFileFields(file, url);
       await addDoc(collection(db, 'hall_messages'), {
         senderId: uid, sender: myProfile.nickname, avatar: myProfile.avatar,
         senderAvatarImage: myProfile.avatarImage || "",
-        text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
+        text: "", ...fields, createdAt: serverTimestamp(),
       });
     } catch {
       toast("上傳失敗，請重試");
@@ -2151,13 +2215,13 @@ export default function ChatApp({ user }) {
     setPrivateUploading(true);
     try {
       const url = await uploadToR2(file);
-      const isVideo = file.type.startsWith("video/");
+      const { fields, label } = chatFileFields(file, url);
       await addDoc(collection(db, 'private_chats', chatId, 'messages'), {
         senderId: uid, sender: myProfile.nickname, avatar: myProfile.avatar,
         senderAvatarImage: myProfile.avatarImage || "",
-        text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
+        text: "", ...fields, createdAt: serverTimestamp(),
       });
-      bumpPrivateChatSummary(activeFriendId, isVideo ? "[影片]" : "[圖片]");
+      bumpPrivateChatSummary(activeFriendId, label);
     } catch {
       toast("上傳失敗，請重試");
     } finally {
@@ -2182,13 +2246,13 @@ export default function ChatApp({ user }) {
     setGroupUploading(true);
     try {
       const url = await uploadToR2(file);
-      const isVideo = file.type.startsWith("video/");
+      const { fields, label } = chatFileFields(file, url);
       await addDoc(collection(db, 'groups', activeGroupId, 'messages'), {
         senderId: uid, sender: myProfile.nickname, avatar: myProfile.avatar,
         senderAvatarImage: myProfile.avatarImage || "",
-        text: "", imageUrl: isVideo ? "" : url, videoUrl: isVideo ? url : "", createdAt: serverTimestamp(),
+        text: "", ...fields, createdAt: serverTimestamp(),
       });
-      bumpGroupChatSummary(activeGroupId, isVideo ? "[影片]" : "[圖片]");
+      bumpGroupChatSummary(activeGroupId, label);
     } catch {
       toast("上傳失敗，請重試");
     } finally {
@@ -2876,7 +2940,7 @@ export default function ChatApp({ user }) {
           </div>
           <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
-              <input ref={privateFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendPrivateMedia(f); e.target.value = ""; } }} />
+              <input ref={privateFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendPrivateMedia(f); e.target.value = ""; } }} />
               <button onClick={() => privateFileRef.current?.click()} disabled={privateUploading} title="上傳圖片/影片"
                 style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: privateUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                 {privateUploading ? "⏳" : "📎"}
@@ -2944,7 +3008,7 @@ export default function ChatApp({ user }) {
           </div>
           <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
-              <input ref={groupFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendGroupMedia(f); e.target.value = ""; } }} />
+              <input ref={groupFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendGroupMedia(f); e.target.value = ""; } }} />
               <button onClick={() => groupFileRef.current?.click()} disabled={groupUploading} title="上傳圖片/影片"
                 style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: groupUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                 {groupUploading ? "⏳" : "📎"}
@@ -3005,7 +3069,7 @@ export default function ChatApp({ user }) {
           </div>
           <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
-              <input ref={hallFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendHallMedia(f); e.target.value = ""; } }} />
+              <input ref={hallFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendHallMedia(f); e.target.value = ""; } }} />
               <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片/影片"
                 style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: hallUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                 {hallUploading ? "⏳" : "📎"}
@@ -4106,7 +4170,7 @@ export default function ChatApp({ user }) {
               </div>
               <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
-                  <input ref={hallFileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { sendHallMedia(f); e.target.value = ""; } }} />
+                  <input ref={hallFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendHallMedia(f); e.target.value = ""; } }} />
                   <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片/影片"
                     style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: hallUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                     {hallUploading ? "⏳" : "📎"}
