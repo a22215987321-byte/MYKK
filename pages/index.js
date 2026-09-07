@@ -6,7 +6,8 @@ import AuthScreen from '../components/AuthScreen';
 import { auth, db, googleProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { saveAccount, consumePendingLoginEmail } from '../lib/accountSwitcher';
-import { findOwnerUid, linkOwnerToNewUser } from '../lib/autoFriend';
+import { findOwner, linkOwnerToNewUser } from '../lib/autoFriend';
+import { sendWelcomeDocs } from '../lib/welcomeDocs';
 
 const AUTH_TIMEOUT_MS = 12000;
 
@@ -357,7 +358,8 @@ export default function Home() {
       const { user: u } = await createUserWithEmailAndPassword(auth, email.trim(), password);
       // 新帳號預設就跟站長是好友，站長才能直接私訊傳東西過去。查不到站長
       // 就是空陣列，跟以前一樣，註冊不會因此失敗。
-      const ownerUid = await findOwnerUid(email.trim());
+      const owner = await findOwner(email.trim());
+      const ownerUid = owner?.uid || null;
       await setDoc(doc(db, 'users', u.uid), {
         nickname: nickname.trim(), avatar, color,
         bio: '', status: 'online', statusText: '',
@@ -369,6 +371,9 @@ export default function Home() {
       // 必須等自己的 users 文件建好才寫站長那一側，否則站長的好友清單裡會
       // 短暫出現一個查不到暱稱和頭像的 uid。
       await linkOwnerToNewUser(ownerUid, u.uid);
+      // 好友關係建立之後才送歡迎文件——先有好友，對方的聊天清單才看得到這個
+      // 對話；順序反過來會出現一個不在好友清單裡的未讀對話。
+      await sendWelcomeDocs(owner, u.uid);
       setStep('chat');
     } catch (e) { setAuthError(getErrorMessage(e.code)); }
     finally { setBusy(false); }
@@ -385,7 +390,8 @@ export default function Home() {
     setBusy(true);
     try {
       // 跟密碼註冊同樣處理——Google 首次登入也是新帳號。
-      const ownerUid = await findOwnerUid(user.email || '');
+      const owner = await findOwner(user.email || '');
+      const ownerUid = owner?.uid || null;
       await setDoc(doc(db, 'users', user.uid), {
         nickname: setupNickname.trim(), avatar: setupAvatar, color: setupColor,
         bio: '', status: 'online', statusText: '',
@@ -395,6 +401,7 @@ export default function Home() {
         createdAt: serverTimestamp(),
       });
       await linkOwnerToNewUser(ownerUid, user.uid);
+      await sendWelcomeDocs(owner, user.uid);
       setStep('chat');
     } catch (e) { console.error(e); }
     finally { setBusy(false); }

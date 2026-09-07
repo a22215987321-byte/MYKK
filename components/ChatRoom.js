@@ -58,6 +58,9 @@ const AiCompanionRoom = dynamic(() => import("./AiCompanionRoom"), {
 // 而且是浮層、只有真的點開才需要，比照上面兩個延遲載入。沒給 loading 畫面是
 // 因為它整個就是一個 modal，還沒載好時不該先閃一個空框出來。
 const ProjectFilesPanel = dynamic(() => import("./ProjectFilesPanel"), { ssr: false });
+// 分享文件的閱讀視窗。裡面帶 marked + DOMPurify，延後到真的要開才載入，
+// 不要讓沒收到分享文件的人也付這份下載成本。
+const DocReaderModal = dynamic(() => import("./DocReaderModal"), { ssr: false });
 // AI OFFICE（見 components/office/OfficeMode.js）——裡面用到 pixi.js/spine
 // 動畫引擎，體積不小，一樣延遲載入、只有真的切到這個模式才下載。
 const OfficeMode = dynamic(() => import("./office/OfficeMode"), {
@@ -82,7 +85,7 @@ import FloatingAudioPlayer from "./FloatingAudioPlayer";
 import AudioRoom from "./AudioRoom";
 import useIsMobile from "../lib/useIsMobile";
 import { QUICK_REACTIONS, STICKER_SRC_BY_ID } from "../data/chat/gesturePacks";
-import { ChevronLeft, ChevronRight, CalendarDays, LogOut, Plus, Search, Newspaper, MessageCircle, FileText, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, LogOut, Plus, Search, Newspaper, MessageCircle, FileText, Download, BookOpen } from "lucide-react";
 import {
   doc, collection, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
   query, orderBy, limitToLast, serverTimestamp,
@@ -815,6 +818,14 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
     );
   }
 
+  // 分享文件（站長自動送給新朋友的那幾份）——點卡片才載入閱讀視窗。開關狀態
+  // 放在泡泡自己身上，不用把 callback 一路傳過六個渲染點；同一時間只會有一個
+  // 被打開，而視窗本身是 position:fixed，從哪一層渲染出來都一樣。
+  const [docOpen, setDocOpen] = useState(false);
+  const sharedDoc = msg.type === "shared_doc" && msg.docId
+    ? { id: msg.docId, name: msg.docName || "文件", note: msg.docNote || "" }
+    : null;
+
   const hasMedia = msg.imageUrl || msg.videoUrl;
   const isEmojiMsg = msg.type === "emoji";
   const isStickerMsg = msg.type === "sticker";
@@ -930,10 +941,35 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
                     <Download size={17} strokeWidth={1.7} style={{ flexShrink: 0, opacity: 0.75 }} />
                   </a>
                 )}
+                {/* 分享文件的卡片。跟上面的檔案附件長得像但行為不同：檔案是下載，
+                    這個是在站內開一個閱讀視窗（可複製全文、可存進自己的專案檔案）。 */}
+                {sharedDoc && (
+                  <button type="button" onClick={() => setDocOpen(true)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, width: 260, maxWidth: "100%",
+                      padding: "11px 12px", borderRadius: "var(--radius-md)",
+                      background: "var(--panel-alt)", border: "1px solid var(--border)",
+                      color: "var(--text)", cursor: "pointer", textAlign: "left", font: "inherit",
+                    }}>
+                    <BookOpen size={20} strokeWidth={1.7} style={{ flexShrink: 0, opacity: 0.75 }} />
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{ display: "block", fontSize: 13.5, fontWeight: 600,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {sharedDoc.name}
+                      </span>
+                      <span style={{ display: "block", fontSize: 11.5, color: "var(--text-faint)" }}>
+                        {sharedDoc.note || "點擊開啟閱讀"}
+                      </span>
+                    </span>
+                  </button>
+                )}
                 {renderMessageText(msg.text)}
               </>
             )}
           </div>
+          {docOpen && sharedDoc && (
+            <DocReaderModal doc={sharedDoc} myUid={myUid} onClose={() => setDocOpen(false)} />
+          )}
           {activeReactions.length > 0 && (
             <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
               {activeReactions.map(([emoji, uids]) => (
@@ -1505,13 +1541,17 @@ export default function ChatApp({ user }) {
   // 監聽或播放進度的功能，兩邊各開一份代表監聽/播放也重複一份。手機版
   // 沿用「一次只看一個功能」的舊體驗，用 mobileActiveKey 這個獨立字串
   // 狀態，跟桌面版雙方塊完全脫鉤（見下面 moreMenuState/moreMenuSetters）。
-  // A 塊放一般功能（預設開 Feed）、B 塊固定放「對話」——不是誰先被點開誰
-  // 就佔哪塊，是每個 key 都有自己固定要去的塊（見下面 openTab 的
-  // DEFAULT_BLOCK 判斷），拖曳可以事後手動搬到另一塊，但預設一律照這個
-  // 規則分配，不看使用者上一步點的是哪一塊。
+  // A 是左塊、B 是右塊（JSX 裡 A 先渲染，兩塊都 flex:1 並排）。左塊固定放
+  // 「對話」、右塊放側欄那些一般功能（預設開 Feed）——不是誰先被點開誰就佔
+  // 哪塊，是每個 key 都有自己固定要去的塊（見下面 openTab 的分配判斷），
+  // 拖曳可以事後手動搬到另一塊，但預設一律照這個規則分配，不看使用者上一步
+  // 點的是哪一塊。
+  //
+  // 對話放左邊是因為它是這個 app 的主線：右邊那條好友/群組清單欄（.cr-cal）
+  // 點下去就是開對話，落點放在緊鄰的左塊比隔著一整塊功能頁更好找。
   const [blocks, setBlocks] = useState({
-    A: { tabs: ["feed"], active: "feed" },
-    B: { tabs: ["conversations"], active: "conversations" },
+    A: { tabs: ["conversations"], active: "conversations" },
+    B: { tabs: ["feed"], active: "feed" },
   });
   // 雙擊任何分頁會讓它所在的那塊從半版變滿版（另一塊暫時隱藏），
   // 再雙擊一次復原——所有功能都能這樣放大看，沒有白名單限制。
@@ -1606,9 +1646,9 @@ export default function ChatApp({ user }) {
     return b != null && blocks[b].active === key;
   };
   const openTab = (key) => {
-    // 已經開著就切過去；沒開過的話固定分配：「對話」去 B 塊，其餘一律去
-    // A 塊——不是看哪塊「目前作用中」。
-    const target = keyBlock[key] || (key === "conversations" ? "B" : "A");
+    // 已經開著就切過去；沒開過的話固定分配：「對話」去左塊（A），側欄那些
+    // 功能一律去右塊（B）——不是看哪塊「目前作用中」。
+    const target = keyBlock[key] || (key === "conversations" ? "A" : "B");
     setBlocks((prev) => {
       const blk = prev[target];
       const tabs = blk.tabs.includes(key) ? blk.tabs : [...blk.tabs, key];
@@ -2941,7 +2981,7 @@ export default function ChatApp({ user }) {
           <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
               <input ref={privateFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendPrivateMedia(f); e.target.value = ""; } }} />
-              <button onClick={() => privateFileRef.current?.click()} disabled={privateUploading} title="上傳圖片/影片"
+              <button onClick={() => privateFileRef.current?.click()} disabled={privateUploading} title="上傳圖片／影片／文件"
                 style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: privateUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                 {privateUploading ? "⏳" : "📎"}
               </button>
@@ -3009,7 +3049,7 @@ export default function ChatApp({ user }) {
           <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
               <input ref={groupFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendGroupMedia(f); e.target.value = ""; } }} />
-              <button onClick={() => groupFileRef.current?.click()} disabled={groupUploading} title="上傳圖片/影片"
+              <button onClick={() => groupFileRef.current?.click()} disabled={groupUploading} title="上傳圖片／影片／文件"
                 style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: groupUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                 {groupUploading ? "⏳" : "📎"}
               </button>
@@ -3070,7 +3110,7 @@ export default function ChatApp({ user }) {
           <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
               <input ref={hallFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendHallMedia(f); e.target.value = ""; } }} />
-              <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片/影片"
+              <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片／影片／文件"
                 style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: hallUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                 {hallUploading ? "⏳" : "📎"}
               </button>
@@ -4171,7 +4211,7 @@ export default function ChatApp({ user }) {
               <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
                   <input ref={hallFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendHallMedia(f); e.target.value = ""; } }} />
-                  <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片/影片"
+                  <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片／影片／文件"
                     style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: hallUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
                     {hallUploading ? "⏳" : "📎"}
                   </button>
@@ -4226,7 +4266,7 @@ export default function ChatApp({ user }) {
                   </div>
                   <div ref={blockAScrollRef} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                     {blocks.A.tabs.length === 0 ? (
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>從左側點一個功能開始，或把分頁拖過來這裡</div>
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>把分頁拖過來這裡，或從左側好友清單點一個對話</div>
                     ) : blocks.A.tabs.map(key => (
                       <div key={key} style={{ flex: 1, minHeight: 0, display: key === blocks.A.active ? "flex" : "none", flexDirection: "column" }}>
                         {CONTENT_REGISTRY[key]}
@@ -4254,7 +4294,7 @@ export default function ChatApp({ user }) {
                   </div>
                   <div ref={blockBScrollRef} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                     {blocks.B.tabs.length === 0 ? (
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>把分頁拖過來這裡，或從左側點一個功能開始</div>
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>從左側點一個功能開始，或把分頁拖過來這裡</div>
                     ) : blocks.B.tabs.map(key => (
                       <div key={key} style={{ flex: 1, minHeight: 0, display: key === blocks.B.active ? "flex" : "none", flexDirection: "column" }}>
                         {CONTENT_REGISTRY[key]}
