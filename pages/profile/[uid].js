@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import LoadingState from "../../components/LoadingState";
 import ProfileView from "../../components/ProfileView";
+import { auth } from "../../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 // Standalone, shareable/direct-link version of the profile page. The full
 // UI lives in components/ProfileView.js, shared with the inline version
@@ -9,8 +12,17 @@ import ProfileView from "../../components/ProfileView";
 export default function ProfilePublicPage() {
   const router = useRouter();
   const { uid } = router.query;
+  const [authResolved, setAuthResolved] = useState(false);
 
-  if (!router.isReady) {
+  useEffect(() => onAuthStateChanged(auth, user => {
+    if (user?.isAnonymous) {
+      router.replace("/");
+      return;
+    }
+    setAuthResolved(true);
+  }), [router]);
+
+  if (!router.isReady || !authResolved) {
     return <LoadingState label="載入中..." />;
   }
 

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import Head from "next/head";
+import { useRouter } from "next/router";
 import "../globals.css";
 import "../styles/theme.css";
 // AI Office 的排版樣式——Next.js 規定 global CSS 只能在這裡 import。這份
@@ -13,6 +14,7 @@ import InstallPrompt from "../components/InstallPrompt";
 import ToastHost from "../components/ToastHost";
 
 export default function App({ Component, pageProps }) {
+  const router = useRouter();
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
     navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -23,7 +25,8 @@ export default function App({ Component, pageProps }) {
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </Head>
-      <ThemeToggle />
+      {/* The home page owns its login UI; ChatRoom keeps its inline theme picker. */}
+      {router.pathname !== "/" && <ThemeToggle />}
       <Component {...pageProps} />
       <InstallPrompt />
       <ToastHost />

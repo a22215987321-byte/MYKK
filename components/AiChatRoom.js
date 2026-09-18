@@ -49,6 +49,129 @@ function ReasoningBlock({ text }) {
   );
 }
 
+// Manus-style message presentation lives here instead of in the chat shell so
+// the sidebar, header, composer and message data flow remain untouched.
+function AiChatMessage({ message }) {
+  if (message.role === "user") {
+    return (
+      <article className="evon-ai-message evon-ai-message--user" aria-label="你的訊息">
+        <div className="evon-ai-user-bubble">{message.content}</div>
+      </article>
+    );
+  }
+
+  return (
+    <article className="evon-ai-message evon-ai-message--assistant" aria-label="EVON AI 回覆">
+      <img className="evon-ai-message-avatar" src="/logo.png?v=3" alt="" aria-hidden="true" />
+      <div className="evon-ai-assistant-content">
+        <div className="evon-ai-message-author">EVON AI</div>
+        {message.reasoning && <ReasoningBlock text={message.reasoning} />}
+        <MarkdownMessage content={message.content} />
+      </div>
+    </article>
+  );
+}
+
+function AiChatMessageStyles() {
+  return (
+    <style>{`
+      .evon-ai-message {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .evon-ai-message--user {
+        display: flex;
+        justify-content: flex-end;
+        margin: 2px 0 0;
+      }
+      .evon-ai-user-bubble {
+        width: fit-content;
+        max-width: 70%;
+        padding: 10px 14px;
+        border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+        border-radius: 14px;
+        background: color-mix(in srgb, var(--panel) 88%, var(--text) 12%);
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      }
+      .evon-ai-message--assistant {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        align-items: start;
+        gap: 12px;
+        width: min(100%, 820px);
+        margin-right: auto;
+      }
+      .evon-ai-message-avatar {
+        width: 28px;
+        height: 28px;
+        margin-top: 1px;
+        border: 0;
+        border-radius: 0;
+        object-fit: contain;
+        flex-shrink: 0;
+      }
+      .evon-ai-assistant-content {
+        width: min(100%, 760px);
+        min-width: 0;
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.65;
+        overflow-wrap: anywhere;
+      }
+      .evon-ai-message-author {
+        margin: 2px 0 7px;
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .evon-ai-assistant-content .ai-md p {
+        margin-bottom: 12px;
+        line-height: 1.68;
+      }
+      .evon-ai-assistant-content .ai-md ul,
+      .evon-ai-assistant-content .ai-md ol {
+        margin-bottom: 12px;
+      }
+      .evon-ai-assistant-content .ai-md li {
+        margin-bottom: 5px;
+        line-height: 1.65;
+      }
+      .evon-ai-message + .evon-ai-message--assistant {
+        margin-top: 24px;
+      }
+      .evon-ai-message--assistant + .evon-ai-message--user {
+        margin-top: 34px;
+      }
+      .evon-ai-message--user + .evon-ai-message--user {
+        margin-top: 10px;
+      }
+      .evon-ai-message--assistant + .evon-ai-message--assistant {
+        margin-top: 20px;
+      }
+      .evon-ai-thinking {
+        color: var(--text-faint);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      @media (max-width: 680px) {
+        .evon-ai-user-bubble { max-width: 78%; }
+        .evon-ai-message--assistant {
+          grid-template-columns: 24px minmax(0, 1fr);
+          gap: 10px;
+        }
+        .evon-ai-message-avatar { width: 24px; height: 24px; }
+        .evon-ai-message--assistant + .evon-ai-message--user { margin-top: 28px; }
+      }
+    `}</style>
+  );
+}
+
 // Standalone "AI 助手" room — a simple chat UI backed by pages/api/ai/chat.js
 // (DeepSeek, server-side only).
 //
@@ -422,7 +545,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           see the .cr-chat-panel rule in ChatRoom.js's <style> block); every
           other theme's --chatpanel-* tokens default to 0/none so this stays
           a plain flush container exactly as before. */}
-      <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14, backgroundSize: "var(--chat-world-bg-size, auto), cover", backgroundRepeat: "var(--chat-world-bg-repeat, repeat), no-repeat", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
+      <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: mode === "chat" ? 0 : 14, backgroundSize: "var(--chat-world-bg-size, auto), cover", backgroundRepeat: "var(--chat-world-bg-repeat, repeat), no-repeat", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
         {mode === "chat" ? (
           <>
             {messages.length === 0 && (
@@ -437,40 +560,16 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
               </div>
             )}
             <MarkdownMessageStyles />
-            {/* 一般聊天室（私訊/群組/大廳）是左右各半的訊息氣泡——雙方各佔畫面
-                一半寬度，靠左右對齊分辨是誰說的。AI 助手不一樣：雙方共用同一份
-                100% 寬的版面（像 ChatGPT 那種一列一列的做法），改用頭像+底色
-                分辨是使用者還是 AI，而不是靠左右各半——AI 的回覆常常是一大段
-                markdown/程式碼，塞在半個畫面寬的氣泡裡會被壓得很窄，改滿版後
-                閱讀空間直接翻倍。 */}
-            {messages.map((m, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%", boxSizing: "border-box" }}>
-                {m.role === "assistant" && m.reasoning && <ReasoningBlock text={m.reasoning} />}
-                <div style={{
-                  display: "flex", alignItems: "flex-start", gap: 10, width: "100%", boxSizing: "border-box",
-                  padding: "12px 14px", borderRadius: "var(--radius-lg)",
-                  background: m.role === "user" ? "var(--panel)" : "var(--bubble-assistant-bg, var(--panel-alt))",
-                  border: m.role === "user" ? "1px solid var(--border)" : "none",
-                }}>
-                  <div style={{
-                    width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
-                    background: m.role === "user" ? "var(--accent)" : "linear-gradient(135deg,#4f46e5,#7c3aed)",
-                    color: m.role === "user" ? "var(--accent-text)" : "#fff",
-                  }}>
-                    {m.role === "user" ? "🙂" : "🤖"}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--text)", wordBreak: "break-word" }}>
-                    {m.role === "user" ? <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div> : <MarkdownMessage content={m.content} />}
-                  </div>
-                </div>
-              </div>
-            ))}
+            <AiChatMessageStyles />
+            {messages.map((message, i) => <AiChatMessage key={i} message={message} />)}
             {sending && (
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "var(--radius-lg)", background: "var(--bubble-assistant-bg, var(--panel-alt))" }}>
-                <div style={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, background: "linear-gradient(135deg,#4f46e5,#7c3aed)", color: "#fff" }}>🤖</div>
-                <span style={{ color: "var(--text-faint)", fontSize: 14 }}>思考中...</span>
-              </div>
+              <article className="evon-ai-message evon-ai-message--assistant" aria-label="EVON AI 正在回覆">
+                <img className="evon-ai-message-avatar" src="/logo.png?v=3" alt="" aria-hidden="true" />
+                <div className="evon-ai-assistant-content">
+                  <div className="evon-ai-message-author">EVON AI</div>
+                  <span className="evon-ai-thinking">思考中...</span>
+                </div>
+              </article>
             )}
             <div ref={endRef} />
           </>

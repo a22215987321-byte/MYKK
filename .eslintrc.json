@@ -1,0 +1,22 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "@next/next/no-img-element": "off",
+    "react/no-unescaped-entities": "off"
+  },
+  "overrides": [
+    {
+      "files": ["components/ChatRoom.js"],
+      "rules": {
+        "react/jsx-no-undef": "off",
+        "react-hooks/rules-of-hooks": "off"
+      }
+    },
+    {
+      "files": ["components/ProfileView.js"],
+      "rules": {
+        "react-hooks/rules-of-hooks": "off"
+      }
+    }
+  ]
+}

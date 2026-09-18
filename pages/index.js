@@ -1,18 +1,43 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import ChatRoom from '../components/ChatRoom';
+import GuestChatRoom from '../components/GuestChatRoom';
 import LoadingState from '../components/LoadingState';
 import AuthScreen from '../components/AuthScreen';
-import { auth, db, googleProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from '../lib/firebase';
+import {
+  auth, db, googleProvider, signInWithPopup, signInAnonymously,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword,
+} from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { saveAccount, consumePendingLoginEmail } from '../lib/accountSwitcher';
 import { findOwner, linkOwnerToNewUser } from '../lib/autoFriend';
 import { sendWelcomeDocs } from '../lib/welcomeDocs';
+import { signOut } from 'firebase/auth';
+import { getGuestAuthErrorMessage } from '../lib/guestAuthErrors';
 
 const AUTH_TIMEOUT_MS = 12000;
 
 const AVATAR_EMOJIS = ["😊","👨‍💻","📚","🏃","🎮","🎨","🍜","🌸","🦊","🐼","🎧","⚡"];
 const COLORS = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06b6d4","#84cc16"];
+
+async function ensureGuestProfile(firebaseUser) {
+  const profileRef = doc(db, 'guest_users', firebaseUser.uid);
+  const snap = await getDoc(profileRef);
+  if (snap.exists()) return snap.data();
+
+  const profile = {
+    nickname: `訪客-${firebaseUser.uid.slice(0, 6).toUpperCase()}`,
+    avatar: '👤',
+    avatarImage: '',
+    color: '#7c5cff',
+    accountType: 'guest',
+    isGuest: true,
+    ownerId: firebaseUser.uid,
+    createdAt: serverTimestamp(),
+  };
+  await setDoc(profileRef, profile);
+  return profile;
+}
 
 function useSplashInteraction(onEnter) {
   const hintRef = useRef(null);
@@ -285,6 +310,7 @@ export default function Home() {
   const [color, setColor] = useState('var(--accent)');
   const [authError, setAuthError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [guestBusy, setGuestBusy] = useState(false);
 
   // First-time setup state (for Google users)
   const [setupNickname, setSetupNickname] = useState('');
@@ -296,6 +322,26 @@ export default function Home() {
       if (!u) { setUser(null); setStep('login'); return; }
       setUser(u);
       try {
+        if (u.isAnonymous) {
+          setGuestBusy(true);
+          try {
+            await ensureGuestProfile(u);
+            if (auth.currentUser?.uid === u.uid) setStep('chat');
+          } catch (error) {
+            console.error('[GuestAuth] profile initialization failed:', error?.code || 'unknown');
+            if (auth.currentUser?.uid === u.uid) {
+              setAuthError(getGuestAuthErrorMessage(error));
+              // Do not leave a failed anonymous session stuck on the loading/error screen.
+              await signOut(auth);
+              setUser(null);
+              setStep('login');
+            }
+          } finally {
+            setGuestBusy(false);
+          }
+          return;
+        }
+
         const snap = await getDoc(doc(db, 'users', u.uid));
         if (snap.exists()) {
           const p = snap.data();
@@ -385,6 +431,19 @@ export default function Home() {
     catch { setAuthError('Google 登入失敗，請稍後再試'); }
   };
 
+  const handleGuestLogin = async () => {
+    setAuthError('');
+    setGuestBusy(true);
+    try {
+      await signInAnonymously(auth);
+      // The auth listener clears guestBusy once the guest profile is ready.
+    } catch (e) {
+      console.error('[GuestAuth] anonymous sign-in failed:', e?.code || 'unknown');
+      setAuthError(getGuestAuthErrorMessage(e));
+      setGuestBusy(false);
+    }
+  };
+
   const handleSetup = async () => {
     if (!setupNickname.trim() || !user) return;
     setBusy(true);
@@ -437,7 +496,11 @@ export default function Home() {
   }
 
   // ── Chat ──
-  if (step === 'chat') return <ChatRoom user={user} />;
+  if (step === 'chat') {
+    return user?.isAnonymous
+      ? <GuestChatRoom user={user} />
+      : <ChatRoom user={user} />;
+  }
 
   // ── First-time profile setup (Google users) ──
   if (step === 'setup') {
@@ -495,10 +558,11 @@ export default function Home() {
       avatar={avatar} setAvatar={setAvatar}
       color={color} setColor={setColor}
       authError={authError} setAuthError={setAuthError}
-      busy={busy}
+      busy={busy} guestBusy={guestBusy}
       onLogin={handleLogin}
       onRegister={handleRegister}
       onGoogleLogin={handleGoogleLogin}
+      onGuestLogin={handleGuestLogin}
     />
   );
 }

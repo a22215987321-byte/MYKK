@@ -12,7 +12,9 @@ export default function FeedPage() {
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
-      if (u) {
+      if (u?.isAnonymous) {
+        router.replace("/");
+      } else if (u) {
         setUser(u);
       } else {
         router.replace("/");
