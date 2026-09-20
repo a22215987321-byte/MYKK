@@ -14,6 +14,7 @@ import { findOwner, linkOwnerToNewUser } from '../lib/autoFriend';
 import { sendWelcomeDocs } from '../lib/welcomeDocs';
 import { signOut } from 'firebase/auth';
 import { getGuestAuthErrorMessage } from '../lib/guestAuthErrors';
+import { OWNER_EMAIL } from '../lib/admin';
 
 const AUTH_TIMEOUT_MS = 12000;
 
@@ -23,7 +24,17 @@ const COLORS = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06
 async function ensureGuestProfile(firebaseUser) {
   const profileRef = doc(db, 'guest_users', firebaseUser.uid);
   const snap = await getDoc(profileRef);
-  if (snap.exists()) return snap.data();
+  const guestFriend = {
+    friendEmails: [OWNER_EMAIL],
+    defaultFriendEmail: OWNER_EMAIL,
+  };
+  if (snap.exists()) {
+    const current = snap.data();
+    if (current.defaultFriendEmail !== OWNER_EMAIL || !current.friendEmails?.includes(OWNER_EMAIL)) {
+      await setDoc(profileRef, guestFriend, { merge: true });
+    }
+    return { ...current, ...guestFriend };
+  }
 
   const profile = {
     nickname: `訪客-${firebaseUser.uid.slice(0, 6).toUpperCase()}`,
@@ -33,6 +44,7 @@ async function ensureGuestProfile(firebaseUser) {
     accountType: 'guest',
     isGuest: true,
     ownerId: firebaseUser.uid,
+    ...guestFriend,
     createdAt: serverTimestamp(),
   };
   await setDoc(profileRef, profile);

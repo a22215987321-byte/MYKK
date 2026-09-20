@@ -10,7 +10,8 @@ input, textarea {
   font-family: "MoyuBrushTC", var(--font-body, sans-serif);
 }
 
-:root {
+/* Guest theme tokens are scoped locally, without changing the saved member/login theme. */
+:root, .guest-root {
   /* Style 1 — light, soft, pastel */
   --bg: #f4f3f9;
   --panel: #ffffff;
@@ -464,7 +465,7 @@ html[data-theme="glass"] body {
    Neutral tokens (surfaces, text, radius, shadow) are identical across all
    6 — only --accent/--accent-2 (and everything derived from them below)
    change, so switching palettes never touches layout or component CSS. */
-html[data-theme="pastel-pearl"] {
+html[data-theme="pastel-pearl"], .guest-root[data-guest-theme="pastel-pearl"] {
   /* Surfaces carry a wash of whichever accent is active (via color-mix
      below) so picking a palette visibly retints the background itself, not
      just buttons/badges — kept above the "imperceptible" 3-9% range an
@@ -582,7 +583,7 @@ html[data-theme="pastel-pearl"][data-pastel-palette="mint-sea-salt"] {
 /* Named semantic accent tokens for new/shared components — always derived
    from --accent/--accent-2 above via color-mix, never a per-palette literal,
    so no component ever needs to branch on the palette id itself. */
-html[data-theme="pastel-pearl"] {
+html[data-theme="pastel-pearl"], .guest-root[data-guest-theme="pastel-pearl"] {
   --accent-primary: var(--accent);
   --accent-secondary: var(--accent-2);
   --accent-soft: color-mix(in srgb, var(--accent) 30%, var(--panel));
@@ -604,7 +605,7 @@ html[data-theme="pastel-pearl"][data-pastel-palette="pearl-silver"] :focus-visib
   outline-color: #444444;
 }
 
-html[data-theme="shadow-window"] {
+html[data-theme="shadow-window"], .guest-root[data-guest-theme="shadow-window"] {
   /* Style 5 — 幽影深窗: dark gray-black floating-panel dashboard, per an
      exact reference mock (see the layout-token block above) rather than a
      freeform dark theme — deep neutral grays (not neon's cyan/pink, not a
@@ -694,7 +695,7 @@ html[data-theme="shadow-window"] {
    這是第一階段，只管四張大卡；卡片內部的細節（分頁列、訊息泡泡、按鈕
    等）之後再一項一項加回來，不要一次補滿。
    ───────────────────────────────────────────────────────────────────── */
-html[data-theme="clean-cards"] {
+html[data-theme="clean-cards"], .guest-root[data-guest-theme="clean-cards"] {
   /* ── 版面幾何：跟 :root/柔和珠光/幽影深窗 完全相同，位置尺寸不變 ── */
   --shell-margin: 12px;
   --panel-gap: 12px;

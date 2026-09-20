@@ -8,6 +8,13 @@ guest_users/{anonymousUid}/chats/{chatId}
 guest_users/{anonymousUid}/chats/{chatId}/messages/{messageId}
 ```
 
+Each guest profile records `friendEmails: ["a22215987321@gmail.com"]` and
+`defaultFriendEmail`, while new chat documents record the same address in
+`counterpartyEmail`. These fields only describe the guest's fixed companion;
+they do not move anonymous users into the member `users` collection or weaken
+the per-UID guest data boundary. The automatic greeting is rendered from the
+trusted application copy and does not create a forged member message document.
+
 The client always builds these paths from `request.auth.uid`, but client-side
 path scoping is not an authorization boundary. Merge the following block into
 the existing production Firestore rules before enabling the feature:
