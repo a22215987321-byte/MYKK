@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import useIsMobile from "../lib/useIsMobile";
+import PortalPopover from "./PortalPopover";
 import { CHAT_WORLDS, getWorldById, getSavedWorldId, getSavedVariantId, applyWorld } from "../lib/chatWorlds";
 import { getSavedAccounts, setPendingLoginEmail } from "../lib/accountSwitcher";
 
@@ -140,7 +140,7 @@ function WorldVariantGrid({ world, selected, onSelect }) {
   );
 }
 
-export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp = false, msgFontSize, onChangeMsgFontSize, onResetMsgFontSize }) {
+export default function ThemeToggle({ mode = "floating", label, onOpenProfile, openUp = false, msgFontSize, onChangeMsgFontSize, onResetMsgFontSize }) {
   const [theme, setTheme] = useState("default");
   const [pastelPalette, setPastelPalette] = useState(DEFAULT_PASTEL_PALETTE);
   const [chatWorld, setChatWorld] = useState("none");
@@ -148,8 +148,8 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
   const [open, setOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [savedAccounts, setSavedAccounts] = useState([]);
-  const menuRef = useRef(null);
-  const isMobile = useIsMobile();
+  const buttonRef = useRef(null);
+  const closeMenu = useCallback(() => setOpen(false), []);
   const router = useRouter();
 
   useEffect(() => {
@@ -179,15 +179,6 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
   }, []);
 
   useEffect(() => onAuthStateChanged(auth, u => setLoggedIn(!!u)), []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClickOutside = e => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [open]);
 
   // Refresh the switcher list each time the menu opens, so a nickname/avatar
   // change made just now (which also re-saves the entry — see pages/index.js)
@@ -275,7 +266,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
   const showPaletteGrid = open && theme === "pastel-pearl";
 
   return (
-    <div ref={menuRef} className={mode === "floating" ? "theme-toggle-floating" : undefined} style={mode === "floating"
+    <div className={mode === "floating" ? "theme-toggle-floating" : undefined} style={mode === "floating"
       // floating 模式是「固定在瀏覽器視窗上的 UI 控制元件」，不是頁面內容的
       // 一部分——捲動時必須一直待在視窗右上角。它掛在 pages/_app.js 最外層、
       // 跟 <Component> 同層，不在任何頁面容器裡面，所以 fixed 是相對視窗定位。
@@ -288,9 +279,12 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
       ? { position: "relative", display: "inline-flex", zIndex: 20 }
       : { position: "relative", display: "inline-flex" }}>
       <button
+        ref={buttonRef}
+        type="button"
         onClick={() => setOpen(v => !v)}
         title="設定"
         aria-label="設定選單"
+        aria-expanded={open}
         style={isPill ? {
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           height: 42, padding: "0 14px", background: "var(--panel)", border: "1px solid var(--border)",
@@ -300,7 +294,8 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
           whiteSpace: "nowrap",
         } : {
           background: "none", border: "none", color: "var(--text-faint)",
-          cursor: "pointer", fontSize: 16, padding: 4, borderRadius: 6,
+          cursor: "pointer", fontSize: 16, padding: label ? "8px 4px" : 4, borderRadius: 6,
+          display: "inline-flex", alignItems: "center", gap: 4, minHeight: label ? 36 : undefined,
         }}
       >
         {isPill ? (
@@ -312,30 +307,29 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
             <span>{(THEMES.find(t => t.id === theme)?.label || "☀️ 淺色預設").slice(2).trim()}</span>
             <span aria-hidden="true" style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
           </>
-        ) : "⚙️"}
+        ) : <><span aria-hidden="true">⚙️</span>{label && <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{label}</span>}</>}
       </button>
 
-      {open && (
+      <PortalPopover anchorRef={buttonRef} open={open} onClose={closeMenu}
+        placement={openUp ? "top-right" : "bottom-right"} constrainToViewport zIndex={2147483001}>
         <div
+          role="region"
+          aria-label="設定"
+          className="profile-settings-menu"
           style={{
-            position: "absolute",
-            ...(openUp
-              ? { bottom: isPill ? 50 : 26 }
-              : { top: isPill ? 50 : 26 }),
-            right: 0,
-            minWidth: showPaletteGrid && !isMobile ? 220 : 190,
+            width: 280,
+            maxWidth: "calc(100vw - 24px)",
+            boxSizing: "border-box",
             background: "var(--panel)",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius-md)",
             boxShadow: "var(--card-shadow)",
             backdropFilter: "var(--panel-blur)",
             WebkitBackdropFilter: "var(--panel-blur)",
-            maxHeight: "min(520px, calc(100vh - 80px))",
-            overflowY: "auto",
             fontFamily: "var(--font-body)",
-            zIndex: 9999,
           }}
         >
+          <style>{`.profile-settings-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }`}</style>
           {loggedIn && (
             <button
               onClick={openProfile}
@@ -416,7 +410,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%",
                 padding: "9px 14px", background: "none", border: "none",
-                borderBottom: t.id === "pastel-pearl" && showPaletteGrid && !isMobile ? "1px solid var(--border-soft)" : "none",
+                borderBottom: t.id === "pastel-pearl" && showPaletteGrid ? "1px solid var(--border-soft)" : "none",
                 color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer",
                 userSelect: "text", WebkitUserSelect: "text",
               }}
@@ -428,11 +422,9 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
             </button>
           ))}
 
-          {/* Second-level accent picker, expanded inline once 柔和珠光 is the
-              active theme. On mobile this is skipped here and rendered as a
-              bottom sheet below instead, so it never gets clipped by the
-              dropdown's own width/height. */}
-          {showPaletteGrid && !isMobile && (
+          {/* The viewport-bounded menu scrolls on small screens, so the palette
+              can stay in the same accessible panel on mobile and desktop. */}
+          {showPaletteGrid && (
             <PaletteGrid selected={pastelPalette} onSelect={selectPalette} />
           )}
 
@@ -463,28 +455,7 @@ export default function ThemeToggle({ mode = "floating", onOpenProfile, openUp =
             </button>
           )}
         </div>
-      )}
-
-      {showPaletteGrid && isMobile && (
-        <>
-          <div
-            onClick={() => setOpen(false)}
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 9998 }}
-          />
-          <div
-            style={{
-              position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9999,
-              background: "var(--panel)", borderTopLeftRadius: 20, borderTopRightRadius: 20,
-              padding: "14px 12px calc(14px + env(safe-area-inset-bottom))",
-              boxShadow: "0 -8px 30px rgba(0,0,0,0.25)", maxHeight: "70vh", overflowY: "auto",
-            }}
-          >
-            <div style={{ width: 36, height: 4, borderRadius: 2, background: "var(--border)", margin: "0 auto 12px" }} />
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", padding: "0 8px 4px" }}>柔和珠光配色</div>
-            <PaletteGrid selected={pastelPalette} onSelect={selectPalette} />
-          </div>
-        </>
-      )}
+      </PortalPopover>
     </div>
   );
 }

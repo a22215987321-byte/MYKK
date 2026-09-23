@@ -8,6 +8,7 @@ import MyStickersPanel from "./MyStickersPanel";
 import LoadingState from "./LoadingState";
 import ImageCropModal from "./ImageCropModal";
 import ThemeToggle from "./ThemeToggle";
+import ProfileAvatar from "./ProfileAvatar";
 import VideoPlayer from "./VideoPlayer";
 import useIsMobile from "../lib/useIsMobile";
 import { uploadToR2 } from "../lib/uploadToR2";
@@ -1207,13 +1208,11 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [tab, setTab] = useState(initialTab);
-  const [avatarZoomImg, setAvatarZoomImg] = useState(null);
   const [mediaLightboxIndex, setMediaLightboxIndex] = useState(null);
   // 從「影片」分頁打開時，prev/next 只在影片之間切換（不會混到圖片貼文）；
   // 從「媒體」分頁打開時維持原本圖片+影片混在一起切換。
   const [lightboxList, setLightboxList] = useState(null);
   const [scrollToPostId, setScrollToPostId] = useState(null);
-  const [avatarHover, setAvatarHover] = useState(false);
   const [hoveredMedia, setHoveredMedia] = useState(null);
   const [stickersPanelOpen, setStickersPanelOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -1314,7 +1313,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
   }, [uid]);
 
   useEffect(() => {
-    function onKey(e) { if (e.key === "Escape") { setAvatarZoomImg(null); setMediaLightboxIndex(null); } }
+    function onKey(e) { if (e.key === "Escape") setMediaLightboxIndex(null); }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -1573,19 +1572,6 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
         `}</style>
       )}
 
-      {/* Avatar zoom (no post context — just the profile picture itself) */}
-      {avatarZoomImg && (
-        <div role="dialog" aria-modal="true" aria-label="圖片檢視" onClick={() => setAvatarZoomImg(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
-          <img src={avatarZoomImg} alt="放大檢視的圖片" onClick={e => e.stopPropagation()}
-            style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 8, objectFit: "contain", cursor: "default", boxShadow: "0 8px 40px rgba(0,0,0,0.6)" }} />
-          <button onClick={() => setAvatarZoomImg(null)} aria-label="關閉圖片檢視"
-            style={{ position: "absolute", top: 20, right: 20, background: "rgba(30,41,59,0.9)", border: "1px solid var(--border)", color: "#f1f5f9", fontSize: 20, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            ✕
-          </button>
-        </div>
-      )}
-
       {/* Media lightbox — keeps the source post's author/text/likes/comments visible */}
       {mediaLightboxIndex != null && (
         <MediaLightbox
@@ -1681,28 +1667,8 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
         {/* Avatar + actions row */}
         <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px" }}>
           <div className="pp-avatar-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: -52, marginBottom: 12 }}>
-            <div className="pp-avatar" style={{ flexShrink: 0, position: "relative", cursor: (!isOwner && profile.avatarImage) ? "pointer" : "default", width: 104, height: 104 }}
-              onClick={() => !isOwner && profile.avatarImage && setAvatarZoomImg(profile.avatarImage)}
-              onMouseEnter={() => setAvatarHover(true)}
-              onMouseLeave={() => setAvatarHover(false)}>
-              {profile.avatarImage
-                ? <img src={profile.avatarImage} alt="頭像" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "4px solid var(--panel-alt)", display: "block", transition: "filter 0.2s", filter: (!isOwner && avatarHover) ? "brightness(0.75)" : "brightness(1)" }} />
-                : <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: profile.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, border: "4px solid var(--panel-alt)" }}>{profile.avatar || "😊"}</div>
-              }
-              {!isOwner && profile.avatarImage && avatarHover && (
-                <div style={{ position: "absolute", inset: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                  <span style={{ fontSize: 28 }}>🔍</span>
-                </div>
-              )}
-              {/* Online status dot */}
-              <span title={st.label} style={{ position: "absolute", bottom: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: st.color, border: "3px solid var(--panel-alt)" }} />
-              {isOwner && (
-                <>
-                  <EditOverlay shape="circle" label="更換頭像" onClick={() => avatarFileRef.current?.click()} />
-                  <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={openCrop("avatar")} />
-                </>
-              )}
-            </div>
+            <ProfileAvatar profile={profile} isOwner={isOwner} status={st} onRequestChange={() => avatarFileRef.current?.click()} />
+            {isOwner && <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={openCrop("avatar")} />}
 
             {isOwner ? (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
@@ -1712,8 +1678,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
                   👤 編輯個人資料
                 </Link>
                 <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "3px 10px", display: "flex", alignItems: "center" }}>
-                  <ThemeToggle mode="inline" openUp />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginLeft: 2 }}>設定</span>
+                  <ThemeToggle mode="inline" label="設定" />
                 </div>
                 <button onClick={() => setStickersPanelOpen(true)}
                   style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 16px", color: "var(--text)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}

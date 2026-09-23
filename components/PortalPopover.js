@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState, useRef } from "react";
+import { getPopoverPosition } from "../lib/popoverPosition";
 
 // 共用的「浮動彈出框」——用 React portal 直接掛到 document.body，不管呼叫端
 // 自己的父層有沒有 overflow:hidden/auto（會裁切）或比較低的 z-index（會被
@@ -12,26 +13,58 @@ import { useEffect, useState, useRef } from "react";
 // anchorRef：觸發彈出框的按鈕（用來算位置、判斷「點擊在按鈕上」不算點外面）。
 // placement："bottom-right"（預設，往下靠右對齊，選單常用）｜"top-right"
 // （往上靠右對齊，貼底部工具列的選單用）｜"right"（往右側對齊，側邊窄欄用）。
-export default function PortalPopover({ anchorRef, open, onClose, children, placement = "bottom-right", offset = 6, minWidth }) {
+export default function PortalPopover({ anchorRef, open, onClose, children, placement = "bottom-right", offset = 6, minWidth, constrainToViewport = false, zIndex = 2000 }) {
   const [pos, setPos] = useState(null);
   const contentRef = useRef(null);
+  const positioned = Boolean(pos);
 
   useEffect(() => {
     if (!open || !anchorRef.current) { setPos(null); return; }
     const update = () => {
       const r = anchorRef.current.getBoundingClientRect();
-      if (placement === "top-right") setPos({ bottom: window.innerHeight - r.top + offset, right: window.innerWidth - r.right });
+      if (constrainToViewport && contentRef.current) {
+        const content = contentRef.current;
+        const viewport = window.visualViewport;
+        setPos(getPopoverPosition(r, { width: content.offsetWidth, height: content.scrollHeight }, {
+          left: viewport?.offsetLeft || 0, top: viewport?.offsetTop || 0,
+          width: viewport?.width || window.innerWidth, height: viewport?.height || window.innerHeight,
+        }, placement, offset));
+      } else if (placement === "top-right") setPos({ bottom: window.innerHeight - r.top + offset, right: window.innerWidth - r.right });
       else if (placement === "right") setPos({ top: r.top, left: r.right + offset });
       else setPos({ top: r.bottom + offset, right: window.innerWidth - r.right });
     };
     update();
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
+    const viewport = window.visualViewport;
+    if (constrainToViewport) {
+      viewport?.addEventListener("resize", update);
+      viewport?.addEventListener("scroll", update);
+    }
+    const observer = constrainToViewport && typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    if (contentRef.current) observer?.observe(contentRef.current);
+    if (contentRef.current?.firstElementChild) observer?.observe(contentRef.current.firstElementChild);
     return () => {
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
+      viewport?.removeEventListener("resize", update);
+      viewport?.removeEventListener("scroll", update);
+      observer?.disconnect();
     };
-  }, [open, anchorRef, placement, offset]);
+  }, [open, anchorRef, placement, offset, constrainToViewport]);
+
+  useEffect(() => {
+    if (!open || !constrainToViewport || !positioned) return;
+    contentRef.current?.querySelector("button:not(:disabled), [href], input")?.focus({ preventScroll: true });
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+      anchorRef.current?.focus({ preventScroll: true });
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, constrainToViewport, positioned, anchorRef, onClose]);
 
   // 這裡曾經只排除「點在觸發鈕上」，沒有排除「點在彈出框自己的內容裡」——
   // 因為內容是用 portal 直接掛到 document.body，不是觸發鈕的子孫節點，所以
@@ -51,10 +84,12 @@ export default function PortalPopover({ anchorRef, open, onClose, children, plac
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [open, anchorRef, onClose]);
 
-  if (!open || !pos || typeof document === "undefined") return null;
+  if (!open || (!pos && !constrainToViewport) || typeof document === "undefined") return null;
 
   return createPortal(
-    <div ref={contentRef} style={{ position: "fixed", zIndex: 2000, minWidth, ...pos }}>
+    <div ref={contentRef} style={{ position: "fixed", zIndex, minWidth, ...pos,
+      ...(constrainToViewport ? { visibility: pos ? "visible" : "hidden", overflowY: "auto", overscrollBehavior: "contain", borderRadius: 14 } : {}),
+    }}>
       {children}
     </div>,
     document.body,
