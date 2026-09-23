@@ -1,10 +1,16 @@
 // Chat completion, server-side only — API keys must never reach the client.
-// Two upstream providers: DeepSeek direct (cheap, already funded), and
-// OpenRouter (one key, routes to Claude/GPT/anything else). Each model id
-// the frontend can pick maps to exactly one provider + the provider's own
-// model string.
+// Upstream providers are server-side only. Each model id the frontend can
+// pick maps to exactly one provider + the provider's own model string.
 const MAX_MESSAGES = 20;
 const MAX_CONTENT_LENGTH = 4000;
+
+export function freeLlmChatUrl(baseUrl) {
+  const value = String(baseUrl || "").trim().replace(/\/+$/, "");
+  if (!value) return "";
+  if (/\/v1\/chat\/completions$/i.test(value)) return value;
+  if (/\/v1$/i.test(value)) return `${value}/chat/completions`;
+  return `${value}/v1/chat/completions`;
+}
 
 const PROVIDERS = {
   deepseek: {
@@ -21,6 +27,14 @@ const PROVIDERS = {
       "X-Title": "EVONCHAT",
     },
   },
+  freellmapi: {
+    // FreeLLMAPI is self-hosted. The production value must be a public URL;
+    // Vercel cannot reach a router running at localhost on a developer PC.
+    url: () => freeLlmChatUrl(process.env.FREELLMAPI_BASE_URL),
+    apiKey: () => process.env.FREELLMAPI_API_KEY?.trim(),
+    missingUrlError: "FreeLLMAPI endpoint 尚未設定",
+    missingKeyError: "FreeLLMAPI API key 尚未設定",
+  },
 };
 
 // id: what the frontend sends/displays. provider: which entry in PROVIDERS
@@ -32,10 +46,18 @@ const MODELS = {
   "gpt-5": { provider: "openrouter", model: "openai/gpt-5" },
   "claude-haiku": { provider: "openrouter", model: "anthropic/claude-haiku-4.5" },
   "gpt-5-mini": { provider: "openrouter", model: "openai/gpt-5-mini" },
+  "freellm-auto": { provider: "freellmapi", model: () => process.env.FREELLMAPI_MODEL?.trim() || "auto" },
 };
 const DEFAULT_MODEL_ID = "deepseek-v4-flash";
 
 export default async function handler(req, res) {
+  if (req.method === "GET") {
+    return res.json({
+      freellmapiEnabled: Boolean(
+        freeLlmChatUrl(process.env.FREELLMAPI_BASE_URL) && process.env.FREELLMAPI_API_KEY?.trim(),
+      ),
+    });
+  }
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const { messages, model, systemPrompt, thinking } = req.body || {};
@@ -55,11 +77,14 @@ export default async function handler(req, res) {
   // allow-list instead of rejecting outright, since a stale/unknown value
   // shouldn't hard-fail the whole chat.
   const modelId = Object.prototype.hasOwnProperty.call(MODELS, model) ? model : DEFAULT_MODEL_ID;
-  const { provider: providerId, model: upstreamModel } = MODELS[modelId];
+  const { provider: providerId, model: configuredModel } = MODELS[modelId];
   const provider = PROVIDERS[providerId];
 
+  const providerUrl = typeof provider.url === "function" ? provider.url() : provider.url;
+  if (!providerUrl) return res.status(500).json({ error: provider.missingUrlError || `${providerId} endpoint 尚未設定` });
   const apiKey = provider.apiKey();
   if (!apiKey) return res.status(500).json({ error: provider.missingKeyError });
+  const upstreamModel = typeof configuredModel === "function" ? configuredModel() : configuredModel;
 
   const cleaned = messages.slice(-MAX_MESSAGES).map(m => ({
     role: m.role === "assistant" ? "assistant" : "user",
@@ -85,7 +110,7 @@ export default async function handler(req, res) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30000);
   try {
-    const r = await fetch(provider.url, {
+    const r = await fetch(providerUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -105,7 +130,12 @@ export default async function handler(req, res) {
     const reply = data.choices?.[0]?.message?.content;
     const reasoning = data.choices?.[0]?.message?.reasoning_content || "";
     if (!reply) return res.status(502).json({ error: "AI 沒有回覆內容" });
-    return res.json({ reply, reasoning });
+    return res.json({
+      reply,
+      reasoning,
+      provider: providerId,
+      routedVia: r.headers?.get?.("x-routed-via") || "",
+    });
   } catch (e) {
     clearTimeout(timer);
     if (e.name === "AbortError") return res.status(504).json({ error: "AI 回覆逾時" });

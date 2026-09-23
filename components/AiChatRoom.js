@@ -7,7 +7,7 @@ import { toast } from "../lib/toast";
 import MarkdownMessage, { MarkdownMessageStyles } from "./MarkdownMessage";
 import PortalPopover from "./PortalPopover";
 
-const MODELS = [
+const DEFAULT_MODELS = [
   { id: "claude-sonnet", label: "Claude Sonnet 5" },
   { id: "claude-haiku", label: "Claude Haiku 4.5" },
   { id: "gpt-5", label: "GPT-5" },
@@ -15,6 +15,7 @@ const MODELS = [
   { id: "deepseek-v4-flash", label: "DeepSeek-V4-Flash" },
   { id: "deepseek-v4-pro", label: "DeepSeek-V4-Pro" },
 ];
+const FREELLM_MODEL = { id: "freellm-auto", label: "FreeLLMAPI Auto" };
 
 function titleFromMessages(messages) {
   const firstUser = messages.find(m => m.role === "user");
@@ -191,8 +192,9 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   // 預設模型固定用 DeepSeek（跟後端 chat.js 的 DEFAULT_MODEL_ID 一致），
-  // 不要因為上面 MODELS 陣列的排序（OpenRouter 排前面方便選）跟著變動。
+  // 不要因為上面模型陣列的排序（OpenRouter 排前面方便選）跟著變動。
   const [model, setModel] = useState("deepseek-v4-flash");
+  const [availableModels, setAvailableModels] = useState(DEFAULT_MODELS);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   // 深度思考（DeepThink）——只有 DeepSeek 的兩個模型支援，切換會讓後端
   // （pages/api/ai/chat.js）帶 extra_body.thinking.type 給 DeepSeek。回覆
@@ -216,6 +218,21 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
   // the save effect below checks this so loading/switching never re-saves
   // the conversation it just loaded straight back on top of itself.
   const skipNextSaveRef = useRef(false);
+
+  // FreeLLMAPI is optional and self-hosted. Only expose it in the picker when
+  // both server-side settings exist, so production never offers a dead option.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/ai/chat", { method: "GET" })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        if (active && data?.freellmapiEnabled) {
+          setAvailableModels([FREELLM_MODEL, ...DEFAULT_MODELS]);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   // Live list of this user's saved conversations, newest first.
   useEffect(() => {
@@ -640,7 +657,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
               background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--modelpicker-radius, 999px)",
               padding: "0 14px", color: "var(--text)", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
             }}>
-            {MODELS.find(m => m.id === model)?.label || model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
+            {availableModels.find(m => m.id === model)?.label || model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
           </button>
 
           <PortalPopover anchorRef={modelMenuRef} open={modelMenuOpen} onClose={() => setModelMenuOpen(false)} placement="top-right" minWidth={210}>
@@ -648,7 +665,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
               background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
               boxShadow: "var(--card-shadow)", overflow: "hidden",
             }}>
-              {MODELS.map(m => (
+              {availableModels.map(m => (
                 <button key={m.id} onClick={() => { setModel(m.id); setModelMenuOpen(false); }}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%",
