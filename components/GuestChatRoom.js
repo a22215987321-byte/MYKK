@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   addDoc,
   collection,
@@ -12,9 +12,12 @@ import {
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
-import { ChevronDown, LogOut, Menu, MessageCircle, MoreHorizontal, Pencil, Plus, Send, Settings, Trash2, X } from "lucide-react";
+import { ArrowDown, ChevronDown, LogOut, Menu, MessageCircle, MoreHorizontal, Pencil, Plus, Search, Send, Settings, Sparkles, SquarePen, Trash2, X } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 import { OWNER_EMAIL } from "../lib/admin";
+import useIsMobile from "../lib/useIsMobile";
+import { GUEST_SKILLS, prepareGuestSkillMessage } from "../lib/guestSkills";
+import GuestSkillsSheet, { GuestSkillIcon } from "./GuestSkillsSheet";
 
 const COMPANION_NAME = "EVON";
 const COMPANION_GREETING = "你好，我是 GPT5.6 SOL，有甚麼能幫你的嗎？";
@@ -31,11 +34,16 @@ function resizeGuestTextarea(element) {
   element.style.height = "40px";
   const height = Math.min(Math.max(element.scrollHeight, 40), 176);
   element.style.height = `${height}px`;
-  element.style.overflowY = element.scrollHeight > 176 ? "auto" : "hidden";
+  element.style.overflowY = element.scrollHeight > element.clientHeight ? "auto" : "hidden";
 }
 
-export function isGuestSubmitKey({ key, shiftKey, isComposing }) {
-  return key === "Enter" && !shiftKey && !isComposing;
+export function isGuestSubmitKey({ key, shiftKey, isComposing, keyCode }) {
+  return key === "Enter" && !shiftKey && !isComposing && keyCode !== 229;
+}
+
+export function filterGuestChats(chats, search) {
+  const term = search.trim().toLocaleLowerCase();
+  return chats.filter(chat => `${COMPANION_NAME} ${chat.title || "新聊天"} ${chat.lastMessage || ""}`.toLocaleLowerCase().includes(term));
 }
 
 const guestRoot = uid => doc(db, "guest_users", uid);
@@ -79,10 +87,76 @@ export default function GuestChatRoom({ user }) {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openActionsId, setOpenActionsId] = useState(null);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [chatSearch, setChatSearch] = useState("");
+  const [skillNotice, setSkillNotice] = useState("");
+  const [showScrollDown, setShowScrollDown] = useState(false);
+  const rootRef = useRef(null);
+  const sidebarRef = useRef(null);
+  const messageListRef = useRef(null);
+  const isMobile = useIsMobile();
   const creatingInitialChat = useRef(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const composingRef = useRef(false);
+  const closeSkills = useCallback(() => setSkillsOpen(false), []);
+
+  // Follow the visible area when the on-screen keyboard or browser bars resize.
+  // Only a CSS measurement changes: no conversation/auth state is touched.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!isMobile) { root?.style.removeProperty("--guest-viewport-height"); return; }
+    const viewport = window.visualViewport;
+    const update = () => {
+      root?.style.setProperty("--guest-viewport-height", `${viewport?.height || window.innerHeight}px`);
+      resizeGuestTextarea(textareaRef.current);
+    };
+    update();
+    viewport?.addEventListener("resize", update);
+    window.addEventListener("resize", update);
+    return () => {
+      viewport?.removeEventListener("resize", update);
+      window.removeEventListener("resize", update);
+      root?.style.removeProperty("--guest-viewport-height");
+    };
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || !sidebarOpen) return;
+    const sidebar = sidebarRef.current;
+    const trigger = document.activeElement;
+    const focusable = () => Array.from(sidebar.querySelectorAll('button:not(:disabled), input, [href]')).filter(element => element.offsetParent !== null);
+    focusable()[0]?.focus({ preventScroll: true });
+    const onKeyDown = event => {
+      if (event.key === "Escape") { event.preventDefault(); setSidebarOpen(false); return; }
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    sidebar.addEventListener("keydown", onKeyDown);
+    return () => {
+      sidebar.removeEventListener("keydown", onKeyDown);
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    };
+  }, [isMobile, sidebarOpen]);
+
+  const applySkill = skillId => {
+    setInput(current => prepareGuestSkillMessage(skillId, current));
+    setSkillsOpen(false);
+    setSkillNotice("已加入任務範本，補上內容後再傳送。");
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      textarea?.focus({ preventScroll: true });
+      if (textarea) textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    });
+  };
+
+  const scrollToLatest = () => {
+    messageListRef.current?.scrollTo({ top: messageListRef.current.scrollHeight, behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  };
 
   useEffect(() => {
     const savedLevel = window.localStorage.getItem("evon-guest-reply-level");
@@ -91,7 +165,10 @@ export default function GuestChatRoom({ user }) {
     if (STYLE_OPTIONS.some(option => option.id === savedStyle)) setStyleId(savedStyle);
   }, []);
 
-  useEffect(() => resizeGuestTextarea(textareaRef.current), [input]);
+  useEffect(() => {
+    resizeGuestTextarea(textareaRef.current);
+    if (!input) setSkillNotice("");
+  }, [input]);
 
   useEffect(() => onSnapshot(guestRoot(uid), snap => {
     if (snap.exists()) setProfile({ uid: snap.id, ...snap.data() });
@@ -206,8 +283,9 @@ export default function GuestChatRoom({ user }) {
   };
 
   return (
-    <main className="guest-root" data-guest-theme={styleId}>
-      <style>{`
+    <main ref={rootRef} className="guest-root" data-guest-theme={styleId}>
+      {/* Static CSS must stay raw in SSR: escaped selector quotes break hydration. */}
+      <style dangerouslySetInnerHTML={{ __html: `
         .guest-root {
           --guest-bg: var(--bg); --guest-panel: var(--panel); --guest-panel-alt: var(--panel-alt);
           --guest-border: var(--border); --guest-text: var(--text);
@@ -221,6 +299,12 @@ export default function GuestChatRoom({ user }) {
         }
         .guest-root[data-guest-theme="shadow-window"] { color-scheme: dark; }
         .guest-root[data-guest-theme="pastel-pearl"] { --guest-accent-text: var(--text); }
+        .guest-mobile-only, .guest-mobile-welcome, .guest-mobile-search, .guest-composer-caption, .guest-skill-notice { display: none; }
+        .guest-header-actions { display: flex; align-items: center; gap: 4px; }
+        .guest-reading-area { position: relative; display: flex; flex: 1; min-height: 0; flex-direction: column; }
+        .guest-scroll-latest { position: absolute; bottom: 8px; left: calc(50% - 20px); z-index: 2; width: 40px; height: 40px; border: 1px solid #e5e5e5; border-radius: 50%; background: #fff; color: #555; cursor: pointer; display: grid; place-items: center; box-shadow: 0 2px 8px #00000008; }
+        .guest-scroll-latest:hover { background: #f2f2f2; }
+        .guest-no-chats { color: #858585; font-size: 13px; padding: 16px 8px; line-height: 1.6; }
         .guest-sidebar { --guest-text: #262626; --guest-muted: #737373; --guest-border: #ececec; width: 280px; height: 100dvh; box-sizing: border-box; flex-shrink: 0; background: #fafafa; color: var(--guest-text); border-right: 1px solid #ececec; padding: 0 14px; display: flex; flex-direction: column; min-width: 0; min-height: 0; box-shadow: none; z-index: 30; }
         .guest-sidebar-backdrop, .guest-sidebar-close, .guest-sidebar-open { display: none; }
         .guest-brand { height: 68px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 0 2px; }
@@ -246,6 +330,7 @@ export default function GuestChatRoom({ user }) {
         .guest-row-menu button:hover { background: #f3f3f3; }
         .guest-row-menu button:last-child { color: #b42318; }
         .guest-icon-button { border: 0; background: none; color: var(--guest-muted); width: 31px; height: 31px; border-radius: 8px; cursor: pointer; display: grid; place-items: center; }
+        .guest-header-new { display: none; }
         .guest-sidebar .guest-sidebar-close { display: none; }
         .guest-icon-button:hover { color: #262626; background: #ededed; }
         .guest-style-switcher { flex-shrink: 0; padding: 8px 0 10px; }
@@ -309,33 +394,88 @@ export default function GuestChatRoom({ user }) {
         .guest-send:not(:disabled):hover { background: #f3f3f3; }
         .guest-send:not(:disabled):active { transform: scale(.96); }
         .guest-send:disabled { opacity: .32; cursor: not-allowed; }
-        @media (min-width: 721px) and (max-width: 1024px) {
+        @media (min-width: 768px) and (max-width: 1024px) {
           .guest-root { grid-template-columns: 252px minmax(0, 1fr); }
           .guest-sidebar { width: 252px; padding-inline: 12px; }
         }
-        @media (max-width: 720px) {
-          .guest-root { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+        @media (max-width: 767px) {
+          .guest-root { height: var(--guest-viewport-height, 100dvh); grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif; }
+          .guest-root *, .guest-root *::before, .guest-root *::after { box-sizing: border-box; }
+          .guest-main { background: #fafafa; padding-top: env(safe-area-inset-top); }
           .guest-sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 29; border: 0; background: rgba(0,0,0,.24); cursor: pointer; }
-          .guest-sidebar { position: fixed; inset: 0 auto 0 0; width: min(86vw, 320px); height: 100dvh; padding: 0 14px; border-right: 1px solid #e5e5e5; visibility: hidden; transform: translateX(-102%); transition: transform .2s ease, visibility 0s linear .2s; }
+          .guest-sidebar { position: fixed; inset: 0 auto auto 0; width: min(88vw, 320px); height: var(--guest-viewport-height, 100dvh); padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom); border-right: 1px solid #e5e5e5; visibility: hidden; transform: translateX(-102%); transition: transform .2s ease, visibility 0s linear .2s; }
           .guest-sidebar.open { visibility: visible; transform: translateX(0); transition-delay: 0s; }
           .guest-sidebar .guest-sidebar-close, .guest-sidebar-open { display: grid; place-items: center; }
+          .guest-sidebar .guest-icon-button { width: 44px; height: 44px; flex: 0 0 44px; }
+          .guest-brand { height: 68px; }
+          .guest-mobile-search { display: flex; align-items: center; flex-shrink: 0; gap: 9px; min-height: 44px; margin-top: 14px; padding: 0 12px; border: 1px solid #e7e7e7; border-radius: 11px; color: #8b8b8b; background: #fff; }
+          .guest-mobile-search input { width: 100%; min-width: 0; padding: 10px 0; border: 0; outline: none; background: transparent; color: #303030; font: inherit; font-size: 16px; }
+          .guest-mobile-search:focus-within { border-color: #888; }
+          .guest-section-label { margin-top: 16px; }
+          .guest-chat-row { min-height: 62px; flex-shrink: 0; }
+          .guest-chat-title { font-size: 14px; }
+          .guest-chat-select > svg { flex-shrink: 0; }
+          .guest-row-menu { top: 43px; }
+          .guest-row-menu button { height: 44px; font-size: 14px; }
+          .guest-style-options { max-height: 180px; overflow-y: auto; }
+          .guest-style-button { min-height: 44px; font-size: 13px; }
           .guest-more { opacity: 1; }
           .guest-main { min-height: 0; }
-          .guest-header { height: 60px; padding: 0 14px; }
-          .guest-header-copy { gap: 9px; }
-          .guest-sidebar-open { flex: 0 0 34px; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #525252; cursor: pointer; }
+          .guest-header { height: 60px; padding: 0 10px; gap: 4px; border-bottom-color: transparent; }
+          .guest-header-left { gap: 4px; }
+          .guest-header-copy { gap: 7px; }
+          .guest-header-avatar { width: 26px; height: 26px; flex-basis: 26px; }
+          .guest-sidebar-open { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px; background: transparent; color: #525252; cursor: pointer; }
           .guest-sidebar-open:hover { background: #efefef; }
           .guest-header h1 { font-size: 14px; }
           .guest-level-control { min-width: 96px; height: 44px; padding-inline: 14px; }
-          .guest-messages { padding: 24px 16px 8px; }
+          .guest-mobile-only { display: inline-flex; }
+          .guest-header-new { width: 44px; height: 44px; align-items: center; justify-content: center; color: #555; }
+          .guest-messages { padding: 20px 20px 8px; scroll-padding-bottom: 16px; }
           .guest-message-column, .guest-composer-column { width: 100%; }
-          .guest-composer-wrap { padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); }
+          .guest-messages.is-empty { display: flex; padding-top: clamp(24px, 10dvh, 90px); }
+          .guest-messages.is-empty .guest-message-column { flex: 1; }
+          .guest-messages.is-empty .guest-greeting { display: none; }
+          .guest-mobile-welcome { display: flex; flex-direction: column; align-items: center; width: 100%; margin: auto 0; padding-bottom: 24px; text-align: center; }
+          .guest-welcome-avatar { width: 52px; height: 52px; object-fit: cover; border-radius: 50%; margin-bottom: 24px; }
+          .guest-welcome-eyebrow { margin: 0 0 10px; color: #8b8b8b; font-size: 11px; letter-spacing: .12em; }
+          .guest-mobile-welcome h2 { margin: 0; color: #292929; font-size: clamp(23px, 6.6vw, 28px); line-height: 1.4; font-weight: 500; letter-spacing: -.035em; }
+          .guest-welcome-copy { max-width: 300px; margin: 14px 0 0; color: #7a7a7a; font-size: 13px; line-height: 1.8; }
+          .guest-quick-skills { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+          .guest-quick-skills button { display: flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 13px; border: 1px solid #e7e5e8; border-radius: 24px; background: #fff; color: #5a555f; font: inherit; font-size: 12px; cursor: pointer; }
+          .guest-quick-skills button:hover { background: #f1eff4; border-color: #d6d0dd; }
+          .guest-skills-all { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; gap: 7px; margin-top: 8px; padding: 0 14px; border: 0; border-radius: 12px; background: transparent; color: #81758f; font: inherit; font-size: 12px; cursor: pointer; }
+          .guest-skills-all:hover { background: #f0edf3; }
+          .guest-message { margin-bottom: 24px; }
+          .guest-bubble { max-width: 90%; padding: 11px 14px; font-size: 15px; border-radius: 16px; }
+          .guest-companion-message { grid-template-columns: 24px minmax(0, 1fr); gap: 10px; font-size: 15px; line-height: 1.75; }
+          .guest-companion-message img { width: 24px; height: 24px; }
+          .guest-composer-wrap { padding: 10px 12px max(10px, env(safe-area-inset-bottom)); background: #fafafa; }
+          .guest-composer { display: grid; grid-template-columns: minmax(0, 1fr) 42px; align-items: end; gap: 2px 8px; min-height: 106px; padding: 10px 10px 8px 14px; border-radius: 22px; border-color: #e4e4e4; }
+          .guest-composer textarea { grid-column: 1 / -1; padding: 6px 2px; font-size: 16px; line-height: 24px; max-height: min(176px, calc(var(--guest-viewport-height, 100dvh) * .3)); }
+          .guest-composer-skills { justify-self: start; align-items: center; gap: 7px; min-height: 42px; padding: 0 9px; border: 0; border-radius: 11px; color: #756785; background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+          .guest-composer-skills:hover { background: #f4f1f6; }
+          .guest-send { grid-column: 2; border-radius: 50%; color: #3a3a3a; }
+          .guest-send:not(:disabled):hover { background: #eeebf1; }
+          .guest-composer-caption { display: block; margin: 8px 0 0; text-align: center; color: #929292; font-size: 10px; line-height: 1.5; }
+          .guest-skill-notice { display: block; margin: 0 4px 8px; color: #7b7088; font-size: 12px; line-height: 1.5; }
+          .guest-root button:focus-visible { outline: 2px solid #80708e; outline-offset: 2px; }
+          .guest-root button:active:not(:disabled) { opacity: .8; }
         }
-      `}</style>
+        @media (max-width: 767px) and (max-height: 620px) {
+          .guest-messages.is-empty { padding-top: 12px; }
+          .guest-welcome-avatar, .guest-welcome-eyebrow, .guest-welcome-copy, .guest-composer-caption { display: none; }
+          .guest-mobile-welcome { padding-bottom: 12px; }
+          .guest-quick-skills { margin-top: 16px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .guest-root *, .guest-root *::before, .guest-root *::after { transition: none !important; scroll-behavior: auto !important; }
+        }
+      ` }} />
 
-      {sidebarOpen && <button className="guest-sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-label="關閉側邊欄" />}
+      {sidebarOpen && <button className="guest-sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-label="關閉側邊欄" tabIndex={-1} />}
 
-      <aside className={`guest-sidebar${sidebarOpen ? " open" : ""}`} aria-label="聊天側邊欄">
+      <aside ref={sidebarRef} className={`guest-sidebar${sidebarOpen ? " open" : ""}`} inert={isMobile && !sidebarOpen ? "" : undefined} aria-label="聊天側邊欄" role={isMobile ? "dialog" : undefined} aria-modal={isMobile && sidebarOpen ? true : undefined}>
         <div className="guest-brand">
           <img src="/logo.png?v=3" alt="" aria-hidden="true" />
           <div className="guest-brand-name">EVONCHAT</div>
@@ -348,11 +488,13 @@ export default function GuestChatRoom({ user }) {
           <Plus size={17} /> 新聊天
         </button>
 
+        <label className="guest-mobile-search"><Search size={17} aria-hidden="true" /><input type="search" value={chatSearch} onChange={event => setChatSearch(event.target.value)} placeholder="搜尋對話" aria-label="搜尋對話" /></label>
+
         <span className="guest-section-label">對話</span>
         <div className="guest-list" aria-label="你的訪客聊天">
-          {chats.map(chat => (
+          {filterGuestChats(chats, isMobile ? chatSearch : "").map(chat => (
             <div key={chat.id} className={`guest-chat-row${chat.id === activeChatId ? " active" : ""}`}>
-              <button className="guest-chat-select" onClick={() => {
+              <button className="guest-chat-select" aria-current={chat.id === activeChatId ? "page" : undefined} onClick={() => {
                 setActiveChatId(chat.id);
                 setSidebarOpen(false);
               }}>
@@ -381,6 +523,7 @@ export default function GuestChatRoom({ user }) {
               </span>
             </div>
           ))}
+          {chats.length > 0 && isMobile && filterGuestChats(chats, chatSearch).length === 0 && <p className="guest-no-chats" role="status">找不到符合的對話。</p>}
         </div>
 
         <div className="guest-style-switcher">
@@ -421,7 +564,7 @@ export default function GuestChatRoom({ user }) {
         </div>
       </aside>
 
-      <section className="guest-main">
+      <section className="guest-main" inert={isMobile && sidebarOpen ? "" : undefined}>
         <header className="guest-header">
           <div className="guest-header-left">
             <button className="guest-sidebar-open" onClick={() => setSidebarOpen(true)} aria-label="開啟側邊欄">
@@ -432,18 +575,31 @@ export default function GuestChatRoom({ user }) {
               <h1>{COMPANION_NAME}</h1>
             </div>
           </div>
-          <span className="guest-level-control">
+          <div className="guest-header-actions"><span className="guest-level-control">
             <select className="guest-level-select" value={replyLevel} onChange={changeReplyLevel} aria-label="回覆模式">
               {REPLY_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
             </select>
             <span className="guest-level-value" aria-hidden="true">{replyLevel}</span>
             <ChevronDown size={14} strokeWidth={1.8} aria-hidden="true" />
           </span>
+          <button type="button" className="guest-icon-button guest-mobile-only guest-header-new" onClick={createChat} aria-label="建立新聊天" title="新聊天"><SquarePen size={19} /></button></div>
         </header>
 
-        <div className="guest-messages">
+        <div className="guest-reading-area">
+        <div ref={messageListRef} className={`guest-messages${messages.length === 0 ? " is-empty" : ""}`} onScroll={event => {
+          const list = event.currentTarget;
+          setShowScrollDown(list.scrollHeight - list.scrollTop - list.clientHeight > 160);
+        }}>
           <div className="guest-message-column">
-            <div className="guest-message guest-message--companion">
+            {messages.length === 0 && <div className="guest-mobile-welcome">
+              <img className="guest-welcome-avatar" src="/evon-avatar.png" alt="" />
+              <p className="guest-welcome-eyebrow">EVON · YOUR WORKSPACE</p>
+              <h2>今天，想從哪裡開始？</h2>
+              <p className="guest-welcome-copy">{COMPANION_GREETING}</p>
+              <div className="guest-quick-skills">{GUEST_SKILLS.slice(0, 3).map(skill => <button type="button" key={skill.id} onClick={() => applySkill(skill.id)}><GuestSkillIcon name={skill.icon} size={15} />{skill.title}</button>)}</div>
+              <button type="button" className="guest-skills-all" onClick={() => setSkillsOpen(true)}><Sparkles size={14} />探索 Skills 任務範本</button>
+            </div>}
+            <div className="guest-message guest-message--companion guest-greeting">
               <div className="guest-companion-message">
                 <img src="/logo.png?v=3" alt="" aria-hidden="true" />
                 <div>
@@ -460,10 +616,13 @@ export default function GuestChatRoom({ user }) {
             <div ref={messagesEndRef} />
           </div>
         </div>
+        {showScrollDown && <button type="button" className="guest-scroll-latest" onClick={scrollToLatest} aria-label="回到最新訊息"><ArrowDown size={18} /></button>}
+        </div>
 
         <div className="guest-composer-wrap">
           <div className="guest-composer-column">
             {error && <div className="guest-error" role="alert">{error}</div>}
+            {skillNotice && <p className="guest-skill-notice" role="status">{skillNotice}</p>}
             <div className="guest-composer">
               <textarea
                 ref={textareaRef}
@@ -471,13 +630,14 @@ export default function GuestChatRoom({ user }) {
                 value={input}
                 onChange={event => {
                   setInput(event.target.value);
+                  setSkillNotice("");
                   resizeGuestTextarea(event.target);
                 }}
                 onCompositionStart={() => { composingRef.current = true; }}
                 onCompositionEnd={() => { composingRef.current = false; }}
                 onKeyDown={event => {
                   const isComposing = composingRef.current || event.nativeEvent.isComposing;
-                  if (isGuestSubmitKey({ key: event.key, shiftKey: event.shiftKey, isComposing })) {
+                  if (isGuestSubmitKey({ key: event.key, shiftKey: event.shiftKey, isComposing, keyCode: event.nativeEvent.keyCode })) {
                     event.preventDefault();
                     sendMessage();
                   }
@@ -485,13 +645,16 @@ export default function GuestChatRoom({ user }) {
                 placeholder="輸入訊息…"
                 aria-label="訊息"
               />
+              <button type="button" className="guest-mobile-only guest-composer-skills" onClick={() => setSkillsOpen(true)} aria-label="開啟 Skills 任務範本" aria-haspopup="dialog"><Sparkles size={17} /><span>Skills</span></button>
               <button className="guest-send" onClick={sendMessage} disabled={!input.trim() || !activeChatId || sending} aria-label="傳送訊息">
                 <Send size={19} />
               </button>
             </div>
+            <p className="guest-composer-caption">訪客模式 · 請勿傳送敏感個人資料</p>
           </div>
         </div>
       </section>
+      <GuestSkillsSheet open={skillsOpen} onClose={closeSkills} onSelect={applySkill} />
     </main>
   );
 }

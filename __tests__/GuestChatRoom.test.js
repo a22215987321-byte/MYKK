@@ -71,4 +71,24 @@ describe('guest chat presentation', () => {
     expect(html).toContain('<span class="guest-section-label">對話</span>');
     expect(html).toContain('aria-label="開啟側邊欄"');
   });
+
+  test('includes the mobile welcome, real task-template entry and accessible history search', () => {
+    const html = renderToStaticMarkup(<GuestChatRoom user={{ uid: 'guest-test' }} />);
+    expect(html).toContain('今天，想從哪裡開始？');
+    expect(html).toContain('aria-label="開啟 Skills 任務範本"');
+    expect(html).toContain('aria-label="搜尋對話"');
+    expect(html).toContain('aria-label="建立新聊天"');
+    expect(html).toContain('@media (max-width: 767px)');
+    expect(html).toContain('height: var(--guest-viewport-height, 100dvh)');
+    expect(html).toContain('grid-template-rows: minmax(0, 1fr)');
+    expect(html).toContain('env(safe-area-inset-bottom)');
+  });
+
+  test('keeps static CSS selectors unescaped for identical server/client rendering', () => {
+    const html = renderToStaticMarkup(<GuestChatRoom user={{ uid: 'guest-test' }} />);
+    const css = html.match(/<style>([\s\S]+?)<\/style>/)[1];
+    expect(css).toContain('[data-guest-theme="shadow-window"]');
+    expect(css).not.toContain('&quot;');
+    expect(css).toContain('.guest-header-new { display: none; }');
+  });
 });
