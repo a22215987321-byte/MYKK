@@ -6,6 +6,8 @@ import {
 import { toast } from "../lib/toast";
 import MarkdownMessage, { MarkdownMessageStyles } from "./MarkdownMessage";
 import PortalPopover from "./PortalPopover";
+import { Brain, History, SquarePen } from "lucide-react";
+import styles from "./AiChatRoom.module.css";
 
 const DEFAULT_MODELS = [
   { id: "claude-sonnet", label: "Claude Sonnet 5" },
@@ -467,7 +469,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
               style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: 6, lineHeight: 1 }}>
               🕘
             </button>
-            <PortalPopover anchorRef={historyRef} open={historyOpen} onClose={() => setHistoryOpen(false)} placement="bottom-right" minWidth={220}>
+            <PortalPopover anchorRef={historyRef} open={historyOpen} onClose={() => setHistoryOpen(false)} placement="bottom-right" minWidth={220} constrainToViewport>
               {historyList}
             </PortalPopover>
           </div>
@@ -485,70 +487,47 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           )}
         </div>
       ) : (
-      <div className="cr-chat-header" style={{ height: "var(--toolbar-height, 56px)", borderBottom: "var(--toolbar-inner-divider, 1px solid var(--panel))", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0, boxSizing: "border-box" }}>
-        <img src="/ai-avatar.jpg" alt="EVON AI" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>1.0 EVON AI</div>
-          <div style={{ fontSize: 11, color: "var(--text-faint)" }}>有問題都可以問我</div>
+      <header className={`cr-chat-header ${styles.header}`} aria-label="AI 助手工具列">
+        <div className={styles.identity}>
+          <img src="/ai-avatar.jpg" alt="" width={32} height={32} />
+          <div className={styles.identityText}>
+            <div className={styles.title}>1.0 EVON AI</div>
+            <div className={styles.subtitle}>有問題都可以問我</div>
+          </div>
         </div>
 
-        {/* 聊天模式／圖片生成模式切換 */}
-        <div style={{ display: "flex", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 999, padding: 3, gap: 2, marginLeft: 4 }}>
-          {[["chat", "聊天模式"], ["image", "圖片生成"]].map(([key, label]) => (
-            <button key={key} onClick={() => setMode(key)}
-              style={{
-                border: "none", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                background: mode === key ? "var(--accent)" : "transparent",
-                color: mode === key ? "var(--accent-text)" : "var(--text-muted)",
-              }}>
-              {label}
+        <div className={styles.options}>
+          <div className={styles.modes} role="group" aria-label="AI 模式">
+            {[["chat", "聊天模式"], ["image", "圖片生成"]].map(([key, label]) => (
+              <button type="button" key={key} onClick={() => setMode(key)} aria-pressed={mode === key}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {mode === "chat" && isDeepseekModel && (
+            <button type="button" className={styles.thinkingButton} onClick={() => setDeepThink(v => !v)}
+              aria-pressed={deepThink} title="深度思考模式，回覆前會先顯示推理過程">
+              <Brain size={16} aria-hidden="true" />深度思考
             </button>
-          ))}
+          )}
         </div>
-
-        <div style={{ flex: 1 }} />
 
         {mode === "chat" && (
-        <>
-        {/* 深度思考——只有 DeepSeek 的兩個模型支援，切到 Claude／GPT 就整顆
-            拿掉（送了也沒用，藏起來比留著按下去沒反應清楚）。 */}
-        {isDeepseekModel && (
-          <button onClick={() => setDeepThink(v => !v)} title="深度思考模式，回覆前會先顯示推理過程"
-            style={{
-              height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box",
-              background: deepThink ? "var(--accent)" : "var(--toolbar-btn-bg, none)",
-              border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))",
-              padding: "6px 14px", color: deepThink ? "var(--accent-text)" : "var(--text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer",
-            }}>
-            💭 深度思考
-          </button>
+          <div className={styles.actions}>
+            <button type="button" ref={historyRef} onClick={() => setHistoryOpen(v => !v)}
+              aria-label={`歷史對話（${conversations.length}）`} aria-expanded={historyOpen} title="歷史對話">
+              <History size={18} aria-hidden="true" />
+              <span className={styles.actionLabel}>歷史對話{conversations.length > 0 ? ` (${conversations.length})` : ""}</span>
+            </button>
+            <PortalPopover anchorRef={historyRef} open={historyOpen} onClose={() => setHistoryOpen(false)} placement="bottom-right" minWidth={240} constrainToViewport>
+              {historyList}
+            </PortalPopover>
+            <button type="button" onClick={newConversation} disabled={sending || messages.length === 0} aria-label="新對話" title="新對話">
+              <SquarePen size={18} aria-hidden="true" /><span className={styles.actionLabel}>新對話</span>
+            </button>
+          </div>
         )}
-        <div style={{ position: "relative" }}>
-          <button ref={historyRef} onClick={() => setHistoryOpen(v => !v)}
-            style={{ height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", padding: "6px 14px", color: "var(--text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            🕘 歷史對話{conversations.length > 0 ? ` (${conversations.length})` : ""}
-          </button>
-          {/* 之前是疊在自己父層裡的 position:absolute，會被別的浮動面板蓋住
-              （使用者反映「點擊歷史對話顯示的也會被擋」）——改成 PortalPopover
-              直接掛到 document.body，一定在最前面。 */}
-          <PortalPopover anchorRef={historyRef} open={historyOpen} onClose={() => setHistoryOpen(false)} placement="bottom-right" minWidth={240}>
-            {historyList}
-          </PortalPopover>
-        </div>
-
-        <button onClick={newConversation} disabled={sending || messages.length === 0}
-          style={{
-            height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box",
-            background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))",
-            padding: "6px 14px", color: "var(--text-muted)", fontSize: 12, fontWeight: 600,
-            cursor: (sending || messages.length === 0) ? "default" : "pointer",
-            opacity: (sending || messages.length === 0) ? 0.5 : 1,
-          }}>
-          🆕 新對話
-        </button>
-        </>
-        )}
-      </div>
+      </header>
       )}
 
       {/* 縮小狀態（compact 版才有）——只留上面那條 header，訊息區跟輸入列
@@ -562,7 +541,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           see the .cr-chat-panel rule in ChatRoom.js's <style> block); every
           other theme's --chatpanel-* tokens default to 0/none so this stays
           a plain flush container exactly as before. */}
-      <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: mode === "chat" ? 0 : 14, backgroundSize: "var(--chat-world-bg-size, auto), cover", backgroundRepeat: "var(--chat-world-bg-repeat, repeat), no-repeat", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
+      <div className={`cr-chat-panel ${styles.messages} ${compact ? "" : styles.fullMessages}`} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: mode === "chat" ? 0 : 14, backgroundSize: "var(--chat-world-bg-size, auto), cover", backgroundRepeat: "var(--chat-world-bg-repeat, repeat), no-repeat", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
         {mode === "chat" ? (
           <>
             {messages.length === 0 && (
@@ -621,7 +600,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           reuses .cr-input-bar for the same reason as the header above
           (also gives it the opaque panel the other 3 rooms' input bars
           already had, which this one was previously missing). */}
-      <div className="cr-input-bar" style={{ padding: "12px 16px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, boxSizing: "border-box" }}>
+      <div className={`cr-input-bar ${styles.composer} ${compact ? "" : styles.fullComposer}`} style={{ padding: "12px 16px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, boxSizing: "border-box" }}>
         {mode === "chat" ? (
           <>
         {/* Decorative under 幽影深窗 only (--plusbtn-display defaults to
@@ -629,7 +608,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
             send an attachment yet, so this doesn't wire up a real upload.
             compact（浮動小視窗）版直接不畫這顆，維持「下方只有傳送訊息」。 */}
         {!compact && (
-        <button type="button" onClick={() => toast("附加檔案功能即將推出")}
+        <button type="button" className={styles.attachment} onClick={() => toast("附加檔案功能即將推出")}
           style={{
             display: "var(--plusbtn-display, none)", width: "var(--plusbtn-size, 0px)", height: "var(--plusbtn-size, 0px)",
             flexShrink: 0, alignItems: "center", justifyContent: "center",
@@ -642,15 +621,15 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
 
         <input type="text" value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && send()}
-          placeholder="輸入訊息..." disabled={sending}
+          placeholder="輸入訊息..." aria-label="輸入訊息" disabled={sending}
           style={{ flex: 1, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
 
         {/* 模型選擇——compact 版拿掉，固定用預設模型（DeepSeek），對話紀錄跟
             完整版共用同一份 Firestore 資料，之後在完整版「AI 助手」頁還是能
             切換模型繼續聊。 */}
         {!compact && (
-        <div style={{ position: "relative", flexShrink: 0, width: "var(--modelpicker-w, auto)" }}>
-          <button ref={modelMenuRef} onClick={() => setModelMenuOpen(v => !v)}
+        <div className={styles.modelPicker} style={{ position: "relative", flexShrink: 0, width: "var(--modelpicker-w, auto)" }}>
+          <button ref={modelMenuRef} onClick={() => setModelMenuOpen(v => !v)} aria-label="選擇 AI 模型" aria-expanded={modelMenuOpen}
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "var(--modelpicker-justify, flex-start)", gap: 6,
               width: "100%", height: "var(--inputbar-field-h, 100%)", boxSizing: "border-box",
@@ -660,7 +639,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
             {availableModels.find(m => m.id === model)?.label || model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
           </button>
 
-          <PortalPopover anchorRef={modelMenuRef} open={modelMenuOpen} onClose={() => setModelMenuOpen(false)} placement="top-right" minWidth={210}>
+          <PortalPopover anchorRef={modelMenuRef} open={modelMenuOpen} onClose={() => setModelMenuOpen(false)} placement="top-right" minWidth={210} constrainToViewport>
             <div style={{
               background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
               boxShadow: "var(--card-shadow)", overflow: "hidden",
@@ -683,7 +662,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
         </div>
         )}
 
-        <button onClick={send} disabled={sending || !input.trim()}
+        <button className={styles.sendButton} onClick={send} disabled={sending || !input.trim()}
           style={{
             width: "var(--sendbtn-width, auto)", height: "var(--sendbtn-height, auto)", boxSizing: "border-box",
             background: "var(--sendbtn-bg, var(--accent))", border: "none", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))",
@@ -697,10 +676,10 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           <>
         <input type="text" value={imagePrompt} onChange={e => setImagePrompt(e.target.value)}
           onKeyDown={e => e.key === "Enter" && generateImage()}
-          placeholder="描述你想要的圖片..." disabled={generating}
+          placeholder="描述你想要的圖片..." aria-label="描述你想要的圖片" disabled={generating}
           style={{ flex: 1, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
 
-        <button onClick={generateImage} disabled={generating || !imagePrompt.trim()}
+        <button className={styles.sendButton} onClick={generateImage} disabled={generating || !imagePrompt.trim()}
           style={{
             width: "var(--sendbtn-width, auto)", height: "var(--sendbtn-height, auto)", boxSizing: "border-box",
             background: "var(--sendbtn-bg, var(--accent))", border: "none", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))",

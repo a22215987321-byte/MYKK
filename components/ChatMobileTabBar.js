@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { Home, Newspaper, Video, Smile } from "lucide-react";
+import { Home, Newspaper, Bot, Smile } from "lucide-react";
 import { auth } from "../lib/firebase";
 
 function TabButton({ Icon, label, active, onClick, badge }) {
   return (
-    <button onClick={onClick} style={{
+    <button type="button" onClick={onClick} aria-current={active ? "page" : undefined} style={{
       flex: 1, minHeight: 56, display: "flex", flexDirection: "column", alignItems: "center",
       justifyContent: "center", gap: 2, background: "none", border: "none", cursor: "pointer",
       color: active ? "var(--accent)" : "var(--text-dim)", position: "relative", padding: "6px 0",
@@ -23,26 +23,29 @@ function TabButton({ Icon, label, active, onClick, badge }) {
   );
 }
 
-// 4 個底部按鈕：首頁（群組＋好友清單，點進去看對話）／動態消息／影片／我。
+// 4 個底部按鈕：首頁（群組＋好友清單，點進去看對話）／動態消息／AI 助手／我。
 // 圖片編輯、原本的「更多」分頁都不在底部了——「更多」（其他功能方塊：
 // AI助手、字典、語言學習工具等，圖片編輯也在裡面）現在改成從聊天畫面
 // 向右滑喚出（見 ChatRoom.js 的 cr-sidebar 手機版內容 + handleShellPointer*
 // 那組拖曳手勢），不用佔一個底部按鈕位置。
 //
-// activeTab/onSelectHome/onSelectVideo/onOpenProfile 都是選填：這個列表被
+// activeTab/onSelectHome/onSelectAi/onOpenProfile 都是選填：這個列表被
 // ChatRoom 內嵌使用時，ChatRoom 會傳明確的 callback 直接切換內部 state；
 // 被 MobileTabBarLayout 獨立掛載時（例如 /feed、/profile/[uid] 這些活在
 // ChatRoom 外面的頁面），沒有這些 callback，就退回用路由的 fallback。
-export default function ChatMobileTabBar({ activeTab, onSelectHome, onSelectVideo, onOpenProfile, pendingCount = 0 }) {
+export default function ChatMobileTabBar({ activeTab, onSelectHome, onSelectAi, onOpenProfile, pendingCount = 0 }) {
   const router = useRouter();
   const goHome = onSelectHome || (() => router.push('/?view=list'));
-  const goVideo = onSelectVideo || (() => router.push('/?view=video'));
+  const goAi = onSelectAi || (() => router.push('/?view=ai'));
   const goProfile = onOpenProfile || (() => router.push(`/profile/${auth.currentUser?.uid || ''}`));
 
   return (
     <div className="cr-tabbar">
       <style>{`
         .cr-tabbar { display: none; }
+        .cr-tabbar > :is(button, a) { min-width: 0; border-radius: 8px; }
+        .cr-tabbar > :is(button, a):hover { background: var(--panel-hover); }
+        .cr-tabbar > :is(button, a):focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
         @media (max-width: 767px) {
           .cr-tabbar {
             display: flex !important;
@@ -54,7 +57,7 @@ export default function ChatMobileTabBar({ activeTab, onSelectHome, onSelectVide
         }
       `}</style>
       <TabButton Icon={Home} label="首頁" active={activeTab === 'home'} onClick={goHome} badge={pendingCount} />
-      <Link href="/feed" style={{
+      <Link href="/feed" aria-current={activeTab === 'feed' ? 'page' : undefined} style={{
         flex: 1, minHeight: 56, display: "flex", flexDirection: "column", alignItems: "center",
         justifyContent: "center", gap: 2, textDecoration: "none",
         color: activeTab === 'feed' ? "var(--accent)" : "var(--text-dim)", padding: "6px 0",
@@ -62,7 +65,7 @@ export default function ChatMobileTabBar({ activeTab, onSelectHome, onSelectVide
         <Newspaper size={20} strokeWidth={activeTab === 'feed' ? 2.4 : 2} />
         <span style={{ fontSize: 11, fontWeight: activeTab === 'feed' ? 700 : 500 }}>動態消息</span>
       </Link>
-      <TabButton Icon={Video} label="影片" active={activeTab === 'video'} onClick={goVideo} />
+      <TabButton Icon={Bot} label="AI 助手" active={activeTab === 'ai'} onClick={goAi} />
       <TabButton Icon={Smile} label="我" active={activeTab === 'me'} onClick={goProfile} />
     </div>
   );

@@ -146,7 +146,7 @@ export default function GuestChatRoom({ user }) {
   const applySkill = skillId => {
     setInput(current => prepareGuestSkillMessage(skillId, current));
     setSkillsOpen(false);
-    setSkillNotice("已加入任務範本，補上內容後再傳送。");
+    setSkillNotice("已加入任務範本；可先編輯並保存，AI 回覆稍後開放。");
     requestAnimationFrame(() => {
       const textarea = textareaRef.current;
       textarea?.focus({ preventScroll: true });
@@ -299,7 +299,12 @@ export default function GuestChatRoom({ user }) {
         }
         .guest-root[data-guest-theme="shadow-window"] { color-scheme: dark; }
         .guest-root[data-guest-theme="pastel-pearl"] { --guest-accent-text: var(--text); }
-        .guest-mobile-only, .guest-mobile-welcome, .guest-mobile-search, .guest-composer-caption, .guest-skill-notice { display: none; }
+        .guest-mobile-only, .guest-mobile-welcome, .guest-mobile-search, .guest-composer-caption { display: none; }
+        .guest-skill-notice { margin: 0 4px 8px; color: #7b7088; font-size: 12px; line-height: 1.5; }
+        .guest-composer-skills { display: inline-flex; flex: 0 0 36px; align-items: center; justify-content: center; min-height: 42px; padding: 0; border: 0; border-radius: 11px; color: #756785; background: transparent; font: inherit; cursor: pointer; }
+        .guest-composer-skills span { display: none; }
+        .guest-composer-skills:hover { background: #f4f1f6; }
+        .guest-composer-skills:focus-visible { outline: 2px solid #80708e; outline-offset: 2px; }
         .guest-header-actions { display: flex; align-items: center; gap: 4px; }
         .guest-reading-area { position: relative; display: flex; flex: 1; min-height: 0; flex-direction: column; }
         .guest-scroll-latest { position: absolute; bottom: 8px; left: calc(50% - 20px); z-index: 2; width: 40px; height: 40px; border: 1px solid #e5e5e5; border-radius: 50%; background: #fff; color: #555; cursor: pointer; display: grid; place-items: center; box-shadow: 0 2px 8px #00000008; }
@@ -454,6 +459,7 @@ export default function GuestChatRoom({ user }) {
           .guest-composer { display: grid; grid-template-columns: minmax(0, 1fr) 42px; align-items: end; gap: 2px 8px; min-height: 106px; padding: 10px 10px 8px 14px; border-radius: 22px; border-color: #e4e4e4; }
           .guest-composer textarea { grid-column: 1 / -1; padding: 6px 2px; font-size: 16px; line-height: 24px; max-height: min(176px, calc(var(--guest-viewport-height, 100dvh) * .3)); }
           .guest-composer-skills { justify-self: start; align-items: center; gap: 7px; min-height: 42px; padding: 0 9px; border: 0; border-radius: 11px; color: #756785; background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+          .guest-composer-skills span { display: inline; }
           .guest-composer-skills:hover { background: #f4f1f6; }
           .guest-send { grid-column: 2; border-radius: 50%; color: #3a3a3a; }
           .guest-send:not(:disabled):hover { background: #eeebf1; }
@@ -645,12 +651,12 @@ export default function GuestChatRoom({ user }) {
                 placeholder="輸入訊息…"
                 aria-label="訊息"
               />
-              <button type="button" className="guest-mobile-only guest-composer-skills" onClick={() => setSkillsOpen(true)} aria-label="開啟 Skills 任務範本" aria-haspopup="dialog"><Sparkles size={17} /><span>Skills</span></button>
+              <button type="button" className="guest-composer-skills" onClick={() => setSkillsOpen(true)} aria-label="開啟 Skills 任務範本" title="Skills 任務範本" aria-haspopup="dialog"><Sparkles size={17} /><span>Skills</span></button>
               <button className="guest-send" onClick={sendMessage} disabled={!input.trim() || !activeChatId || sending} aria-label="傳送訊息">
                 <Send size={19} />
               </button>
             </div>
-            <p className="guest-composer-caption">訪客模式 · 請勿傳送敏感個人資料</p>
+            <p className="guest-composer-caption">訪客模式 · AI 回覆稍後開放 · 請勿傳送敏感個人資料</p>
           </div>
         </div>
       </section>

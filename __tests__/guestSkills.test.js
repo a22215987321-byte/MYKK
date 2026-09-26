@@ -2,13 +2,14 @@ import { GUEST_SKILLS, filterGuestSkills, prepareGuestSkillMessage } from "../li
 import { filterGuestChats, isGuestSubmitKey } from "../components/GuestChatRoom";
 
 describe("guest task templates", () => {
-  test("offers six distinct, non-empty editable instruction templates", () => {
-    expect(GUEST_SKILLS).toHaveLength(6);
-    expect(new Set(GUEST_SKILLS.map(skill => skill.id)).size).toBe(6);
+  test("offers general and professional non-empty editable instruction templates", () => {
+    expect(GUEST_SKILLS).toHaveLength(14);
+    expect(new Set(GUEST_SKILLS.map(skill => skill.id)).size).toBe(14);
     GUEST_SKILLS.forEach(skill => {
       expect(skill.prompt.trim().length).toBeGreaterThan(30);
       expect(prepareGuestSkillMessage(skill.id)).toBe(skill.prompt);
     });
+    expect(GUEST_SKILLS.filter(skill => skill.professional)).toHaveLength(8);
   });
   test("keeps the complete existing draft when adding a skill", () => {
     const draft = "  原有內容\n第二行 😀\n";
@@ -19,10 +20,13 @@ describe("guest task templates", () => {
     expect(prepareGuestSkillMessage("unknown", "我的文字")).toBe("我的文字");
   });
   test("searches by category and title, and handles empty results", () => {
-    expect(filterGuestSkills(" 寫作 ").map(skill => skill.id)).toEqual(["write", "translate"]);
+    expect(filterGuestSkills(" 寫作 ").map(skill => skill.id)).toEqual(["write", "translate", "decision-analysis", "evidence-academic-writing"]);
     expect(filterGuestSkills("摘要").map(skill => skill.id)).toEqual(["summarize"]);
     expect(filterGuestSkills("安裝程式")).toEqual([]);
-    expect(filterGuestSkills()).toHaveLength(6);
+    expect(filterGuestSkills("學術").map(skill => skill.id)).toEqual(["academic-argument", "evidence-academic-writing"]);
+    expect(filterGuestSkills("CRM").map(skill => skill.id)).toEqual(["opportunity-scoring"]);
+    expect(filterGuestSkills()).toHaveLength(14);
+    expect(JSON.stringify(GUEST_SKILLS)).not.toMatch(/AppData|dsh-workspace|SKILL\.md|api\/ai/i);
   });
 });
 

@@ -2109,19 +2109,20 @@ export default function ChatApp({ user }) {
   }, [uid]);
 
   // Standalone pages outside this SPA (e.g. /feed, /profile/[uid]) send the
-  // mobile tab bar's "首頁"/"影片" taps back here as /?view=list|video, since
+  // mobile tab bar's "首頁"/"AI 助手" taps back here as /?view=list|ai, since
   // mobileHomeSubview/mobileActiveKey are local state they have no other way to
   // reach. Consume it once and strip it so it doesn't linger in the URL/history.
   useEffect(() => {
     if (!router.isReady) return;
     const v = router.query.view;
     if (v === "list") resetAllViews();
+    else if (v === "ai") { resetAllViews(); setMobileView(null); setMobileActiveKey("aiChat"); }
     else if (v === "video") { resetAllViews(); setMobileActiveKey("videoHub"); }
     else if (v === "more") setMobileView("more");
     else if (v === "editProfile") setShowProfile(true);
     else if (v === "imageEditor") { resetAllViews(); setMobileActiveKey("imageEditor"); }
-    if (v === "list" || v === "video" || v === "more" || v === "editProfile" || v === "imageEditor") router.replace("/", undefined, { shallow: true });
-  }, [router.isReady]);
+    if (v === "list" || v === "ai" || v === "video" || v === "more" || v === "editProfile" || v === "imageEditor") router.replace("/", undefined, { shallow: true });
+  }, [router.isReady, router.query.view, resetAllViews, router]);
 
   // 個人頁「傳訊息」按鈕送過來的 /?chat=<uid>，直接開對應的私訊視窗
   // （這條路徑先前完全沒接，該按鈕只會回首頁不會真的開聊天）。
@@ -2567,6 +2568,7 @@ export default function ChatApp({ user }) {
     "englishPron", "ieltsBand4", "aiChat", "docConvert", "aiCompanion", "upgrade"].includes(mobileActiveKey);
   const inTool = inMoreTool || mobileActiveKey === "imageEditor";
   const inThread = !!activeFriendId || !!activeGroupId;
+  const mobileAiActive = isMobile && mobileView === null && !inThread && mobileActiveKey === "aiChat";
 
   // 手機版側邊抽屜：從內容區「中間」開始跟手拖曳，不是邊緣手勢。
   // 這裡刻意不做「只有貼著螢幕左邊才觸發」的邊緣手勢——iPhone Safari 把貼著螢幕
@@ -3337,7 +3339,7 @@ export default function ChatApp({ user }) {
     ),
     imageEditor: <ImageEditorRoom />,
     aiChat: aiChatAllowed ? (
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <AiChatRoom user={user} db={db} />
       </div>
     ) : (
@@ -3816,7 +3818,8 @@ export default function ChatApp({ user }) {
         {/* Mobile topbar: back chevron（在聊天串/工具畫面時）+ 標題 + 日曆／設定／登出
             （在聊天列表首頁時）。全部改用 lucide 圖示，跟桌面版共用邏輯、不共用這個
             只在 isMobile 才會顯示的元素本身，所以不會影響桌面版。 */}
-        <header className="cr-mobile-topbar">
+        {/* AI room has its own responsive toolbar; do not stack the global bar above it. */}
+        {!mobileAiActive && <header className="cr-mobile-topbar">
           {mobileView === null ? (
             <button onClick={() => {
               if (inTool) { setMobileView('more'); }
@@ -3853,7 +3856,7 @@ export default function ChatApp({ user }) {
               <LogOut size={21} />
             </button>
           </div>
-        </header>
+        </header>}
 
         {/* 資料夾 rail 外面再包一層直向欄——資料夾方塊本身縮小成「剛好容納
             內容」的高度（不再撐滿整條側欄），下面多一顆「AI OFFICE」切換鈕，
@@ -4396,11 +4399,11 @@ export default function ChatApp({ user }) {
           <ChatMobileTabBar
             activeTab={
               mobileActiveKey === 'feed' ? 'feed'
-              : mobileActiveKey === 'videoHub' ? 'video'
+              : mobileAiActive ? 'ai'
               : 'home'
             }
-            onSelectHome={() => { resetAllViews(); settleDrawer(false); }}
-            onSelectVideo={() => { resetAllViews(); setMobileActiveKey('videoHub'); settleDrawer(false); }}
+            onSelectHome={() => { resetAllViews(); setMobileView(null); settleDrawer(false); }}
+            onSelectAi={() => { resetAllViews(); setMobileView(null); setMobileActiveKey('aiChat'); settleDrawer(false); }}
             pendingCount={pendingInCount}
           />
         )}
