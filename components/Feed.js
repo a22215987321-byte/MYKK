@@ -72,27 +72,30 @@ function renderMarkdownLite(text) {
   const lines = text.split("\n");
   const blocks = [];
   let list = null;
+  let paragraphBreak = false;
   const flushList = (key) => {
-    if (list) { blocks.push(<ul key={`ul-${key}`} style={{ margin: "4px 0 8px", paddingLeft: 20 }}>{list}</ul>); list = null; }
+    if (list) { blocks.push(<ul key={`ul-${key}`} style={{ margin: "8px 0", paddingLeft: 20 }}>{list}</ul>); list = null; }
   };
   lines.forEach((line, i) => {
     const t = line.trim();
     if (/^###\s+/.test(t)) {
       flushList(i);
-      blocks.push(<h4 key={i} style={{ fontSize: 15, fontWeight: 800, margin: "10px 0 4px", color: "var(--text)" }}>{renderInline(t.replace(/^###\s+/, ""), i)}</h4>);
+      blocks.push(<h4 key={i} style={{ fontSize: 15, fontWeight: 800, margin: "12px 0 8px", color: "var(--text)" }}>{renderInline(t.replace(/^###\s+/, ""), i)}</h4>);
     } else if (/^##\s+/.test(t)) {
       flushList(i);
-      blocks.push(<h3 key={i} style={{ fontSize: 16, fontWeight: 800, margin: "12px 0 6px", color: "var(--text)" }}>{renderInline(t.replace(/^##\s+/, ""), i)}</h3>);
+      blocks.push(<h3 key={i} style={{ fontSize: 16, fontWeight: 800, margin: "12px 0 8px", color: "var(--text)" }}>{renderInline(t.replace(/^##\s+/, ""), i)}</h3>);
     } else if (/^[-*]\s+/.test(t)) {
       if (!list) list = [];
       list.push(<li key={i} style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text)" }}>{renderInline(t.replace(/^[-*]\s+/, ""), i)}</li>);
     } else if (t === "") {
       flushList(i);
-      blocks.push(<div key={i} style={{ height: 6 }} />);
+      paragraphBreak = true;
+      return;
     } else {
       flushList(i);
-      blocks.push(<p key={i} style={{ margin: "2px 0", fontSize: 15, lineHeight: 1.6, color: "var(--text)" }}>{renderInline(line, i)}</p>);
+      blocks.push(<p key={i} style={{ margin: paragraphBreak ? "8px 0 0" : 0, fontSize: 15, lineHeight: 1.6, color: "var(--text)" }}>{renderInline(line, i)}</p>);
     }
+    paragraphBreak = false;
   });
   flushList("end");
   return blocks;
@@ -210,7 +213,7 @@ function PostBookmarkButton({ post, bookmarked, audioBookmarked, onToggle, onTog
   );
 }
 
-function PostCard({ post, myUid, myProfile, onOpenProfile }) {
+export function PostCard({ post, myUid, myProfile, onOpenProfile }) {
   const [showComments, setShowComments] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -275,9 +278,9 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
   };
 
   return (
-    <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", marginBottom: 16, overflow: "hidden" }}>
+    <div className={styles.postCard} style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", overflow: "hidden" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 16px", position: "relative" }}>
         {/* onOpenProfile (embedded-in-ChatRoom mode) swaps the Feed pane for
             an inline profile view instead of navigating to /profile/[uid] —
             clicking an author used to leave the chat SPA entirely, which
@@ -335,7 +338,7 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
 
       {/* Tags */}
       {tags.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: "0 16px 8px" }}>
+        <div style={{ display: "flex", gap: 6, rowGap: 8, flexWrap: "wrap", padding: "0 16px" }}>
           {tags.map(tag => (
             <span key={tag} style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", background: "var(--accent-active)", borderRadius: 20, padding: "2px 10px" }}>{tag}</span>
           ))}
@@ -344,7 +347,7 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
 
       {/* Text */}
       {post.text && (
-        <div style={{ padding: "0 16px 12px", wordBreak: "break-word" }}>
+        <div className={styles.postText} style={{ padding: "0 16px", wordBreak: "break-word" }}>
           {isLong && !expanded ? (
             <div style={{ fontSize: 15, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
               {post.text.slice(0, LONG_POST_THRESHOLD)}…{" "}
@@ -356,7 +359,7 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
             <>
               {renderMarkdownLite(post.text)}
               {isLong && (
-                <button onClick={() => setExpanded(false)} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, padding: 0, marginTop: 4 }}>
+                <button onClick={() => setExpanded(false)} style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, padding: 0, marginTop: 8 }}>
                   收合
                 </button>
               )}
@@ -385,16 +388,13 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
 
       {/* Audio (MP3) */}
       {post.audioUrl && (
-        <div style={{ padding: "0 16px 12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>🎵</span>
-            <audio src={post.audioUrl} controls style={{ flex: 1, minWidth: 0, height: 34 }} />
-          </div>
+        <div className={styles.postAudio}>
+          <audio src={post.audioUrl} controls aria-label="貼文音訊" style={{ display: "block", width: "100%", minWidth: 0, height: 34 }} />
         </div>
       )}
 
       {/* Actions */}
-      <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 18, borderTop: "1px solid var(--panel)" }}>
+      <div style={{ padding: "0 16px", display: "flex", alignItems: "center", gap: 18, borderTop: "1px solid var(--panel)" }}>
         <button onClick={toggleLike} className="feed-action-btn"
           style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: liked ? "#ef4444" : "var(--text-faint)", fontSize: 14, fontWeight: 600, padding: 0 }}>
           <span style={{ fontSize: 18 }}>{liked ? "❤️" : "🤍"}</span>
@@ -415,7 +415,7 @@ function PostCard({ post, myUid, myProfile, onOpenProfile }) {
 
       {/* Comments */}
       {showComments && (
-        <div style={{ padding: "0 16px 14px" }}>
+        <div className={styles.postComments} style={{ padding: "0 16px" }}>
           <CommentSection postId={post.id} myProfile={myProfile} />
         </div>
       )}
@@ -603,7 +603,7 @@ function NewPostForm({ myProfile, onPosted }) {
   const canPost = (text.trim() || media.hasMedia) && !posting;
 
   return (
-    <div style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", padding: 16, marginBottom: 24 }}>
+    <div className={styles.composerCard} style={{ background: "var(--panel)", borderRadius: 16, border: "1px solid var(--border)", boxShadow: "var(--card-shadow)", padding: "12px 16px", marginBottom: 16 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         <Avatar avatar={myProfile.avatar} avatarImage={myProfile.avatarImage} color={myProfile.color} size={40} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -622,7 +622,7 @@ function NewPostForm({ myProfile, onPosted }) {
                 minHeight: TEXTAREA_MIN_HEIGHT, maxHeight: `${TEXTAREA_MAX_HEIGHT_RATIO * 100}vh`, overflowY: "auto", resize: "vertical",
               }}
             />
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
               <button ref={visBtnRef} type="button" onClick={() => setVisOpen(v => !v)} title="誰可以看到這篇貼文"
                 style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "4px 10px", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", cursor: "pointer", whiteSpace: "nowrap" }}>
                 {visibilityMeta(visibility).icon} {visibilityMeta(visibility).label} <span style={{ fontSize: 9 }}>▾</span>
@@ -653,7 +653,7 @@ function NewPostForm({ myProfile, onPosted }) {
           </div>
 
           {expanded && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 6, rowGap: 8, flexWrap: "wrap", marginTop: 8 }}>
               {QUICK_TOPICS.map(topic => (
                 <button key={topic} onClick={() => insertTopic(topic)}
                   style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: 20, padding: "4px 12px", color: "var(--text-muted)", fontSize: 12, cursor: "pointer" }}>
@@ -666,7 +666,7 @@ function NewPostForm({ myProfile, onPosted }) {
           <MediaAttachPreview media={media} thumbSize={120} />
 
           {expanded && (
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 12 }}>
               <button
                 onClick={() => media.fileRef.current?.click()}
                 style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", color: "var(--text-faint)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}
@@ -860,10 +860,10 @@ export default function FeedApp({ user, embedded = false, onOpenProfile }) {
       <NewPostForm myProfile={myProfile} />
 
       {filteredPosts.length === 0 && (
-        <div style={{ textAlign: "center", padding: "60px 20px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16 }}>
+        <div style={{ textAlign: "center", padding: "16px 20px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16 }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>還沒有動態</div>
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>分享你的第一篇學習筆記吧！</div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>分享你的第一篇學習筆記吧！</div>
         </div>
       )}
 

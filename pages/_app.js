@@ -12,6 +12,7 @@ import "../components/office/office.css";
 import ThemeToggle from "../components/ThemeToggle";
 import InstallPrompt from "../components/InstallPrompt";
 import ToastHost from "../components/ToastHost";
+import MessageNotificationHost from "../components/MessageNotificationHost";
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function App({ Component, pageProps }) {
       <Component {...pageProps} />
       <InstallPrompt />
       <ToastHost />
+      <MessageNotificationHost />
     </>
   );
 }

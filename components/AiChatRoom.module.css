@@ -61,6 +61,23 @@
 .messages { min-width: 0; overflow-wrap: anywhere; }
 .messages > * { flex-shrink: 0; }
 .messages :global(.ai-md table) { display: block; max-width: 100%; overflow-x: auto; }
+.messages :global(.ai-md blockquote) {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--panel-alt);
+  background: color-mix(in srgb, var(--text) 6%, var(--panel-alt));
+  color: inherit;
+  opacity: 1;
+  overflow-wrap: anywhere;
+}
+.messages :global(.ai-md blockquote > :first-child) { margin-top: 0; }
+.messages :global(.ai-md blockquote > :last-child) { margin-bottom: 0; }
 
 @media (max-width: 767px) {
   .header.header {

@@ -1,8 +1,25 @@
 .content {
   max-width: 720px;
   margin: 0 auto;
-  padding: 24px 16px;
+  padding: 16px;
 }
+
+.postCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: auto;
+  min-height: 0;
+  padding-block: 12px;
+  margin-bottom: 12px;
+}
+.postCard > * { flex-shrink: 0; }
+.composerCard { height: auto; min-height: 0; }
+.postText > :first-child { margin-top: 0 !important; }
+.postText > :last-child { margin-bottom: 0 !important; }
+.postAudio { padding-inline: 16px; }
+/* Native playback controls are unchanged; only the extra card/icon are removed. */
+.postComments > div { margin-top: 0 !important; padding-top: 0 !important; }
 
 .toolbar {
   display: flex;
@@ -10,7 +27,7 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .filters {
@@ -39,7 +56,7 @@
 }
 
 @media (max-width: 767px) {
-  .content { padding: 12px 16px 20px; }
+  .content { padding: 12px 16px; }
   .heading { display: none; }
   .toolbar { margin-bottom: 16px; }
   .filters { width: 100%; flex-wrap: nowrap; }
