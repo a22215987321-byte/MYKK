@@ -78,6 +78,8 @@ const MobileHomeList = dynamic(() => import("./MobileHomeList"), { ssr: false })
 import AiCompanionCreator from "./AiCompanionCreator";
 import UpgradeMembership, { UpgradeHighlights } from "./UpgradeMembership";
 import EmojiStickerPicker from "./EmojiStickerPicker";
+import ChatComposerActions from "./ChatComposerActions";
+import ChatMessageList from "./ChatMessageList";
 import LoadingState from "./LoadingState";
 import PortalPopover from "./PortalPopover";
 import FloatingAiChat from "./FloatingAiChat";
@@ -85,7 +87,7 @@ import FloatingAudioPlayer from "./FloatingAudioPlayer";
 import AudioRoom from "./AudioRoom";
 import useIsMobile from "../lib/useIsMobile";
 import { QUICK_REACTIONS, STICKER_SRC_BY_ID } from "../data/chat/gesturePacks";
-import { ChevronLeft, ChevronRight, CalendarDays, LogOut, Plus, Search, Newspaper, MessageCircle, FileText, Download, BookOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Plus, Search, Newspaper, MessageCircle, FileText, Download, BookOpen } from "lucide-react";
 import {
   doc, collection, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
   query, orderBy, limitToLast, serverTimestamp,
@@ -844,7 +846,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
       onTouchStart={handleLongPressStart}
       onTouchEnd={handleLongPressCancel}
       onTouchMove={handleLongPressCancel}
-      style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start", marginBottom: 2, position: "relative" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start", minWidth: 0, maxWidth: "100%", marginBottom: 2, position: "relative" }}
     >
       {preview && (isStickerMsg || isEmojiMsg) && (
         <div onClick={e => { e.stopPropagation(); setPreview(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
@@ -860,14 +862,14 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
           </button>
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, maxWidth: "72%", marginTop: showActions && isMine ? 22 : 0 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, minWidth: 0, maxWidth: "72%", marginTop: showActions && isMine ? 22 : 0 }}>
         {!isMine && showSender && (
           <div style={{ flexShrink: 0 }}>
             <AvatarImg avatarImage={msg.senderAvatarImage} avatar={msg.avatar || msg.sender?.[0]} color="var(--accent-2)" size={30} />
           </div>
         )}
         {!isMine && !showSender && <div style={{ width: 30, flexShrink: 0 }} />}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start", minWidth: 0, maxWidth: "100%" }}>
           {!isMine && showSender && <span style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 3, marginLeft: 2 }}>{msg.sender}</span>}
           <div onDoubleClick={() => setShowPicker(v => !v)} style={{
             padding: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? 0 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
@@ -876,20 +878,20 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
             color: isMine ? "#fff" : "var(--text)", fontSize: msgFontSize, lineHeight: 1.5, cursor: "default",
             border: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : (isMine ? "none" : "1px solid var(--border)"),
             backdropFilter: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : "var(--panel-blur)", WebkitBackdropFilter: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : "var(--panel-blur)",
-            overflow: "hidden",
+            overflow: "hidden", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", overflowWrap: "anywhere",
           }}>
             {isEmojiMsg ? (
               <span style={{ fontSize: 42 * (msgFontSize / 14), lineHeight: 1, display: "block" }}>{msg.text}</span>
             ) : isStickerMsg ? (
               <div onClick={e => { e.stopPropagation(); setPreview(true); }} data-sticker-message={msg.stickerId || ""}
-                style={{ width: 160, height: 160, maxWidth: 160, maxHeight: 160, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in" }}>
+                style={{ width: 160, aspectRatio: "1", maxWidth: "100%", maxHeight: 160, display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-in" }}>
                 {msg.stickerSrc
                   ? <img src={msg.stickerSrc} alt={msg.text} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                   : <span style={{ fontSize: 84, lineHeight: 1 }}>{msg.text}</span>}
               </div>
             ) : isPostShareMsg ? (
               <Link href={`/profile/${msg.sharedPost.userId}?post=${msg.sharedPost.id}`} onClick={e => e.stopPropagation()}
-                style={{ display: "block", textDecoration: "none", color: "var(--text)", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 10, width: 220, boxShadow: "var(--glow-shadow)" }}>
+                style={{ display: "block", textDecoration: "none", color: "var(--text)", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 10, width: 220, maxWidth: "100%", minWidth: 0, boxSizing: "border-box", boxShadow: "var(--glow-shadow)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                   <AvatarImg avatarImage={msg.sharedPost.userAvatarImage} avatar={msg.sharedPost.userAvatar} color={msg.sharedPost.userColor} size={20} />
                   <span style={{ fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{msg.sharedPost.userNickname}</span>
@@ -911,10 +913,10 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
             ) : (
               <>
                 {msg.videoUrl && (
-                  <video src={msg.videoUrl} controls style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
+                  <video src={msg.videoUrl} controls style={{ maxWidth: "min(260px, 100%)", maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
                 )}
                 {msg.imageUrl && (
-                  <img src={msg.imageUrl} alt="圖片" style={{ maxWidth: 260, maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
+                  <img src={msg.imageUrl} alt="圖片" style={{ maxWidth: "min(260px, 100%)", maxHeight: 200, borderRadius: "var(--radius-md)", display: "block", boxShadow: "var(--glow-shadow)" }} />
                 )}
                 {/* 檔案附件。R2 的網址跨網域，跨網域時瀏覽器會忽略 download 屬性
                     ——但這類文件回來的 Content-Type 不是瀏覽器能內嵌顯示的類型，
@@ -923,7 +925,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
                 {msg.fileUrl && (
                   <a href={msg.fileUrl} download={msg.fileName || ""} target="_blank" rel="noopener noreferrer"
                     style={{
-                      display: "flex", alignItems: "center", gap: 10, maxWidth: 260,
+                      display: "flex", alignItems: "center", gap: 10, width: 260, maxWidth: "100%", minWidth: 0, boxSizing: "border-box",
                       padding: "10px 12px", borderRadius: "var(--radius-md)",
                       background: "var(--panel-alt)", border: "1px solid var(--border)",
                       textDecoration: "none", color: "var(--text)",
@@ -946,7 +948,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
                 {sharedDoc && (
                   <button type="button" onClick={() => setDocOpen(true)}
                     style={{
-                      display: "flex", alignItems: "center", gap: 10, width: 260, maxWidth: "100%",
+                      display: "flex", alignItems: "center", gap: 10, width: 260, maxWidth: "100%", minWidth: 0, boxSizing: "border-box",
                       padding: "11px 12px", borderRadius: "var(--radius-md)",
                       background: "var(--panel-alt)", border: "1px solid var(--border)",
                       color: "var(--text)", cursor: "pointer", textAlign: "left", font: "inherit",
@@ -1861,7 +1863,6 @@ export default function ChatApp({ user }) {
   const [showCreateCinema, setShowCreateCinema] = useState(false);
   const [cinemaViewerCount, setCinemaViewerCount] = useState(0);
 
-  const messagesEndRef = useRef(null);
   const loadedFriendIds = useRef(new Set());
   const longPressTimerRef = useRef(null);
   const longPressFiredRef = useRef(false);
@@ -2069,35 +2070,6 @@ export default function ChatApp({ user }) {
   useEffect(() => {
     cinemaCommentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [cinemaComments]);
-
-  // 訊息區捲到底。「剛切進一個對話」跟「同一個對話來了新訊息」要用不同做法：
-  //
-  // 原本兩種情況都用 behavior:"smooth"。剛打開對話時訊息一次全部進來，瀏覽器
-  // 要從最上面平滑捲到最底，是一段很長的動畫；而頭像、貼圖、圖片訊息是之後
-  // 才載入的，載完高度就變了，動畫當初算好的目標位置於是過期，捲到一半就停
-  // 住——結果每次打開對話都落在中間某處，不是最新訊息。
-  //
-  // 切對話時改成 auto（瞬間跳，沒有動畫就沒有「動畫途中高度變了」的問題），
-  // 而且跳完之後再用 rAF 和兩個 timeout 補跳幾次，把晚一步載入的圖片撐開的
-  // 高度一起吃掉。同一個對話裡收到新訊息時維持 smooth，那是短距離捲動、也
-  // 需要動畫讓人注意到有新訊息。
-  const activeConvKey = activeGroupId ? "g:" + activeGroupId
-    : activeFriendId ? "f:" + activeFriendId
-    : "hall";
-  const lastConvKeyRef = useRef(null);
-  useEffect(() => {
-    const el = messagesEndRef.current;
-    if (!el) return;
-    const toBottom = (behavior) => el.scrollIntoView({ behavior, block: "end" });
-    const switched = lastConvKeyRef.current !== activeConvKey;
-    lastConvKeyRef.current = activeConvKey;
-    if (!switched) { toBottom("smooth"); return; }
-    toBottom("auto");
-    const raf = requestAnimationFrame(() => toBottom("auto"));
-    const t1 = setTimeout(() => toBottom("auto"), 250);
-    const t2 = setTimeout(() => toBottom("auto"), 700);
-    return () => { cancelAnimationFrame(raf); clearTimeout(t1); clearTimeout(t2); };
-  }, [hallMessages, privateMessages, groupMessages, activeConvKey]);
 
   useEffect(() => {
     const onVisibility = () => {
@@ -2674,6 +2646,15 @@ export default function ChatApp({ user }) {
     settleDrawer(open);
   }
 
+  function handleShellPointerCancel(e) {
+    const st = dragStateRef.current;
+    if (!st.dragging || e.pointerId !== st.pointerId) return;
+    st.dragging = false;
+    // Safari cancels pointers when native scrolling takes over. Cancellation
+    // must not be treated as a swipe release or create a drawer history entry.
+    if (st.locked) applyDrawerTransform(st.wasOpen ? st.drawerWidth : 0, st.drawerWidth, true);
+  }
+
   const leaderboard = Object.values(
     donations.reduce((acc, d) => {
       if (!acc[d.userId]) acc[d.userId] = { userId: d.userId, userNickname: d.userNickname, userAvatar: d.userAvatar, userColor: d.userColor, userAvatarImage: d.userAvatarImage, total: 0 };
@@ -2937,6 +2918,24 @@ export default function ChatApp({ user }) {
     </div>
   );
 
+  const friendHeaderIdentity = activeFriendProfile && (
+    <button className="cr-friend-identity" onClick={() => setShowFriendInfo(true)}
+      title="查看好友資訊" aria-label="查看好友資訊"
+      style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12, minWidth: 0,
+        background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "var(--text)" }}>
+      <div style={{ position: "relative", flexShrink: 0 }}>
+        <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={isMobile ? 38 : 34} />
+        <span style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: getStatus(activeFriendProfile.status).color, border: "2px solid var(--panel-alt)" }} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: isMobile ? 16 : 14, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeFriendProfile.nickname}</div>
+        <div style={{ fontSize: isMobile ? 12 : 11, lineHeight: 1.4, color: getStatus(activeFriendProfile.status).color, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {getStatus(activeFriendProfile.status).label}{activeFriendProfile.statusText ? ` · ${activeFriendProfile.statusText}` : ""}
+        </div>
+      </div>
+    </button>
+  );
+
   // Reuse the same controls in the mobile topbar or desktop thread header,
   // never both: one file input/ref and the existing avatar/info actions.
   const groupHeaderIdentity = activeGroup && (
@@ -2970,31 +2969,19 @@ export default function ChatApp({ user }) {
   const conversationsThreadPane = (
     <>
       {activeFriendId && activeFriendProfile && showFriendInfo && (
-        <FriendInfoView friend={activeFriendProfile} myUid={uid} myBlocked={myProfile?.blocked} messages={privateMessages} myGroups={myGroups} onClose={() => setShowFriendInfo(false)} />
+        <FriendInfoView friend={activeFriendProfile} myUid={uid} myBlocked={myProfile?.blocked} messages={privateMessages} myGroups={myGroups} onClose={() => setShowFriendInfo(false)} showProfileLink={isMobile} />
       )}
       {activeFriendId && activeFriendProfile && !showFriendInfo && (
         <>
-          <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
-            <button onClick={() => setShowFriendInfo(true)} title="查看好友資訊"
-              style={{ display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
-              <div style={{ position: "relative" }}>
-                <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={34} />
-                <span style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: getStatus(activeFriendProfile.status).color, border: "2px solid var(--panel-alt)" }} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{activeFriendProfile.nickname}</div>
-                <div style={{ fontSize: 11, color: getStatus(activeFriendProfile.status).color }}>
-                  {getStatus(activeFriendProfile.status).label}{activeFriendProfile.statusText ? ` · ${activeFriendProfile.statusText}` : ""}
-                </div>
-              </div>
-            </button>
+          {!isMobile && <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
+            {friendHeaderIdentity}
             <Link href={`/profile/${activeFriendProfile.uid}`} style={{ marginLeft: "auto", color: "var(--text-faint)", fontSize: 12, textDecoration: "none" }}
               onMouseEnter={e => e.currentTarget.style.color = "var(--text-muted)"}
               onMouseLeave={e => e.currentTarget.style.color = "var(--text-faint)"}>
               ℹ️ 個人檔案
             </Link>
-          </div>
-          <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-no-image, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "28px 28px" }}>
+          </div>}
+          <ChatMessageList conversationKey={`private:${activeFriendId}`} messages={privateMessages} currentUserId={uid} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-no-image, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "28px 28px" }}>
             <div style={{ textAlign: "center", marginBottom: 16 }}>
               <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={56} />
               <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{activeFriendProfile.nickname}</div>
@@ -3005,19 +2992,14 @@ export default function ChatApp({ user }) {
               const isMine = msg.senderId === uid;
               return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={!isMine && privateMessages[i-1]?.senderId !== msg.senderId} myUid={uid} collectionPath={["private_chats", chatId, "messages", msg.id]} msgFontSize={msgFontSize} prevCreatedAt={privateMessages[i-1]?.createdAt} />;
             })}
-            <div ref={messagesEndRef} />
-          </div>
+          </ChatMessageList>
           <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
               <input ref={privateFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendPrivateMedia(f); e.target.value = ""; } }} />
-              <button onClick={() => privateFileRef.current?.click()} disabled={privateUploading} title="上傳圖片／影片／文件"
-                style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: privateUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
-                {privateUploading ? "⏳" : "📎"}
-              </button>
-              <button ref={privateEmojiBtnRef} onClick={() => { if (isMobile && document.activeElement?.blur) document.activeElement.blur(); setEmojiPickerOpen(v => v === 'private' ? null : 'private'); }} title="表情/手勢"
-                style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
-                😊
-              </button>
+              <ChatComposerActions anchorRef={privateEmojiBtnRef} isMobile={isMobile} uploading={privateUploading}
+                onOpen={() => setEmojiPickerOpen(null)}
+                onUpload={() => privateFileRef.current?.click()}
+                onEmoji={() => setEmojiPickerOpen('private')} />
               <input type="text" value={privateInput} onChange={e => setPrivateInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendPrivate()} placeholder={`傳送訊息給 ${activeFriendProfile.nickname}...`}
                 style={{ flex: 1, minWidth: 0, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
               <button className="sb" onClick={sendPrivate} disabled={!privateInput.trim()}
@@ -3044,7 +3026,7 @@ export default function ChatApp({ user }) {
               {groupHeaderIdentity}
             </div>
           )}
-          <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, background: "transparent" }}>
+          <ChatMessageList conversationKey={`group:${activeGroupId}`} messages={groupMessages} currentUserId={uid} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, background: "transparent" }}>
             {groupMessages.length === 0 && (
               <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
                 <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
@@ -3056,19 +3038,14 @@ export default function ChatApp({ user }) {
               const showSender = !isMine && groupMessages[i-1]?.senderId !== msg.senderId;
               return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["groups", activeGroupId, "messages", msg.id]} msgFontSize={msgFontSize} prevCreatedAt={groupMessages[i-1]?.createdAt} />;
             })}
-            <div ref={messagesEndRef} />
-          </div>
+          </ChatMessageList>
           <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
               <input ref={groupFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendGroupMedia(f); e.target.value = ""; } }} />
-              <button onClick={() => groupFileRef.current?.click()} disabled={groupUploading} title="上傳圖片／影片／文件"
-                style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: groupUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
-                {groupUploading ? "⏳" : "📎"}
-              </button>
-              <button ref={groupEmojiBtnRef} onClick={() => { if (isMobile && document.activeElement?.blur) document.activeElement.blur(); setEmojiPickerOpen(v => v === 'group' ? null : 'group'); }} title="表情/手勢"
-                style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
-                😊
-              </button>
+              <ChatComposerActions anchorRef={groupEmojiBtnRef} isMobile={isMobile} uploading={groupUploading}
+                onOpen={() => setEmojiPickerOpen(null)}
+                onUpload={() => groupFileRef.current?.click()}
+                onEmoji={() => setEmojiPickerOpen('group')} />
               <input type="text" value={groupInput} onChange={e => setGroupInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendGroup()} placeholder={`傳送訊息給 ${activeGroup.name}...`}
                 style={{ flex: 1, minWidth: 0, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
               <button className="sb" onClick={sendGroup} style={{ background: "var(--sendbtn-bg, var(--accent))", border: "none", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--sendbtn-width, auto)", height: "var(--sendbtn-height, auto)", boxSizing: "border-box", padding: "9px 16px", color: "var(--accent-text)", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>傳送</button>
@@ -3090,14 +3067,14 @@ export default function ChatApp({ user }) {
           都沒選，這裡負責顯示對應的聊天內容。 */}
       {!activeFriendId && !activeGroupId && (
         <>
-          <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
+          {!isMobile && <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
             <span style={{ fontSize: 20 }}>💬</span>
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}># 公共大廳</div>
               <div style={{ fontSize: 11, color: "var(--text-faint)" }}>大家都可以看到這裡的訊息</div>
             </div>
-          </div>
-          <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, background: "transparent" }}>
+          </div>}
+          <ChatMessageList conversationKey="hall" messages={hallMessages} currentUserId={uid} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, background: "transparent" }}>
             <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 12, padding: "8px 0 16px" }}>
               今天 · {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric" })}
             </div>
@@ -3117,19 +3094,14 @@ export default function ChatApp({ user }) {
               const showSender = !isMine && hallMessages[i-1]?.senderId !== msg.senderId;
               return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["hall_messages", msg.id]} msgFontSize={msgFontSize} prevCreatedAt={hallMessages[i-1]?.createdAt} />;
             })}
-            <div ref={messagesEndRef} />
-          </div>
+          </ChatMessageList>
           <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
               <input ref={hallFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendHallMedia(f); e.target.value = ""; } }} />
-              <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片／影片／文件"
-                style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: hallUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
-                {hallUploading ? "⏳" : "📎"}
-              </button>
-              <button ref={hallEmojiBtnRef} onClick={() => { if (isMobile && document.activeElement?.blur) document.activeElement.blur(); setEmojiPickerOpen(v => v === 'hall' ? null : 'hall'); }} title="表情/手勢"
-                style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
-                😊
-              </button>
+              <ChatComposerActions anchorRef={hallEmojiBtnRef} isMobile={isMobile} uploading={hallUploading}
+                onOpen={() => setEmojiPickerOpen(null)}
+                onUpload={() => hallFileRef.current?.click()}
+                onEmoji={() => setEmojiPickerOpen('hall')} />
               <input type="text" value={hallInput} onChange={e => setHallInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendHall()} placeholder="輸入訊息..."
                 style={{ flex: 1, minWidth: 0, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
               <button className="sb" onClick={sendHall} style={{ background: "var(--sendbtn-bg, var(--accent))", border: "none", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--sendbtn-width, auto)", height: "var(--sendbtn-height, auto)", boxSizing: "border-box", padding: "9px 16px", color: "var(--accent-text)", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>傳送</button>
@@ -3635,6 +3607,8 @@ export default function ChatApp({ user }) {
             flex: 1; min-width: 0;
           }
           .cr-mobile-group-identity .cr-group-details { flex: 1; min-height: 40px; }
+          .cr-mobile-topbar .cr-friend-identity { flex: 1; min-height: 44px; }
+          .cr-mobile-topbar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 
           /* Groups / Friends sidebar rows: bigger touch targets, no hover-era transition */
           .fb {
@@ -3783,7 +3757,7 @@ export default function ChatApp({ user }) {
 
       <div className="cr-shell" ref={shellElRef}
         onPointerDown={handleShellPointerDown} onPointerMove={handleShellPointerMove}
-        onPointerUp={handleShellPointerEnd} onPointerCancel={handleShellPointerEnd}
+        onPointerUp={handleShellPointerEnd} onPointerCancel={handleShellPointerCancel}
         style={{
         display: "flex",
         position: "relative",
@@ -3815,9 +3789,8 @@ export default function ChatApp({ user }) {
         <div ref={backdropElRef} className="cr-sidebar-backdrop"
           onClick={() => settleDrawer(false)} />
 
-        {/* Mobile topbar: back chevron（在聊天串/工具畫面時）+ 標題 + 日曆／設定／登出
-            （在聊天列表首頁時）。全部改用 lucide 圖示，跟桌面版共用邏輯、不共用這個
-            只在 isMobile 才會顯示的元素本身，所以不會影響桌面版。 */}
+        {/* One mobile identity row with calendar/settings only on the right.
+            Logout remains available inside the shared settings menu. */}
         {/* AI room has its own responsive toolbar; do not stack the global bar above it. */}
         {!mobileAiActive && <header className="cr-mobile-topbar">
           {mobileView === null ? (
@@ -3834,6 +3807,8 @@ export default function ChatApp({ user }) {
           )}
           {isMobile && mobileView === null && activeGroup && !showGroupInfo ? (
             <div className="cr-mobile-group-identity">{groupHeaderIdentity}</div>
+          ) : isMobile && mobileView === null && activeFriendProfile && !showFriendInfo ? (
+            friendHeaderIdentity
           ) : (
             <div style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 17, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {mobileView === 'more' ? "更多" : activeGroup ? activeGroup.name : activeFriendProfile ? activeFriendProfile.nickname : mobileActiveKey === 'feed' && !viewProfileUid ? "動態消息" : mobileHomeSubview === 'hall' ? "公共大廳" : "Evonchat"}
@@ -3851,10 +3826,6 @@ export default function ChatApp({ user }) {
             <ThemeToggle mode="inline" onOpenProfile={() => setShowProfile(true)}
               msgFontSize={msgFontSize} onChangeMsgFontSize={setMsgFontSize}
               onResetMsgFontSize={() => { setMsgFontSize(DEFAULT_MSG_FONT_SIZE); resetPanelWidths(); }} />
-            <button onClick={() => auth.signOut()} aria-label="登出"
-              style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", padding: 6, lineHeight: 1, display: "flex" }}>
-              <LogOut size={21} />
-            </button>
           </div>
         </header>}
 
@@ -4205,59 +4176,7 @@ export default function ChatApp({ user }) {
                 longPressTimerRef={longPressTimerRef}
               />
             ) : (
-            <>
-              <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
-                <span style={{ fontSize: 20 }}>💬</span>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}># 公共大廳</div>
-                  <div style={{ fontSize: 11, color: "var(--text-faint)" }}>大家都可以看到這裡的訊息</div>
-                </div>
-              </div>
-              <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, background: "transparent" }}>
-                <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 12, padding: "8px 0 16px" }}>
-                  今天 · {new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric" })}
-                </div>
-                {hallMessages.length === 0 && (
-                  <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
-                    <div style={{ fontSize: 40, marginBottom: 8 }}>💬</div>
-                    <div>大廳還沒有訊息，來說第一句話吧！</div>
-                  </div>
-                )}
-                {hallMessages.map((msg, i) => {
-                  if (msg.isSystem) return (
-                    <div key={msg.id} style={{ textAlign: "center", marginBottom: 10 }}>
-                      <span style={{ background: "var(--panel)", color: "var(--text-faint)", fontSize: 12, padding: "5px 14px", borderRadius: 20, border: "1px solid var(--border)" }}>ℹ️ {msg.text}</span>
-                    </div>
-                  );
-                  const isMine = msg.senderId === uid;
-                  const showSender = !isMine && hallMessages[i-1]?.senderId !== msg.senderId;
-                  return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={showSender} myUid={uid} collectionPath={["hall_messages", msg.id]} msgFontSize={msgFontSize} prevCreatedAt={hallMessages[i-1]?.createdAt} />;
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-              <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
-                  <input ref={hallFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendHallMedia(f); e.target.value = ""; } }} />
-                  <button onClick={() => hallFileRef.current?.click()} disabled={hallUploading} title="上傳圖片／影片／文件"
-                    style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: hallUploading ? "default" : "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
-                    {hallUploading ? "⏳" : "📎"}
-                  </button>
-                  <button ref={hallEmojiBtnRef} onClick={() => { if (isMobile && document.activeElement?.blur) document.activeElement.blur(); setEmojiPickerOpen(v => v === 'hall' ? null : 'hall'); }} title="表情/手勢"
-                    style={{ background: "var(--toolbar-btn-bg, none)", border: "1px solid var(--border)", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--toolbar-btn-height, auto)", height: "var(--toolbar-btn-height, auto)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", fontSize: 16, color: "var(--text-faint)", flexShrink: 0 }}>
-                    😊
-                  </button>
-                  <input type="text" value={hallInput} onChange={e => setHallInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendHall()} placeholder="輸入訊息..."
-                    style={{ flex: 1, minWidth: 0, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
-                  <button className="sb" onClick={sendHall} style={{ background: "var(--sendbtn-bg, var(--accent))", border: "none", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--sendbtn-width, auto)", height: "var(--sendbtn-height, auto)", boxSizing: "border-box", padding: "9px 16px", color: "var(--accent-text)", cursor: "pointer", fontSize: 14, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>傳送</button>
-                </div>
-                {emojiPickerOpen === 'hall' && (
-                  <EmojiStickerPicker isMobile={isMobile} anchorRef={hallEmojiBtnRef} uid={uid}
-                    onClose={() => setEmojiPickerOpen(null)}
-                    onInsertEmoji={ch => setHallInput(v => v + ch)}
-                    onSendItem={item => sendHallItem(item)} />
-                )}
-              </div>
-            </>
+            conversationsThreadPane
             )
               )
             ) : (

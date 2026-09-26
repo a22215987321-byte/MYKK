@@ -1,6 +1,6 @@
 .header.header {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   flex-shrink: 0;
   gap: 8px 16px;
@@ -18,14 +18,26 @@
   -webkit-backdrop-filter: none;
 }
 
-.identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.identity { display: flex; align-items: center; gap: 10px; min-width: 0; grid-column: 1; grid-row: 1; }
 .identity img { flex-shrink: 0; border-radius: 50%; object-fit: cover; }
 .identityText { min-width: 0; }
 .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; color: var(--text); }
 .subtitle { margin-top: 2px; font-size: 11px; color: var(--text-faint); white-space: nowrap; }
-.options { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.modes { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--panel-alt); }
-.actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.options { display: flex; align-items: center; gap: 8px; min-width: 0; grid-column: 1 / -1; grid-row: 2; }
+.options[hidden] { display: none; }
+.modes { display: flex; flex-shrink: 0; gap: 2px; padding: 3px; border-radius: 12px; background: var(--panel-alt); }
+.actions { display: flex; align-items: center; gap: 4px; margin-left: auto; grid-column: 2; grid-row: 1; }
+.body, .chatSurface { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.body { position: relative; isolation: isolate; }
+.chatSurface[aria-hidden="true"] { visibility: hidden; }
+.modelPicker { min-width: 0; max-width: 220px; flex: 0 1 auto; }
+.header .modelButton { width: 100%; min-width: 0; box-sizing: border-box; padding: 6px 8px; background: var(--panel-alt); border: 1px solid var(--border); }
+.modelLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.modelButton svg { flex-shrink: 0; }
+.modelMenu { overflow: hidden; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--card-shadow); font-family: var(--font-body, sans-serif); }
+.modelMenu button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 10px 14px; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.modelMenu button:hover, .modelMenu button[aria-checked="true"] { background: var(--panel-hover); }
+.modelMenu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 
 .header button {
   display: inline-flex;
@@ -55,6 +67,7 @@
 .composer button:focus-visible,
 .composer input:focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 2px; }
 .composer { min-width: 0; }
+.fullComposer.fullComposer { min-height: 0; }
 .composer input { min-width: 0; }
 .composer button { white-space: nowrap; }
 .composer button:hover:not(:disabled) { filter: brightness(1.08); }
@@ -92,7 +105,8 @@
   .actions { grid-column: 2; grid-row: 1; }
   .actions button { width: 44px; height: 44px; padding: 0; }
   .actionLabel { display: none; }
-  .options { grid-column: 1 / -1; grid-row: 2; justify-content: space-between; }
+  .options { gap: 6px; }
+  .options button { padding-inline: 6px; }
   .fullMessages.fullMessages {
     margin: 0;
     padding: 20px 14px !important;
@@ -103,7 +117,7 @@
   .fullComposer.fullComposer {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 6px 8px !important;
+    gap: 8px !important;
     min-height: 0;
     margin: 0;
     padding: 8px 12px !important;
@@ -128,21 +142,6 @@
     height: 44px !important;
     padding: 0 12px !important;
     border-radius: 12px !important;
-  }
-  .fullComposer .modelPicker {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-self: start;
-    width: auto !important;
-    max-width: 100%;
-  }
-  .fullComposer .modelPicker > button {
-    height: 36px !important;
-    padding: 0 8px !important;
-    border: 0 !important;
-    border-radius: 8px !important;
-    background: transparent !important;
-    color: var(--text-muted) !important;
   }
   .fullComposer .attachment { display: none !important; }
 }

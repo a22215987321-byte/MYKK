@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { db } from "../lib/firebase";
 import { doc, updateDoc, arrayUnion, arrayRemove, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { toast } from "../lib/toast";
@@ -24,7 +25,7 @@ const SETTINGS_ROWS = [
 // 版面邏輯，一樣是「版面先做出來」：媒體/共同群組是真資料，聊天設定六列
 // 先做版面（點下去提示即將推出），封鎖／檢舉是真的（沿用 ProfileView.js
 // 裡 blockUser/reportUser 那套寫法，Firestore 規則本來就允許）。
-export default function FriendInfoView({ friend, myUid, myBlocked, messages, myGroups, onClose, onSendMessage }) {
+export default function FriendInfoView({ friend, myUid, myBlocked, messages, myGroups, onClose, onSendMessage, showProfileLink = false }) {
   const [busy, setBusy] = useState(false);
 
   const mediaMessages = useMemo(
@@ -90,6 +91,10 @@ export default function FriendInfoView({ friend, myUid, myBlocked, messages, myG
               <div style={{ fontSize: 12, color: st.color, marginTop: 2 }}>{st.label}</div>
               {friend.signature && <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 6 }}>{friend.signature}</div>}
               <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>{handle} · ID: {friend.uid.slice(0, 8)}</div>
+              {showProfileLink && <Link href={`/profile/${friend.uid}`}
+                style={{ display: "inline-flex", alignItems: "center", minHeight: 44, color: "var(--accent)", fontSize: 13 }}>
+                查看個人檔案
+              </Link>}
             </div>
             <div style={{ display: "flex", gap: 18, flexShrink: 0 }}>
               <button onClick={onClose} title="發送訊息" aria-label="發送訊息"

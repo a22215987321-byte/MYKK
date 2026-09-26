@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId, useCallback } from "react";
 import {
-  collection, doc, getDoc, addDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, addDoc, updateDoc, writeBatch,
   onSnapshot, query, orderBy, limit, serverTimestamp,
 } from "firebase/firestore";
 import { toast } from "../lib/toast";
 import MarkdownMessage, { MarkdownMessageStyles } from "./MarkdownMessage";
 import PortalPopover from "./PortalPopover";
-import { Brain, History, SquarePen } from "lucide-react";
+import AiConversationHistory from "./AiConversationHistory";
+import { Brain, ChevronDown, ChevronUp, History, SquarePen } from "lucide-react";
 import styles from "./AiChatRoom.module.css";
 
 const DEFAULT_MODELS = [
@@ -24,12 +25,6 @@ function titleFromMessages(messages) {
   if (!firstUser?.content) return "新對話";
   const t = firstUser.content.trim().replace(/\s+/g, " ");
   return t.length > 24 ? t.slice(0, 24) + "…" : t;
-}
-
-function formatConvTime(ts) {
-  const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
-  if (!d) return "";
-  return d.toLocaleDateString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 // 深度思考（DeepThink）開啟時，DeepSeek 回傳的 reasoning_content——收合
@@ -205,6 +200,11 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
   const [deepThink, setDeepThink] = useState(false);
   const isDeepseekModel = model.startsWith("deepseek");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [optionsCollapsed, setOptionsCollapsed] = useState(false);
+  const [deletingConversations, setDeletingConversations] = useState(false);
+  const deletionPendingRef = useRef(false);
+  const optionsId = useId();
+  const historyId = useId();
   // 聊天模式／圖片生成模式切換。圖片生成目前是純前端暫存（images），不會存進
   // aiChats 對話紀錄——先讓功能能用，之後真的要留存再另外接 Firestore。
   const [mode, setMode] = useState("chat"); // "chat" | "image"
@@ -214,6 +214,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
   const endRef = useRef(null);
   const modelMenuRef = useRef(null);
   const historyRef = useRef(null);
+  const closeHistory = useCallback(() => setHistoryOpen(false), []);
   const migratedRef = useRef(false);
   // Set right before a programmatic setMessages() that's "switching to a
   // different conversation" rather than "the current one grew a message" —
@@ -380,74 +381,53 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
   // (autosave above), this just clears the view so the next message starts
   // a fresh one instead of appending to the old thread.
   const newConversation = () => {
-    if (sending) return;
+    if (sending || deletionPendingRef.current) return;
     skipNextSaveRef.current = true;
     setMessages([]);
     setActiveConvId(null);
   };
 
   const openConversation = (conv) => {
+    if (sending || deletionPendingRef.current) return;
     skipNextSaveRef.current = true;
     setActiveConvId(conv.id);
     setMessages(conv.messages || []);
     setHistoryOpen(false);
   };
 
-  const removeConversation = async (e, convToDelete) => {
-    e.stopPropagation();
+  const removeConversations = async (selectedIds) => {
+    if (!uid || sending || deletionPendingRef.current || creatingConvRef.current) {
+      throw new Error("Conversation is busy");
+    }
+    // Only IDs from this user's loaded list can enter the atomic batch. A failed
+    // commit must not clear the active conversation or hide any selected records.
+    const ids = [...new Set(selectedIds)].filter(id => conversations.some(conversation => conversation.id === id));
+    if (!ids.length) return;
+    deletionPendingRef.current = true;
+    setDeletingConversations(true);
     try {
-      await deleteDoc(doc(db, "aiChats", uid, "conversations", convToDelete.id));
-      if (convToDelete.id === activeConvId) {
-        skipNextSaveRef.current = true;
+      const batch = writeBatch(db);
+      ids.forEach(id => batch.delete(doc(db, "aiChats", uid, "conversations", id)));
+      await batch.commit();
+      setConversations(current => current.filter(conversation => !ids.includes(conversation.id)));
+      if (ids.includes(activeConvId)) {
+        // Empty messages already suppress autosave; don't skip the next real message.
+        skipNextSaveRef.current = false;
         setActiveConvId(null);
         setMessages([]);
       }
-    } catch (err) {
-      console.error("AiChatRoom delete error:", err);
-      toast("刪除失敗，請重試");
+    } finally {
+      deletionPendingRef.current = false;
+      setDeletingConversations(false);
     }
   };
 
-  // 歷史對話清單內容——完整版跟浮動小視窗（compact）共用同一份，compact 版
-  // 只是額外在最上面加一條「新對話」（完整版有自己獨立的「新對話」按鈕，不需要
-  // 塞進清單裡）。
-  const historyList = (
-    <div style={{
-      background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", boxShadow: "var(--card-shadow)",
-      overflow: "hidden", maxHeight: 320, overflowY: "auto",
-    }}>
-      {compact && (
-        <div onClick={() => { newConversation(); setHistoryOpen(false); }}
-          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border-soft)", fontSize: 13, color: "var(--text)", fontWeight: 600 }}
-          onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
-          onMouseLeave={e => e.currentTarget.style.background = "none"}>
-          🆕 新對話
-        </div>
-      )}
-      {conversations.length === 0 && (
-        <div style={{ padding: "14px", fontSize: 12, color: "var(--text-dim)", textAlign: "center" }}>還沒有過去的對話</div>
-      )}
-      {conversations.map(c => (
-        <div key={c.id} onClick={() => openConversation(c)}
-          style={{
-            display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 14px",
-            background: c.id === activeConvId ? "var(--panel-hover)" : "none", cursor: "pointer",
-            borderBottom: "1px solid var(--border-soft)",
-          }}
-          onMouseEnter={e => { if (c.id !== activeConvId) e.currentTarget.style.background = "var(--panel-hover)"; }}
-          onMouseLeave={e => { if (c.id !== activeConvId) e.currentTarget.style.background = "none"; }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "新對話"}</div>
-            <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{formatConvTime(c.updatedAt)}</div>
-          </div>
-          <button onClick={e => removeConversation(e, c)} aria-label="刪除此對話" title="刪除此對話"
-            style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: 13, padding: 4, flexShrink: 0 }}>
-            🗑️
-          </button>
-        </div>
-      ))}
-    </div>
-  );
+  const toggleHistory = () => {
+    if (deletionPendingRef.current) return;
+    setModelMenuOpen(false);
+    if (compact && minimized) onMinimize?.();
+    setHistoryOpen(open => !open);
+  };
 
   return (
     <>
@@ -464,14 +444,11 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           <span style={{ fontSize: 15 }}>🤖</span>
           <div style={{ flex: 1, fontWeight: 700, fontSize: 13, color: "var(--text)" }}>EVON AI</div>
           <div style={{ position: "relative" }}>
-            <button ref={historyRef} onClick={() => setHistoryOpen(v => !v)} onPointerDown={e => e.stopPropagation()}
-              aria-label="開啟以往的對話" title="以往的對話"
+            <button ref={historyRef} onClick={toggleHistory} onPointerDown={e => e.stopPropagation()} disabled={deletingConversations}
+              aria-label="開啟以往的對話" title="以往的對話" aria-expanded={historyOpen} aria-controls={historyId}
               style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: 6, lineHeight: 1 }}>
               🕘
             </button>
-            <PortalPopover anchorRef={historyRef} open={historyOpen} onClose={() => setHistoryOpen(false)} placement="bottom-right" minWidth={220} constrainToViewport>
-              {historyList}
-            </PortalPopover>
           </div>
           {onMinimize && (
             <button onClick={onMinimize} onPointerDown={e => e.stopPropagation()} aria-label={minimized ? "還原視窗" : "縮小視窗"}
@@ -496,14 +473,43 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           </div>
         </div>
 
-        <div className={styles.options}>
+        <div id={optionsId} className={styles.options} hidden={optionsCollapsed} aria-label="聊天模式與模型設定">
           <div className={styles.modes} role="group" aria-label="AI 模式">
             {[["chat", "聊天模式"], ["image", "圖片生成"]].map(([key, label]) => (
-              <button type="button" key={key} onClick={() => setMode(key)} aria-pressed={mode === key}>
+              <button type="button" key={key} onClick={() => { setMode(key); setHistoryOpen(false); setModelMenuOpen(false); }} disabled={deletingConversations} aria-pressed={mode === key}>
                 {label}
               </button>
             ))}
           </div>
+          {mode === "chat" && (
+            <div className={styles.modelPicker}>
+              <button type="button" ref={modelMenuRef} className={styles.modelButton}
+                onClick={() => { setHistoryOpen(false); setModelMenuOpen(open => !open); }} disabled={deletingConversations}
+                aria-label="選擇 AI 模型" aria-describedby={`${optionsId}-model`} aria-expanded={modelMenuOpen} aria-haspopup="menu"
+                title={availableModels.find(item => item.id === model)?.label || model}>
+                <span id={`${optionsId}-model`} className={styles.modelLabel}>{availableModels.find(item => item.id === model)?.label || model}</span>
+                <ChevronDown size={12} aria-hidden="true" />
+              </button>
+              <PortalPopover anchorRef={modelMenuRef} open={modelMenuOpen} onClose={() => setModelMenuOpen(false)} placement="bottom-right" minWidth={210} constrainToViewport>
+                <div className={styles.modelMenu} role="menu" aria-label="AI 模型" onKeyDown={event => {
+                  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+                  event.preventDefault();
+                  const options = [...event.currentTarget.querySelectorAll('[role="menuitemradio"]')];
+                  const current = options.indexOf(document.activeElement);
+                  const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1
+                    : (current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+                  options[next]?.focus();
+                }}>
+                  {availableModels.map(item => (
+                    <button type="button" key={item.id} role="menuitemradio" aria-checked={model === item.id}
+                      onClick={() => { setModel(item.id); setModelMenuOpen(false); modelMenuRef.current?.focus({ preventScroll: true }); }}>
+                      <span>{item.label}</span>{model === item.id && <span aria-hidden="true">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </PortalPopover>
+            </div>
+          )}
           {mode === "chat" && isDeepseekModel && (
             <button type="button" className={styles.thinkingButton} onClick={() => setDeepThink(v => !v)}
               aria-pressed={deepThink} title="深度思考模式，回覆前會先顯示推理過程">
@@ -512,21 +518,23 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           )}
         </div>
 
-        {mode === "chat" && (
-          <div className={styles.actions}>
-            <button type="button" ref={historyRef} onClick={() => setHistoryOpen(v => !v)}
-              aria-label={`歷史對話（${conversations.length}）`} aria-expanded={historyOpen} title="歷史對話">
+        <div className={styles.actions}>
+          {mode === "chat" && <>
+            <button type="button" ref={historyRef} onClick={toggleHistory} disabled={deletingConversations}
+              aria-label={`歷史對話（${conversations.length}）`} aria-expanded={historyOpen} aria-controls={historyId} title="歷史對話">
               <History size={18} aria-hidden="true" />
               <span className={styles.actionLabel}>歷史對話{conversations.length > 0 ? ` (${conversations.length})` : ""}</span>
             </button>
-            <PortalPopover anchorRef={historyRef} open={historyOpen} onClose={() => setHistoryOpen(false)} placement="bottom-right" minWidth={240} constrainToViewport>
-              {historyList}
-            </PortalPopover>
-            <button type="button" onClick={newConversation} disabled={sending || messages.length === 0} aria-label="新對話" title="新對話">
+            <button type="button" onClick={() => { newConversation(); setHistoryOpen(false); }} disabled={sending || deletingConversations || messages.length === 0} aria-label="新對話" title="新對話">
               <SquarePen size={18} aria-hidden="true" /><span className={styles.actionLabel}>新對話</span>
             </button>
-          </div>
-        )}
+          </>}
+          <button type="button" onClick={() => { setOptionsCollapsed(collapsed => !collapsed); setModelMenuOpen(false); }}
+            aria-label={optionsCollapsed ? "展開聊天工具列" : "收合聊天工具列"} title={optionsCollapsed ? "展開聊天工具列" : "收合聊天工具列"}
+            aria-expanded={!optionsCollapsed} aria-controls={optionsId}>
+            {optionsCollapsed ? <ChevronDown size={18} aria-hidden="true" /> : <ChevronUp size={18} aria-hidden="true" />}
+          </button>
+        </div>
       </header>
       )}
 
@@ -535,7 +543,8 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           監聽都還在，還原後訊息會接著原本的樣子，不會重新載入或掉輸入到
           一半的草稿。 */}
       {!(compact && minimized) && (
-      <>
+      <div className={styles.body}>
+      <div className={styles.chatSurface} inert={historyOpen ? "" : undefined} aria-hidden={historyOpen ? true : undefined}>
       {/* Messages — className="cr-chat-panel" gives this its own floating
           "window" treatment under 幽影深窗 (background/border/radius/glow —
           see the .cr-chat-panel rule in ChatRoom.js's <style> block); every
@@ -596,7 +605,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
         )}
       </div>
 
-      {/* Input row — model picker sits directly to the left of 傳送. className
+      {/* Input row — model selection now lives in the collapsible header. className
           reuses .cr-input-bar for the same reason as the header above
           (also gives it the opaque panel the other 3 rooms' input bars
           already had, which this one was previously missing). */}
@@ -623,44 +632,6 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           onKeyDown={e => e.key === "Enter" && send()}
           placeholder="輸入訊息..." aria-label="輸入訊息" disabled={sending}
           style={{ flex: 1, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 14, outline: "none" }} />
-
-        {/* 模型選擇——compact 版拿掉，固定用預設模型（DeepSeek），對話紀錄跟
-            完整版共用同一份 Firestore 資料，之後在完整版「AI 助手」頁還是能
-            切換模型繼續聊。 */}
-        {!compact && (
-        <div className={styles.modelPicker} style={{ position: "relative", flexShrink: 0, width: "var(--modelpicker-w, auto)" }}>
-          <button ref={modelMenuRef} onClick={() => setModelMenuOpen(v => !v)} aria-label="選擇 AI 模型" aria-expanded={modelMenuOpen}
-            style={{
-              display: "inline-flex", alignItems: "center", justifyContent: "var(--modelpicker-justify, flex-start)", gap: 6,
-              width: "100%", height: "var(--inputbar-field-h, 100%)", boxSizing: "border-box",
-              background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--modelpicker-radius, 999px)",
-              padding: "0 14px", color: "var(--text)", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
-            }}>
-            {availableModels.find(m => m.id === model)?.label || model} <span style={{ fontSize: 10, color: "var(--text-faint)" }}>▾</span>
-          </button>
-
-          <PortalPopover anchorRef={modelMenuRef} open={modelMenuOpen} onClose={() => setModelMenuOpen(false)} placement="top-right" minWidth={210} constrainToViewport>
-            <div style={{
-              background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
-              boxShadow: "var(--card-shadow)", overflow: "hidden",
-            }}>
-              {availableModels.map(m => (
-                <button key={m.id} onClick={() => { setModel(m.id); setModelMenuOpen(false); }}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%",
-                    padding: "10px 14px", background: "none", border: "none",
-                    color: "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = "var(--panel-hover)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "none"}>
-                  <span>{m.label}</span>
-                  {model === m.id && <span>✓</span>}
-                </button>
-              ))}
-            </div>
-          </PortalPopover>
-        </div>
-        )}
 
         <button className={styles.sendButton} onClick={send} disabled={sending || !input.trim()}
           style={{
@@ -691,7 +662,14 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           </>
         )}
       </div>
-      </>
+      </div>
+      {historyOpen && (
+        <AiConversationHistory id={historyId} conversations={conversations} activeConvId={activeConvId}
+          loading={!convListReady} busy={sending || generating} deleting={deletingConversations}
+          triggerRef={historyRef} onOpen={openConversation} onDelete={removeConversations} onClose={closeHistory}
+          onNew={compact ? () => { newConversation(); setHistoryOpen(false); } : undefined} />
+      )}
+      </div>
       )}
     </>
   );
