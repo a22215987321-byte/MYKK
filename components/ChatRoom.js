@@ -2935,6 +2935,33 @@ export default function ChatApp({ user }) {
     </div>
   );
 
+  // Reuse the same controls in the mobile topbar or desktop thread header,
+  // never both: one file input/ref and the existing avatar/info actions.
+  const groupHeaderIdentity = activeGroup && (
+    <>
+      <input ref={groupAvatarFileRef} type="file" accept="image/*" style={{ display: "none" }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) changeGroupAvatar(f); e.target.value = ""; }} />
+      <button className="cr-group-avatar" onClick={() => groupAvatarFileRef.current?.click()} disabled={groupAvatarUploading}
+        title="更換群組頭像" aria-label="更換群組頭像"
+        style={{
+          width: isMobile ? 38 : 34, height: isMobile ? 38 : 34, borderRadius: "50%", flexShrink: 0, padding: 0,
+          border: "none", cursor: groupAvatarUploading ? "default" : "pointer",
+          background: "linear-gradient(135deg,var(--text-dim),var(--border))",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+          overflow: "hidden", opacity: groupAvatarUploading ? 0.6 : 1,
+        }}>
+        {isGroupAvatarImage(activeGroup.avatar)
+          ? <img src={activeGroup.avatar} alt={activeGroup.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          : (activeGroup.avatar || (activeGroup.name ? activeGroup.name.slice(0, 1).toUpperCase() : "👥"))}
+      </button>
+      <button className="cr-group-details" onClick={() => setShowGroupInfo(true)} title="查看群組資訊" aria-label="查看群組資訊"
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", minWidth: 0, fontFamily: "inherit" }}>
+        <div style={{ fontWeight: 700, fontSize: isMobile ? 16 : 14, lineHeight: 1.3, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeGroup.name}</div>
+        <div style={{ fontSize: isMobile ? 12 : 11, lineHeight: 1.4, color: "var(--text-faint)", whiteSpace: "nowrap" }}>{(activeGroup.members || []).length} 位成員</div>
+      </button>
+    </>
+  );
+
   // 好友/群組對話串——桌面版「對話」分頁跟手機版共用同一套（手機版原本
   // 就沒有 isMobile 分支，這段邏輯本來就是共用的，只是現在從 .cr-main
   // 搬出來獨立成一個變數）。
@@ -3010,28 +3037,11 @@ export default function ChatApp({ user }) {
       )}
       {activeGroupId && activeGroup && !showGroupInfo && (
         <>
-          <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
-            <input ref={groupAvatarFileRef} type="file" accept="image/*" style={{ display: "none" }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) changeGroupAvatar(f); e.target.value = ""; }} />
-            <button onClick={() => groupAvatarFileRef.current?.click()} disabled={groupAvatarUploading}
-              title="更換群組頭像" aria-label="更換群組頭像"
-              style={{
-                width: 34, height: 34, borderRadius: "50%", flexShrink: 0, padding: 0,
-                border: "none", cursor: groupAvatarUploading ? "default" : "pointer",
-                background: "linear-gradient(135deg,var(--text-dim),var(--border))",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-                overflow: "hidden", opacity: groupAvatarUploading ? 0.6 : 1,
-              }}>
-              {isGroupAvatarImage(activeGroup.avatar)
-                ? <img src={activeGroup.avatar} alt={activeGroup.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                : (activeGroup.avatar || (activeGroup.name ? activeGroup.name.slice(0, 1).toUpperCase() : "👥"))}
-            </button>
-            <button onClick={() => setShowGroupInfo(true)} title="查看群組資訊"
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{activeGroup.name}</div>
-              <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{(activeGroup.members || []).length} 位成員</div>
-            </button>
-          </div>
+          {!isMobile && (
+            <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
+              {groupHeaderIdentity}
+            </div>
+          )}
           <div className="cr-chat-panel" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, background: "transparent" }}>
             {groupMessages.length === 0 && (
               <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-dim)" }}>
@@ -3471,6 +3481,10 @@ export default function ChatApp({ user }) {
 
         /* ── Mobile topbar: hidden on desktop ── */
         .cr-mobile-topbar { display: none; }
+        .cr-group-avatar:focus-visible, .cr-group-details:focus-visible {
+          outline: 2px solid var(--accent); outline-offset: 3px;
+        }
+        .cr-group-avatar:hover:not(:disabled), .cr-group-details:hover { filter: brightness(0.95); }
 
         /* ── Mobile drawer backdrop: hidden on desktop ── */
         .cr-sidebar-backdrop { display: none; }
@@ -3556,6 +3570,7 @@ export default function ChatApp({ user }) {
             height: 100dvh !important;
             border-radius: 0 !important;
             flex-direction: column !important;
+            gap: 0;
           }
 
           /* Sidebar (聊天分頁): iOS 風格抽屜，position:fixed 疊在畫面上，
@@ -3606,13 +3621,18 @@ export default function ChatApp({ user }) {
             display: flex !important;
             align-items: center;
             gap: 8px;
-            min-height: 56px;
+            min-height: calc(60px + env(safe-area-inset-top));
             box-sizing: border-box;
-            padding: calc(env(safe-area-inset-top) + 10px) 12px 10px;
+            padding: calc(env(safe-area-inset-top) + 8px) 12px 8px;
             background: var(--panel);
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
           }
+          .cr-mobile-group-identity {
+            display: flex; align-items: center; gap: 8px;
+            flex: 1; min-width: 0;
+          }
+          .cr-mobile-group-identity .cr-group-details { flex: 1; min-height: 40px; }
 
           /* Groups / Friends sidebar rows: bigger touch targets, no hover-era transition */
           .fb {
@@ -3809,9 +3829,13 @@ export default function ChatApp({ user }) {
           ) : (
             <div style={{ width: 24, flexShrink: 0 }} />
           )}
-          <div style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 17, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {mobileView === 'more' ? "更多" : activeGroup ? activeGroup.name : activeFriendProfile ? activeFriendProfile.nickname : mobileHomeSubview === 'hall' ? "公共大廳" : "Evonchat"}
-          </div>
+          {isMobile && mobileView === null && activeGroup && !showGroupInfo ? (
+            <div className="cr-mobile-group-identity">{groupHeaderIdentity}</div>
+          ) : (
+            <div style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 17, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {mobileView === 'more' ? "更多" : activeGroup ? activeGroup.name : activeFriendProfile ? activeFriendProfile.nickname : mobileActiveKey === 'feed' && !viewProfileUid ? "動態消息" : mobileHomeSubview === 'hall' ? "公共大廳" : "Evonchat"}
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
             <button onClick={() => setCalendarOpen(true)} aria-label="開啟日曆"
               style={{ background: "none", border: "none", color: "var(--text)", cursor: "pointer", padding: 6, lineHeight: 1, display: "flex" }}>

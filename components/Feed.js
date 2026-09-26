@@ -19,6 +19,7 @@ import PortalPopover from "./PortalPopover";
 import { VISIBILITY_OPTIONS, visibilityMeta, canViewPost } from "../lib/postVisibility";
 import { splitLinks } from "../lib/linkify";
 import { linkAnchor } from "./LinkifiedText";
+import styles from "./Feed.module.css";
 
 const HASHTAG_RE = /#[\p{L}\p{N}_]+/gu;
 // 只從「不是網址」的片段抓標籤：https://x.com/a#section 的 #section 是網址的
@@ -824,26 +825,26 @@ export default function FeedApp({ user, embedded = false, onOpenProfile }) {
   }
 
   const content = (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px" }} ref={topRef}>
-      {/* Hero */}
-      <div style={{ marginBottom: 20, display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div>
+    <div className={styles.content} ref={topRef}>
+      {/* Mobile uses the page's topbar title; desktop keeps its pane title. */}
+      <div className={styles.toolbar}>
+        <div className={styles.heading}>
           <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>動態消息</div>
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>看看朋友近況，分享你的想法</div>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ position: "relative" }}>
+        <div className={styles.filters}>
+          <div className={styles.search}>
             <Icon name="search" size={15} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }} />
             <input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="搜尋貼文..."
-              style={{ width: 160, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 12px 7px 30px", color: "var(--text)", fontSize: 13, outline: "none" }}
+              aria-label="搜尋貼文"
+              className={styles.searchInput}
             />
           </div>
-          <div style={{ display: "flex", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 3, gap: 2 }}>
+          <div className={styles.sort} style={{ display: "flex", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: 3, gap: 2 }}>
             {[["latest", "最新"], ["hot", "熱門"]].map(([mode, label]) => (
-              <button key={mode} onClick={() => setSortMode(mode)}
+              <button key={mode} onClick={() => setSortMode(mode)} aria-pressed={sortMode === mode}
                 style={{
                   border: "none", borderRadius: 16, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
                   background: sortMode === mode ? "var(--accent)" : "transparent",
