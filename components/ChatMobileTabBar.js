@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { useRef } from "react";
 import { useRouter } from "next/router";
 import { Home, Newspaper, Bot, Smile } from "lucide-react";
 import { auth } from "../lib/firebase";
+import useOverlayHeight from "../lib/useOverlayHeight";
+import styles from "./ChatMobileTabBar.module.css";
 
 function TabButton({ Icon, label, active, onClick, badge }) {
   return (
@@ -33,14 +36,16 @@ function TabButton({ Icon, label, active, onClick, badge }) {
 // ChatRoom 內嵌使用時，ChatRoom 會傳明確的 callback 直接切換內部 state；
 // 被 MobileTabBarLayout 獨立掛載時（例如 /feed、/profile/[uid] 這些活在
 // ChatRoom 外面的頁面），沒有這些 callback，就退回用路由的 fallback。
-export default function ChatMobileTabBar({ activeTab, onSelectHome, onSelectAi, onOpenProfile, pendingCount = 0 }) {
+export default function ChatMobileTabBar({ activeTab, onSelectHome, onSelectAi, onOpenProfile, pendingCount = 0, glass = false, overlayRootRef }) {
   const router = useRouter();
+  const tabbarRef = useRef(null);
+  useOverlayHeight(tabbarRef, overlayRootRef, "--ai-nav-height", glass && Boolean(overlayRootRef));
   const goHome = onSelectHome || (() => router.push('/?view=list'));
   const goAi = onSelectAi || (() => router.push('/?view=ai'));
   const goProfile = onOpenProfile || (() => router.push(`/profile/${auth.currentUser?.uid || ''}`));
 
   return (
-    <div className="cr-tabbar">
+    <div ref={tabbarRef} className={`cr-tabbar${glass ? ` ${styles.glass}` : ""}`} data-ai-glass={glass ? "true" : undefined}>
       <style>{`
         .cr-tabbar { display: none; }
         .cr-tabbar > :is(button, a) { min-width: 0; border-radius: 8px; }

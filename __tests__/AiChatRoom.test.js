@@ -156,6 +156,23 @@ test("model picker sits between modes and thinking; collapse preserves model, th
   expect(global.fetch.mock.calls.every(([, options]) => options.method === "GET")).toBe(true);
 });
 
+test("full AI room keeps messages and controls in a shared glass canvas; compact room stays unchanged", async () => {
+  await render(<AiChatRoom user={{ uid: "test-owner" }} db={{}} />);
+  const room = container.querySelector('[aria-label="AI 對話工作區"]');
+  const viewport = room.querySelector('[data-ai-messages="true"]');
+  expect(room).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(room.querySelector('header[aria-label="AI 助手工具列"]')).not.toBeNull();
+  expect(viewport.parentElement.querySelector(".cr-input-bar")).not.toBeNull();
+  await click(container.querySelector('[aria-label="歷史對話（1）"]'));
+  expect(room.querySelector('[role="dialog"]').parentElement.className).toContain("historyLayer");
+  expect(viewport.parentElement.hasAttribute("inert")).toBe(true);
+  await render(<AiChatRoom user={{ uid: "test-owner" }} db={{}} compact />);
+  expect(container.querySelector('[aria-label="AI 對話工作區"]')).toBeNull();
+  expect(container.querySelector('[data-ai-messages="true"]')).toBeNull();
+  expect(container.querySelector(".cr-chat-header")).not.toBeNull();
+});
+
 test("history opens over the chat area; selecting does not open or delete a conversation", async () => {
   await openHistory();
   const dialog = container.querySelector('[role="dialog"]');

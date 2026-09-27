@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowUpRight, BookOpen, FileText, Languages, Lightbulb, ListChecks, PenLine, Search, X } from "lucide-react";
+import { ArrowUpRight, BookOpen, Calculator, ChartNoAxesCombined, Database, FileText, Languages, Lightbulb, ListChecks, PenLine, Search, X } from "lucide-react";
 import { filterGuestSkills } from "../lib/guestSkills";
 import styles from "./GuestSkillsSheet.module.css";
 
@@ -8,6 +8,7 @@ const ICONS = {
   summary: FileText, write: PenLine, translate: Languages, plan: ListChecks, ideas: Lightbulb, explain: BookOpen,
   academic: BookOpen, account: Search, competitive: ListChecks, decision: ListChecks,
   evidence: FileText, expansion: ArrowUpRight, market: Search, opportunity: Lightbulb,
+  finance: Calculator, data: Database, sales: ChartNoAxesCombined,
 };
 export function GuestSkillIcon({ name, size = 20 }) {
   const Icon = ICONS[name] || FileText;
@@ -57,7 +58,7 @@ export default function GuestSkillsSheet({ open, onClose, onSelect }) {
             <span className={styles.copy}><span className={styles.meta}>{skill.category}{skill.professional && <em>專業</em>}</span><strong>{skill.title}</strong><span>{skill.description}</span></span>
             <ArrowUpRight size={16} className={styles.arrow} aria-hidden="true" />
           </button>)}
-          {skills.length === 0 && <p className={styles.empty} role="status">沒有符合的範本，試試「寫作」或「規劃」。</p>}
+          {skills.length === 0 && <p className={styles.empty} role="status">沒有符合的範本，試試「寫作」、「財務」、「資料」或「銷售」。</p>}
         </div>
         <p className={styles.note}>目前只提供可編輯的指令範本，不會呼叫 AI、執行工具或讀取外部資料。</p>
       </section>

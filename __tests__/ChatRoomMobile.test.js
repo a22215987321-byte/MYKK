@@ -194,6 +194,7 @@ test("mobile AI tab removes the duplicate global toolbar without expanding accou
   expect(container.querySelector(".cr-mobile-topbar")).toBeNull();
   expect(container.textContent).toContain("此功能暫時僅限管理員帳號使用");
   expect(container.querySelector('[data-testid="ai-room"]')).toBeNull();
+  expect(container.querySelector('.cr-tabbar[data-ai-glass="true"]')).toBeNull();
   expect(container.querySelector('.cr-tabbar [aria-current="page"]').textContent).toBe("AI 助手");
   await click([...container.querySelectorAll(".cr-tabbar button")].find(el => el.textContent === "首頁"));
   expect(container.querySelector(".cr-mobile-topbar")).not.toBeNull();
@@ -204,10 +205,14 @@ test("AI deep link opens the existing permitted room and can return home", async
   await act(async () => root.render(<ChatRoom user={{ uid: "test-owner", email: "a22215987321@gmail.com" }} />));
   expect(container.querySelector('[data-testid="ai-room"]')).not.toBeNull();
   expect(container.querySelector(".cr-mobile-topbar")).toBeNull();
+  expect(container.querySelector(".cr-ai-glass-active")).not.toBeNull();
+  expect(container.querySelector('.cr-tabbar[data-ai-glass="true"]')).not.toBeNull();
   expect(useRouter().replace).toHaveBeenCalledWith("/", undefined, { shallow: true });
   await click([...container.querySelectorAll(".cr-tabbar button")].find(el => el.textContent === "首頁"));
   expect(container.querySelector(".cr-mobile-topbar")).not.toBeNull();
   expect(container.querySelector('[data-testid="ai-room"]')).toBeNull();
+  expect(container.querySelector(".cr-ai-glass-active")).toBeNull();
+  expect(container.querySelector('.cr-tabbar[data-ai-glass="true"]')).toBeNull();
 });
 
 async function openHall() {

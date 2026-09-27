@@ -3535,6 +3535,7 @@ export default function ChatApp({ user }) {
         }
 
         @media (max-width: 767px) {
+          .cr-ai-glass-active { --ai-nav-height: calc(68px + env(safe-area-inset-bottom)); }
           /* Prevent iOS Safari auto-zoom on input focus (needs >=16px) */
           input, textarea, select { font-size: 16px !important; }
 
@@ -3755,7 +3756,7 @@ export default function ChatApp({ user }) {
         </div>
       )}
 
-      <div className="cr-shell" ref={shellElRef}
+      <div className={`cr-shell${mobileAiActive && aiChatAllowed ? " cr-ai-glass-active" : ""}`} ref={shellElRef}
         onPointerDown={handleShellPointerDown} onPointerMove={handleShellPointerMove}
         onPointerUp={handleShellPointerEnd} onPointerCancel={handleShellPointerCancel}
         style={{
@@ -4316,6 +4317,8 @@ export default function ChatApp({ user }) {
 
         {isMobile && (
           <ChatMobileTabBar
+            glass={mobileAiActive && aiChatAllowed}
+            overlayRootRef={shellElRef}
             activeTab={
               mobileActiveKey === 'feed' ? 'feed'
               : mobileAiActive ? 'ai'

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useId, useCallback } from "react";
+import { Fragment, useState, useRef, useEffect, useId, useCallback } from "react";
 import {
   collection, doc, getDoc, addDoc, updateDoc, writeBatch,
   onSnapshot, query, orderBy, limit, serverTimestamp,
@@ -7,6 +7,7 @@ import { toast } from "../lib/toast";
 import MarkdownMessage, { MarkdownMessageStyles } from "./MarkdownMessage";
 import PortalPopover from "./PortalPopover";
 import AiConversationHistory from "./AiConversationHistory";
+import useOverlayHeight from "../lib/useOverlayHeight";
 import { Brain, ChevronDown, ChevronUp, History, SquarePen } from "lucide-react";
 import styles from "./AiChatRoom.module.css";
 
@@ -214,6 +215,11 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
   const endRef = useRef(null);
   const modelMenuRef = useRef(null);
   const historyRef = useRef(null);
+  const roomRef = useRef(null);
+  const headerRef = useRef(null);
+  const composerRef = useRef(null);
+  useOverlayHeight(headerRef, roomRef, "--ai-header-height", !compact);
+  useOverlayHeight(composerRef, roomRef, "--ai-composer-height", !compact);
   const closeHistory = useCallback(() => setHistoryOpen(false), []);
   const migratedRef = useRef(false);
   // Set right before a programmatic setMessages() that's "switching to a
@@ -429,8 +435,12 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
     setHistoryOpen(open => !open);
   };
 
+  // Full rooms share one scroll canvas beneath translucent controls. Keep the
+  // floating compact window's existing DOM/layout and drag behavior unchanged.
+  const Room = compact ? Fragment : "section";
+
   return (
-    <>
+    <Room {...(compact ? {} : { ref: roomRef, className: styles.room, "aria-label": "AI 對話工作區" })}>
       {/* Header — className shares the .cr-chat-header rule defined in
           ChatRoom.js's <style> block (this component always renders inside
           ChatRoom's tree), so it gets the same "世界" background translucency
@@ -464,7 +474,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           )}
         </div>
       ) : (
-      <header className={`cr-chat-header ${styles.header}`} aria-label="AI 助手工具列">
+      <header ref={headerRef} className={`cr-chat-header ${styles.header}`} aria-label="AI 助手工具列">
         <div className={styles.identity}>
           <img src="/ai-avatar.jpg" alt="" width={32} height={32} />
           <div className={styles.identityText}>
@@ -550,7 +560,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           see the .cr-chat-panel rule in ChatRoom.js's <style> block); every
           other theme's --chatpanel-* tokens default to 0/none so this stays
           a plain flush container exactly as before. */}
-      <div className={`cr-chat-panel ${styles.messages} ${compact ? "" : styles.fullMessages}`} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: mode === "chat" ? 0 : 14, backgroundSize: "var(--chat-world-bg-size, auto), cover", backgroundRepeat: "var(--chat-world-bg-repeat, repeat), no-repeat", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
+      <div data-ai-messages={compact ? undefined : "true"} className={`cr-chat-panel ${styles.messages} ${compact ? "" : styles.fullMessages}`} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: mode === "chat" ? 0 : 14, backgroundSize: "var(--chat-world-bg-size, auto), cover", backgroundRepeat: "var(--chat-world-bg-repeat, repeat), no-repeat", backgroundPosition: "center, center", backgroundAttachment: "fixed, fixed" }}>
         {mode === "chat" ? (
           <>
             {messages.length === 0 && (
@@ -609,7 +619,7 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
           reuses .cr-input-bar for the same reason as the header above
           (also gives it the opaque panel the other 3 rooms' input bars
           already had, which this one was previously missing). */}
-      <div className={`cr-input-bar ${styles.composer} ${compact ? "" : styles.fullComposer}`} style={{ padding: "12px 16px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, boxSizing: "border-box" }}>
+      <div ref={composerRef} className={`cr-input-bar ${styles.composer} ${compact ? "" : styles.fullComposer}`} style={{ padding: "12px 16px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, boxSizing: "border-box" }}>
         {mode === "chat" ? (
           <>
         {/* Decorative under 幽影深窗 only (--plusbtn-display defaults to
@@ -664,13 +674,15 @@ export default function AiChatRoom({ user, db, compact = false, onClose, headerD
       </div>
       </div>
       {historyOpen && (
+        <div className={styles.historyLayer}>
         <AiConversationHistory id={historyId} conversations={conversations} activeConvId={activeConvId}
           loading={!convListReady} busy={sending || generating} deleting={deletingConversations}
           triggerRef={historyRef} onOpen={openConversation} onDelete={removeConversations} onClose={closeHistory}
           onNew={compact ? () => { newConversation(); setHistoryOpen(false); } : undefined} />
+        </div>
       )}
       </div>
       )}
-    </>
+    </Room>
   );
 }

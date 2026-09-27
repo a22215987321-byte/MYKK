@@ -1,3 +1,17 @@
+.room {
+  --ai-header-height: 108px;
+  --ai-composer-height: 66px;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .header.header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -29,6 +43,7 @@
 .actions { display: flex; align-items: center; gap: 4px; margin-left: auto; grid-column: 2; grid-row: 1; }
 .body, .chatSurface { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .body { position: relative; isolation: isolate; }
+.historyLayer { position: absolute; inset: 0; z-index: 2; }
 .chatSurface[aria-hidden="true"] { visibility: hidden; }
 .modelPicker { min-width: 0; max-width: 220px; flex: 0 1 auto; }
 .header .modelButton { width: 100%; min-width: 0; box-sizing: border-box; padding: 6px 8px; background: var(--panel-alt); border: 1px solid var(--border); }
@@ -144,4 +159,79 @@
     border-radius: 12px !important;
   }
   .fullComposer .attachment { display: none !important; }
+}
+
+/* The messages, not a duplicate background image, pass beneath both overlays.
+   Insets are measured from the real controls so collapse and text zoom stay safe. */
+.room .body { position: absolute; inset: 0; }
+.room .chatSurface { position: relative; }
+.room .header.header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border-soft, var(--border));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+.room .fullMessages.fullMessages {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  background-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding-top: calc(var(--ai-header-height) + 20px) !important;
+  padding-bottom: calc(var(--ai-composer-height) + var(--ai-nav-height, 0px) + 20px) !important;
+  scroll-padding-top: calc(var(--ai-header-height) + 20px);
+  scroll-padding-bottom: calc(var(--ai-composer-height) + var(--ai-nav-height, 0px) + 20px);
+}
+.room .fullComposer.fullComposer {
+  position: absolute;
+  inset: auto 0 var(--ai-nav-height, 0px);
+  z-index: 2;
+  margin: 0;
+  min-height: 0;
+  border: 0;
+  border-top: 1px solid var(--border-soft, var(--border)) !important;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--panel);
+}
+.room .historyLayer {
+  top: var(--ai-header-height);
+  bottom: var(--ai-nav-height, 0px);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (background: color-mix(in srgb, white 50%, transparent)) {
+  .room .header.header {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.18), transparent 55%), color-mix(in srgb, var(--panel) 58%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--text) 8%, transparent);
+    backdrop-filter: blur(12px) saturate(1.3);
+    -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  }
+  .room .fullComposer.fullComposer {
+    background: color-mix(in srgb, var(--panel) 70%, transparent);
+    border-top-color: color-mix(in srgb, var(--text) 7%, transparent) !important;
+    backdrop-filter: blur(8px) saturate(1.15);
+    -webkit-backdrop-filter: blur(8px) saturate(1.15);
+  }
+  .room .modes, .room .modelButton {
+    background: color-mix(in srgb, var(--panel-alt) 70%, transparent);
+  }
+  .room .fullComposer > input {
+    background: color-mix(in srgb, var(--panel) 88%, transparent) !important;
+  }
+}
+
+/* Accessibility/older browsers retain opaque, readable controls. */
+@media (prefers-reduced-transparency: reduce) {
+  .room .header.header, .room .fullComposer.fullComposer {
+    background: var(--panel);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .room .fullComposer > input { background: var(--panel) !important; }
 }
