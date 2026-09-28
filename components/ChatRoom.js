@@ -3204,7 +3204,7 @@ export default function ChatApp({ user }) {
   const CONTENT_REGISTRY = {
     ...Object.fromEntries(openPrivateIds.map(friendId => ["private:" + friendId, renderPrivateThread(friendId)])),
     feed: (
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflowY: viewProfileUid ? "hidden" : "auto" }}>
         {viewProfileUid ? (
           <ProfileView uid={viewProfileUid} embedded onClose={() => setViewProfileUid(null)} onOpenProfile={setViewProfileUid} onPlayAudioQueue={playAudioQueue} />
         ) : (
@@ -4303,7 +4303,7 @@ export default function ChatApp({ user }) {
                     {blocks[block].tabs.length === 0 ? (
                       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>從側欄開啟對話或功能，或把分頁拖到這裡</div>
                     ) : blocks[block].tabs.map(key => (
-                      <div key={key} data-workspace-pane={key} style={{ flex: 1, minHeight: 0, display: key === blocks[block].active ? "flex" : "none", flexDirection: "column" }}>
+                      <div key={key} data-workspace-pane={key} style={{ flex: 1, minWidth: 0, minHeight: 0, display: key === blocks[block].active ? "flex" : "none", flexDirection: "column" }}>
                         {CONTENT_REGISTRY[key]}
                       </div>
                     ))}

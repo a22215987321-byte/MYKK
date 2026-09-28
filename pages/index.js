@@ -7,9 +7,10 @@ import AuthScreen from '../components/AuthScreen';
 import ProfileSetup from '../components/ProfileSetup';
 import InstallPrompt from '../components/InstallPrompt';
 import { uploadToR2 } from '../lib/uploadToR2';
-import { rememberAccountSession, restoreAccountSession, forgetAccountSession } from '../lib/accountSessions';
+import { rememberAccountSession, forgetAccountSession } from '../lib/accountSessions';
+import { continueSavedAccount, signInWithGoogleAccount } from '../lib/savedAccountLogin';
 import {
-  auth, db, googleProvider, signInWithPopup, signInAnonymously,
+  auth, db, signInAnonymously,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
 } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -374,7 +375,7 @@ export default function Home() {
         if (revision !== authRevision.current || auth.currentUser?.uid !== u.uid) return;
         if (snap.exists()) {
           const p = snap.data();
-          const evictedUids = saveAccount({ uid: u.uid, email: u.email, nickname: p.nickname, avatar: p.avatar, avatarImage: p.avatarImage, color: p.color });
+          const evictedUids = saveAccount({ uid: u.uid, email: u.email, nickname: p.nickname, avatar: p.avatar, avatarImage: p.avatarImage, color: p.color, providerIds: u.providerData.map(provider => provider.providerId) });
           rememberAccountSession(u, evictedUids).catch(() => {});
           // The splash screen is a once-per-session boot animation, not a
           // per-navigation one — every client-side nav back to "/" (the
@@ -451,7 +452,7 @@ export default function Home() {
       // 好友關係建立之後才送歡迎文件——先有好友，對方的聊天清單才看得到這個
       // 對話；順序反過來會出現一個不在好友清單裡的未讀對話。
       await sendWelcomeDocs(owner, u.uid);
-      const evictedUids = saveAccount({ uid: u.uid, email: u.email, nickname: nickname.trim(), avatar, avatarImage: '/avatar1.png', color });
+      const evictedUids = saveAccount({ uid: u.uid, email: u.email, nickname: nickname.trim(), avatar, avatarImage: '/avatar1.png', color, providerIds: u.providerData.map(provider => provider.providerId) });
       await rememberAccountSession(u, evictedUids).catch(() => {});
       setStep('chat');
     } catch (e) { setAuthError(getErrorMessage(e.code)); }
@@ -459,21 +460,31 @@ export default function Home() {
   };
 
   const handleGoogleLogin = async () => {
+    if (busy || guestBusy) return;
     setAuthError('');
     setBusy(true);
-    try { await signInWithPopup(auth, googleProvider); }
+    try { await signInWithGoogleAccount(email.trim()); }
     catch { setAuthError('Google 登入失敗，請稍後再試'); }
     finally { setBusy(false); }
   };
 
   const handleSavedAccount = async (account) => {
+    if (busy || guestBusy) return;
     setBusy(true); setAuthError('');
+    setEmail(account.email || ''); setPassword(''); setTab('login');
     try {
-      if (!await restoreAccountSession(account.uid)) {
-        setEmail(account.email); setTab('login');
-        setAuthError('這個帳號需要重新驗證一次；登入後可在此裝置快速切換。');
+      if (!await continueSavedAccount(account)) {
+        setAuthError(account.providerIds?.includes('password')
+          ? '此帳號的登入狀態已失效，請使用 Email 登入重新驗證。'
+          : '此裝置尚未保留這個帳號的有效登入。若先前使用 Google，請按「使用 Google 繼續」，不需要網站密碼；登入後可直接點選帳號切換。');
       }
-    } catch { setAuthError('暫時無法恢復登入，請檢查網路後再試。'); }
+    } catch (error) {
+      setAuthError(error.code === 'auth/popup-blocked'
+        ? '瀏覽器阻擋了 Google 登入視窗，請按「使用 Google 繼續」完成驗證。'
+        : error.code === 'auth/popup-closed-by-user'
+          ? '已取消 Google 驗證；請按「使用 Google 繼續」重試。'
+          : '暫時無法恢復登入，請檢查網路後再試。');
+    }
     finally { setBusy(false); }
   };
   const handleForgetAccount = async (account) => {
@@ -515,7 +526,7 @@ export default function Home() {
       });
       await linkOwnerToNewUser(ownerUid, user.uid);
       await sendWelcomeDocs(owner, user.uid);
-      const evictedUids = saveAccount({ uid: user.uid, email: user.email, nickname: setupNickname.trim(), avatar: setupAvatar, avatarImage, color: setupColor });
+      const evictedUids = saveAccount({ uid: user.uid, email: user.email, nickname: setupNickname.trim(), avatar: setupAvatar, avatarImage, color: setupColor, providerIds: user.providerData.map(provider => provider.providerId) });
       await rememberAccountSession(user, evictedUids).catch(() => {});
       setStep('chat');
     } catch (e) { setSetupError('儲存失敗，請檢查網路或選擇另一張圖片後重試。'); }

@@ -16,6 +16,7 @@ import VideoPlayer from "./VideoPlayer";
 import { Avatar, CommentSection } from "./PostComments";
 import SharePostModal from "./SharePostModal";
 import PortalPopover from "./PortalPopover";
+import { POST_PREVIEW_LENGTH } from "./ExpandablePostText";
 import { VISIBILITY_OPTIONS, visibilityMeta, canViewPost } from "../lib/postVisibility";
 import { splitLinks } from "../lib/linkify";
 import { linkAnchor } from "./LinkifiedText";
@@ -135,7 +136,7 @@ function Icon({ name, size = 18, style }) {
   );
 }
 
-const LONG_POST_THRESHOLD = 260;
+const LONG_POST_THRESHOLD = POST_PREVIEW_LENGTH;
 
 // 貼文右上角的媒體收藏鈕——只有真的有影片/MP3的貼文才會出現，跟原本貼文
 // 下方那顆泛用的📑收藏鈕（收藏整篇貼文，任何類型都能收）不衝突，這顆是

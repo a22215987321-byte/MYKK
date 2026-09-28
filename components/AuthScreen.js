@@ -1,5 +1,5 @@
 // Presentation only: authentication, validation and navigation stay in pages/index.js.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Eye, EyeOff, Mail, UserRound, X, ArrowLeft } from "lucide-react";
 import styles from "./AuthScreen.module.css";
 
@@ -10,7 +10,8 @@ function Brand() {
   return (
     <div className={styles.brand}>
       <img src="/logo.png?v=3" width="48" height="48" alt="" aria-hidden="true" />
-      <div className={styles.brandName}>EVONCHAT</div>
+      <h1 className={styles.brandName}>EVONCHAT</h1>
+      <p className={styles.tagline}>與重要的人，保持聯繫</p>
     </div>
   );
 }
@@ -34,8 +35,9 @@ export default function AuthScreen({
   savedAccounts = [], onSavedAccount, onForgetAccount,
 }) {
   const [showPassword, setShowPassword] = useState(false);
-  const [emailExpanded, setEmailExpanded] = useState(Boolean(email));
-  useEffect(() => { if (email) setEmailExpanded(true); }, [email]);
+  // An email identifies both Google and password accounts. Prefilling it must
+  // not send remembered Google users into a password form.
+  const [emailExpanded, setEmailExpanded] = useState(false);
   const isLogin = tab === "login";
   const showForm = emailExpanded || !isLogin;
   const formBusy = busy || guestBusy;
@@ -48,13 +50,13 @@ export default function AuthScreen({
     <main className={styles.root}>
       <div className={styles.layout}>
         <Brand />
-        <section className={styles.loginRegion} aria-labelledby="auth-title">
+        <section className={styles.loginRegion} aria-label={isLogin ? "登入" : "註冊"}>
           <div className={`${styles.card} ${showForm ? styles.formCard : ""}`} aria-busy={formBusy}>
-            <h1 id="auth-title" className={styles.title}>{isLogin ? "與重要的人，保持聯繫" : "建立你的帳戶"}</h1>
+            {!isLogin && <h2 className={styles.title}>建立你的帳戶</h2>}
             {isLogin && savedAccounts.length > 0 && <section className={styles.saved} aria-label="已儲存的帳號">
               <p>繼續使用已儲存的帳號</p>
               {savedAccounts.map(account => <div className={styles.savedRow} key={account.uid}>
-                <button type="button" disabled={formBusy} className={styles.savedAccount} onClick={() => onSavedAccount?.(account)}>
+                <button type="button" disabled={formBusy} className={styles.savedAccount} onClick={() => { setEmailExpanded(false); onSavedAccount?.(account); }}>
                   {account.avatarImage ? <img src={account.avatarImage} alt="" /> : <UserRound size={24} />}
                   <span><strong>{account.nickname || account.email}</strong><small>{account.email}</small></span>
                 </button>

@@ -5,10 +5,19 @@
 .root > :global(.cr-input-bar) { bottom: var(--thread-nav-height, 0px); border: 0 !important; border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent) !important; }
 .root :is(button, a, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .root :global(.cr-file-card):hover { background: color-mix(in srgb, var(--text) 4%, transparent) !important; }
-.centered { --thread-column-width: clamp(320px, 33.333%, 820px); }
+.root:not(.details) :global(.cr-message-column),
+.root:not(.details) > :global(.cr-input-bar) > :first-child {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  margin-inline: auto;
+}
+@media (min-width: 900px) {
+  .root:not(.details) :global(.cr-message-column),
+  .root:not(.details) > :global(.cr-input-bar) > :first-child { max-width: 720px; }
+}
 .centered > :global(.cr-chat-panel) { scrollbar-gutter: stable both-edges; }
-.centered :global(.cr-message-column) { width: var(--thread-column-width); max-width: 100%; margin-inline: auto; gap: 16px; }
-.centered > :global(.cr-input-bar) > :first-child { width: var(--thread-column-width); max-width: 100%; margin-inline: auto; }
+.centered :global(.cr-message-column) { gap: 16px; }
 .centered :global(.cr-message-body):not([data-unframed="true"]) { background: #fff !important; color: #222 !important; border: 1px solid #e7e7e7 !important; border-radius: 16px !important; box-shadow: none; }
 @media (max-width: 767px) {
   .root:not(.details) { --thread-nav-height: var(--ai-nav-height, calc(68px + env(safe-area-inset-bottom))); }

@@ -18,7 +18,6 @@ export default function ChatThreadSurface({ children, centered, mobile, conversa
       const pinned = scroller?.clientHeight > 0 && scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop < 64;
       root.style.setProperty("--thread-header-height", `${Math.ceil((header || mobileHeader)?.getBoundingClientRect().height || 0)}px`);
       root.style.setProperty("--thread-footer-height", `${Math.ceil(footer?.getBoundingClientRect().height || 80)}px`);
-      root.style.setProperty("--thread-column-width", `${Math.min(820, Math.max(320, root.clientWidth / 3))}px`);
       if (mobileHeader) mobileHeader.style.marginBottom = details ? "" : `-${Math.ceil(mobileHeader.getBoundingClientRect().height)}px`;
       if (pinned) scroller.scrollTop = scroller.scrollHeight;
     };

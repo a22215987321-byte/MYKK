@@ -9,6 +9,7 @@ import LoadingState from "./LoadingState";
 import ImageCropModal from "./ImageCropModal";
 import ThemeToggle from "./ThemeToggle";
 import ProfileAvatar from "./ProfileAvatar";
+import ExpandablePostText from "./ExpandablePostText";
 import VideoPlayer from "./VideoPlayer";
 import useIsMobile from "../lib/useIsMobile";
 import { uploadToR2 } from "../lib/uploadToR2";
@@ -359,7 +360,7 @@ function PostItem({ post, profile, isOwner, onTogglePin, onOpenMedia }) {
             </div>
             {post.text && (
               <div style={{ fontSize: 15, color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: (post.imageUrl || post.videoUrl || post.audioUrl) ? 10 : 0 }}>
-                {post.text}
+                <ExpandablePostText key={post.text} text={post.text} />
               </div>
             )}
             {post.videoUrl && (
@@ -1614,15 +1615,11 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
         />
       )}
 
-      <div className={embedded ? "pp-root pv-embedded" : "pp-root"} style={{ minHeight: embedded ? "100%" : "100vh", background: "var(--panel-alt)", color: "var(--text)", fontFamily: "var(--font-body)", boxSizing: "border-box" }}>
+      <div className={embedded ? "pp-root pv-embedded" : "pp-root"} style={{ minHeight: embedded ? 0 : "100vh", minWidth: 0, flex: embedded ? 1 : undefined, display: "flex", flexDirection: "column", position: "relative", background: "var(--panel-alt)", color: "var(--text)", fontFamily: "var(--font-body)", boxSizing: "border-box" }}>
 
-        {/* 頂部只留返回鍵，沒有橫條。原本這裡是一條 52px 高、有底色和下邊框
-            的 sticky 標題列（暱稱＋貼文數＋關閉鈕＋帳號選單），夾在分頁列和
-            封面橫幅中間，視覺上多一層切斷。整條拿掉之後封面直接接在分頁列
-            下面，返回鍵改成浮在封面上的純圖示。
-            height:0 + overflow:visible 讓它不佔版面高度（封面因此貼到最上面），
-            但保留 sticky，捲到下面時返回鍵仍然固定在左上角可以按。 */}
-        <header style={{ position: "sticky", top: 0, zIndex: 50, height: 0, overflow: "visible", display: "flex", alignItems: "flex-start", padding: "10px 0 0 10px", pointerEvents: "none" }}>
+        {/* Keep the back control outside the scrolling content. Embedded profiles
+            anchor to their pane, standalone profiles anchor to the viewport. */}
+        <header data-profile-back style={{ position: embedded ? "absolute" : "fixed", top: embedded ? 10 : "max(10px, env(safe-area-inset-top))", left: 10, zIndex: 50, pointerEvents: "none" }}>
           {embedded ? (
             <button onClick={onClose} aria-label="返回動態消息" style={backBtnStyle}>←</button>
           ) : (
@@ -1630,7 +1627,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
           )}
         </header>
 
-        <main>
+        <main data-profile-content style={embedded ? { flex: 1, minHeight: 0, minWidth: 0, overflowY: "auto" } : undefined}>
         {/* Banner */}
         <div className="pp-banner" style={{ height: 200, position: "relative", overflow: "hidden", ...bannerStyle }}>
           {/* Star-field texture — only over the default/custom-color gradient;

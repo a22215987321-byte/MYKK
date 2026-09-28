@@ -13,6 +13,9 @@ describe('login presentation contract', () => {
       const html = renderToStaticMarkup(<AuthScreen {...props} tab={tab} />);
       expect(html).not.toContain('聊天社交平台');
       expect(html.indexOf('/logo.png')).toBeLessThan(html.indexOf('EVONCHAT'));
+      expect(html.indexOf('EVONCHAT')).toBeLessThan(html.indexOf('與重要的人，保持聯繫'));
+      expect(html.indexOf('與重要的人，保持聯繫')).toBeLessThan(html.indexOf('<section'));
+      expect(html.match(/與重要的人，保持聯繫/g)).toHaveLength(1);
     }
   });
 
@@ -51,10 +54,11 @@ describe('login presentation contract', () => {
     expect(html).toContain('&lt;error&gt;');
   });
 
-  test('a selected email expands the real login form', () => {
+  test('a remembered email does not assume a password account or expand a password form', () => {
     const html = renderToStaticMarkup(<AuthScreen {...props} email="person@example.test" />);
-    expect(html).toContain('autoComplete="current-password"');
-    expect(html).toContain('person@example.test');
+    expect(html).not.toContain('as-password');
+    expect(html).toContain('使用 Google 繼續');
+    expect(html).toContain('使用 Email 登入');
   });
 
   test('remembered accounts have distinct restore and forget controls', () => {
