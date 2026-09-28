@@ -1,4 +1,4 @@
-import { Search, MessageCircle, Plus } from "lucide-react";
+import { Search, MessageCircle, Plus, Bell } from "lucide-react";
 import { getStatus, AvatarImg, UnreadBadge, isGroupAvatarImage } from "./ChatRoom";
 
 // 手機版「首頁」分頁的預設內容：群組＋好友清單（＋置頂的 # 公共大廳 入口），
@@ -47,12 +47,11 @@ export default function MobileHomeList({
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
       {pendingInCount > 0 && (
-        <button onClick={() => setShowFriendReqs(true)}
-          style={{ margin: "12px 16px 0", display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#dc2626,#b91c1c)", border: "none", borderRadius: 14, padding: "10px 12px", color: "#fff", cursor: "pointer", width: "calc(100% - 32px)", textAlign: "left" }}>
-          <span style={{ fontSize: 18 }}>🔔</span>
+        <button onClick={() => setShowFriendReqs(true)} className="cr-friend-invite cr-friend-invite-banner"
+          style={{ margin: "12px 16px 0", borderRadius: 14, padding: "14px 12px", width: "calc(100% - 32px)" }}>
+          <Bell size={18} aria-hidden="true" />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13 }}>你有 {pendingInCount} 個好友請求</div>
-            <div style={{ fontSize: 11, opacity: 0.8 }}>點擊查看並處理</div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>你有 {pendingInCount} 個好友邀請</div>
           </div>
         </button>
       )}
@@ -111,8 +110,8 @@ export default function MobileHomeList({
         <span className="cr-nav-hdr-label">好友 {myFriends.length}</span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {pendingInCount > 0 && (
-            <button onClick={() => setShowFriendReqs(true)} title="好友請求" style={{ background: "#ef4444", border: "none", borderRadius: 20, padding: "2px 8px", color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-              🔔 {pendingInCount}
+            <button onClick={() => setShowFriendReqs(true)} title="好友請求" aria-label={`${pendingInCount} 個好友邀請`} className="cr-friend-invite cr-friend-invite-badge">
+              <Bell size={12} aria-hidden="true" /> {pendingInCount}
             </button>
           )}
           <button onClick={() => setShowFriendSearch(true)} title="加好友" className="cr-nav-icon-btn">
@@ -154,7 +153,7 @@ export default function MobileHomeList({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="cr-fb-name">{friend.nickname}</div>
                 <div className="cr-fb-sub">
-                  {friend.statusText || getStatus(friend.status).label}
+                  {friend.statusText || friend.signature || ""}
                 </div>
               </div>
             </button>

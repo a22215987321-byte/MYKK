@@ -20,6 +20,8 @@ describe('guest chat presentation', () => {
     expect(html).toContain('data-guest-theme="shadow-window"');
     expect(html).toContain('placeholder="輸入訊息…"');
     expect(html).not.toContain('class="guest-badge"');
+    expect(html).toContain('.guest-main > .guest-header');
+    expect(html).not.toContain('.guest-main &gt;');
   });
 
   test('only plain Enter submits and protects Shift+Enter and IME composition', () => {

@@ -29,6 +29,10 @@ beforeEach(async () => {
   global.IS_REACT_ACT_ENVIRONMENT = true;
   window.innerWidth = 390;
   window.HTMLElement.prototype.scrollIntoView = () => {};
+  // React's input-event fallback is selected when React is imported before
+  // this manually-created JSDOM. Avoid unsupported IE event hooks on focus.
+  window.HTMLElement.prototype.attachEvent = () => {};
+  window.HTMLElement.prototype.detachEvent = () => {};
   window.HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
   window.HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
   originalFetch = global.fetch;

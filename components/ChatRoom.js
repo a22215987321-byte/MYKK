@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import ChatThreadSurface from "./ChatThreadSurface";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import { auth, db } from "../lib/firebase";
@@ -87,7 +88,7 @@ import FloatingAudioPlayer from "./FloatingAudioPlayer";
 import AudioRoom from "./AudioRoom";
 import useIsMobile from "../lib/useIsMobile";
 import { QUICK_REACTIONS, STICKER_SRC_BY_ID } from "../data/chat/gesturePacks";
-import { ChevronLeft, ChevronRight, CalendarDays, Plus, Search, Newspaper, MessageCircle, FileText, Download, BookOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Plus, Search, Newspaper, MessageCircle, FileText, Download, BookOpen, Bell } from "lucide-react";
 import {
   doc, collection, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
   query, orderBy, limitToLast, serverTimestamp,
@@ -214,7 +215,11 @@ function renderMessageText(text) {
 
 // Avatar helper
 
-export function AvatarImg({ avatarImage, avatar, color, size = 36 }) {
+export function AvatarImg({ avatarImage, avatar, color, size = 36, status }) {
+  if (status !== undefined) return <div style={{ position: "relative", flexShrink: 0 }}>
+    <AvatarImg avatarImage={avatarImage} avatar={avatar} color={color} size={size} />
+    <span role="img" aria-label={getStatus(status).label} title={getStatus(status).label} style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: getStatus(status).color, border: "2px solid var(--panel)" }} />
+  </div>;
   if (avatarImage) {
     return <img src={avatarImage} alt="頭像" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, display: "block" }} />;
   }
@@ -759,6 +764,7 @@ export function isGroupAvatarImage(avatar) {
 // MessageBubble
 
 function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFontSize = 14, prevCreatedAt }) {
+  const [docOpen, setDocOpen] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [tapped, setTapped] = useState(false);
@@ -823,7 +829,6 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
   // 分享文件（站長自動送給新朋友的那幾份）——點卡片才載入閱讀視窗。開關狀態
   // 放在泡泡自己身上，不用把 callback 一路傳過六個渲染點；同一時間只會有一個
   // 被打開，而視窗本身是 position:fixed，從哪一層渲染出來都一樣。
-  const [docOpen, setDocOpen] = useState(false);
   const sharedDoc = msg.type === "shared_doc" && msg.docId
     ? { id: msg.docId, name: msg.docName || "文件", note: msg.docNote || "" }
     : null;
@@ -836,6 +841,7 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
   // 沒有跟其他文字混在一起）——外觀比照 isStickerMsg，跟文字混用時則維持
   // 普通文字泡泡、代碼縮小成行內圖片（見下面 renderMessageText）。
   const soloSticker = !isEmojiMsg && !isStickerMsg && isSoloStickerToken(msg.text);
+  const unframed = Boolean(isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker || sharedDoc || msg.fileUrl);
   const activeReactions = Object.entries(msg.reactions || {}).filter(([, uids]) => uids?.length > 0);
 
   return (
@@ -871,13 +877,13 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
         {!isMine && !showSender && <div style={{ width: 30, flexShrink: 0 }} />}
         <div style={{ display: "flex", flexDirection: "column", alignItems: isMine ? "flex-end" : "flex-start", minWidth: 0, maxWidth: "100%" }}>
           {!isMine && showSender && <span style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 3, marginLeft: 2 }}>{msg.sender}</span>}
-          <div onDoubleClick={() => setShowPicker(v => !v)} style={{
-            padding: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? 0 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
+          <div className="cr-message-body" data-unframed={unframed ? "true" : undefined} onDoubleClick={() => setShowPicker(v => !v)} style={{
+            padding: unframed ? 0 : (hasMedia && !msg.text ? "4px" : "9px 14px"),
             borderRadius: isEmojiMsg ? 0 : (isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px"),
-            background: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : (isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)"),
-            color: isMine ? "#fff" : "var(--text)", fontSize: msgFontSize, lineHeight: 1.5, cursor: "default",
-            border: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : (isMine ? "none" : "1px solid var(--border)"),
-            backdropFilter: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : "var(--panel-blur)", WebkitBackdropFilter: isEmojiMsg || isStickerMsg || isPostShareMsg || soloSticker ? "none" : "var(--panel-blur)",
+            background: unframed ? "none" : (isMine ? "linear-gradient(135deg,var(--accent),var(--accent-2))" : "var(--panel)"),
+            color: isMine && !unframed ? "#fff" : "var(--text)", fontSize: msgFontSize, lineHeight: 1.5, cursor: "default",
+            border: unframed ? "none" : (isMine ? "none" : "1px solid var(--border)"),
+            backdropFilter: unframed ? "none" : "var(--panel-blur)", WebkitBackdropFilter: unframed ? "none" : "var(--panel-blur)",
             overflow: "hidden", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", overflowWrap: "anywhere",
           }}>
             {isEmojiMsg ? (
@@ -923,11 +929,11 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
                     所以還是會觸發下載。download 留著是為了將來若改成自家網域時
                     能指定存檔名稱。 */}
                 {msg.fileUrl && (
-                  <a href={msg.fileUrl} download={msg.fileName || ""} target="_blank" rel="noopener noreferrer"
+                  <a className="cr-file-card" href={msg.fileUrl} download={msg.fileName || ""} target="_blank" rel="noopener noreferrer"
                     style={{
                       display: "flex", alignItems: "center", gap: 10, width: 260, maxWidth: "100%", minWidth: 0, boxSizing: "border-box",
                       padding: "10px 12px", borderRadius: "var(--radius-md)",
-                      background: "var(--panel-alt)", border: "1px solid var(--border)",
+                      background: "transparent", border: "1px solid var(--border)",
                       textDecoration: "none", color: "var(--text)",
                     }}>
                     <FileText size={20} strokeWidth={1.7} style={{ flexShrink: 0, opacity: 0.75 }} />
@@ -946,11 +952,11 @@ function MessageBubble({ msg, isMine, showSender, myUid, collectionPath, msgFont
                 {/* 分享文件的卡片。跟上面的檔案附件長得像但行為不同：檔案是下載，
                     這個是在站內開一個閱讀視窗（可複製全文、可存進自己的專案檔案）。 */}
                 {sharedDoc && (
-                  <button type="button" onClick={() => setDocOpen(true)}
+                  <button className="cr-file-card" type="button" onClick={e => { e.stopPropagation(); setDocOpen(true); }}
                     style={{
                       display: "flex", alignItems: "center", gap: 10, width: 260, maxWidth: "100%", minWidth: 0, boxSizing: "border-box",
                       padding: "11px 12px", borderRadius: "var(--radius-md)",
-                      background: "var(--panel-alt)", border: "1px solid var(--border)",
+                      background: "transparent", border: "1px solid var(--border)",
                       color: "var(--text)", cursor: "pointer", textAlign: "left", font: "inherit",
                     }}>
                     <BookOpen size={20} strokeWidth={1.7} style={{ flexShrink: 0, opacity: 0.75 }} />
@@ -1128,10 +1134,10 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {friendList.map(f => (
                   <div key={f.uid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--panel-alt)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
-                    <AvatarImg avatarImage={f.avatarImage} avatar={f.avatar} color={f.color} size={32} />
+                    <AvatarImg avatarImage={f.avatarImage} avatar={f.avatar} color={f.color} size={32} status={f.status || "offline"} />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{f.nickname}</div>
-                      <div style={{ fontSize: 11, color: getStatus(f.status).color }}>{getStatus(f.status).label}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{f.statusText || f.signature || ""}</div>
                     </div>
                   </div>
                 ))}
@@ -2111,7 +2117,12 @@ export default function ChatApp({ user }) {
   // 手機版側邊抽屜：非拖曳觸發的開關（點 tab bar／選單項目／遮罩）統一經過這裡套用
   // transform，跟拖曳中直接寫 DOM style 用的是同一個 applyDrawerTransform，行為一致。
   useEffect(() => {
-    if (!isMobile) return;
+    if (!isMobile) {
+      sidebarElRef.current?.style.removeProperty("transform");
+      mainElRef.current?.style.removeProperty("transform");
+      if (backdropElRef.current) { backdropElRef.current.style.opacity = "0"; backdropElRef.current.style.pointerEvents = "none"; }
+      return;
+    }
     const w = measuredDrawerWidth();
     applyDrawerTransform(sidebarOpen ? w : 0, w, true);
   }, [sidebarOpen, isMobile]);
@@ -2541,6 +2552,8 @@ export default function ChatApp({ user }) {
   const inTool = inMoreTool || mobileActiveKey === "imageEditor";
   const inThread = !!activeFriendId || !!activeGroupId;
   const mobileAiActive = isMobile && mobileView === null && !inThread && mobileActiveKey === "aiChat";
+  const mobileThreadGlass = isMobile && mobileView === null && !showFriendInfo && !showGroupInfo
+    && (inThread || (!mobileActiveKey && mobileHomeSubview === 'hall'));
 
   // 手機版側邊抽屜：從內容區「中間」開始跟手拖曳，不是邊緣手勢。
   // 這裡刻意不做「只有貼著螢幕左邊才觸發」的邊緣手勢——iPhone Safari 把貼著螢幕
@@ -2563,7 +2576,7 @@ export default function ChatApp({ user }) {
     const transition = animate ? "transform 240ms cubic-bezier(0.22,1,0.36,1)" : "none";
     if (sidebarElRef.current) {
       sidebarElRef.current.style.transition = transition;
-      sidebarElRef.current.style.transform = `translateX(${dragX - drawerWidth}px)`;
+      sidebarElRef.current.style.transform = dragX === 0 ? "translateX(-100%)" : `translateX(${dragX - drawerWidth}px)`;
     }
     if (mainElRef.current) {
       mainElRef.current.style.transition = transition;
@@ -2881,8 +2894,8 @@ export default function ChatApp({ user }) {
         <span className="cr-nav-hdr-label">好友 {myFriends.length}</span>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
           {pendingInCount > 0 && (
-            <button onClick={() => setShowFriendReqs(true)} title="好友請求" style={{ background: "#ef4444", border: "none", borderRadius: 20, padding: "2px 8px", color: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-              🔔 {pendingInCount}
+            <button onClick={() => setShowFriendReqs(true)} title="好友請求" aria-label={`${pendingInCount} 個好友邀請`} className="cr-friend-invite cr-friend-invite-badge">
+              <Bell size={12} aria-hidden="true" /> {pendingInCount}
             </button>
           )}
           <button onClick={() => setShowFriendSearch(true)} title="加好友" className="cr-nav-icon-btn">+</button>
@@ -2909,7 +2922,7 @@ export default function ChatApp({ user }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="cr-fb-name" style={{ fontSize: 14 }}>{friend.nickname}</div>
-                <div className="cr-fb-sub">{friend.signature || getStatus(friend.status).label}</div>
+                <div className="cr-fb-sub">{friend.statusText || friend.signature || ""}</div>
               </div>
             </button>
           );
@@ -2929,8 +2942,8 @@ export default function ChatApp({ user }) {
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: isMobile ? 16 : 14, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeFriendProfile.nickname}</div>
-        <div style={{ fontSize: isMobile ? 12 : 11, lineHeight: 1.4, color: getStatus(activeFriendProfile.status).color, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {getStatus(activeFriendProfile.status).label}{activeFriendProfile.statusText ? ` · ${activeFriendProfile.statusText}` : ""}
+        <div style={{ fontSize: isMobile ? 12 : 11, lineHeight: 1.4, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {activeFriendProfile.statusText || activeFriendProfile.signature || ""}
         </div>
       </div>
     </button>
@@ -2967,7 +2980,8 @@ export default function ChatApp({ user }) {
   // 就沒有 isMobile 分支，這段邏輯本來就是共用的，只是現在從 .cr-main
   // 搬出來獨立成一個變數）。
   const conversationsThreadPane = (
-    <>
+    <ChatThreadSurface centered={!isMobile && Boolean(effectiveMaximizedBlock)} mobile={isMobile}
+      conversationKey={activeFriendId || activeGroupId || 'hall'} details={showFriendInfo || showGroupInfo}>
       {activeFriendId && activeFriendProfile && showFriendInfo && (
         <FriendInfoView friend={activeFriendProfile} myUid={uid} myBlocked={myProfile?.blocked} messages={privateMessages} myGroups={myGroups} onClose={() => setShowFriendInfo(false)} showProfileLink={isMobile} />
       )}
@@ -2983,7 +2997,6 @@ export default function ChatApp({ user }) {
           </div>}
           <ChatMessageList conversationKey={`private:${activeFriendId}`} messages={privateMessages} currentUserId={uid} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-no-image, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "28px 28px" }}>
             <div style={{ textAlign: "center", marginBottom: 16 }}>
-              <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={56} />
               <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{activeFriendProfile.nickname}</div>
               {activeFriendProfile.bio && <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 4, maxWidth: 260, margin: "4px auto 0" }}>{activeFriendProfile.bio}</div>}
               <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>你們已經是好友了</div>
@@ -3115,7 +3128,7 @@ export default function ChatApp({ user }) {
           </div>
         </>
       )}
-    </>
+    </ChatThreadSurface>
   );
 
   // ===== 桌面雙方塊分頁系統的內容登記表——每個 key 對應原本 .cr-main 那些
@@ -3380,6 +3393,17 @@ export default function ChatApp({ user }) {
           background: var(--border); border: none; border-radius: var(--radius-sm); padding: 3px 8px;
           color: var(--text-muted); cursor: pointer; font-size: 14px;
         }
+        .cr-friend-invite {
+          display: flex; align-items: center; background: #e5f2e9; color: #365e46;
+          border: 1px solid #cce1d3; cursor: pointer; box-sizing: border-box;
+          transition: background .16s ease, border-color .16s ease;
+        }
+        .cr-friend-invite svg { flex-shrink: 0; }
+        .cr-friend-invite:hover:not(:disabled) { background: #d6e9dc; border-color: #b7d2c0; }
+        .cr-friend-invite:focus-visible { outline: 2px solid #4b765b; outline-offset: 3px; }
+        .cr-friend-invite:disabled { opacity: .55; cursor: not-allowed; }
+        .cr-friend-invite-banner { justify-content: flex-start; text-align: left; gap: 10px; }
+        .cr-friend-invite-badge { border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 700; gap: 4px; }
 
         /* ── 雙大方塊分頁列（TabbedBlock.js）── 跟 ChatMobileTabBar.js 自己的
            .cr-tabbar（手機底部導覽列）是完全不同的元件，故意用不同 class
@@ -3455,6 +3479,11 @@ export default function ChatApp({ user }) {
 
         /* ── Mobile topbar: hidden on desktop ── */
         .cr-mobile-topbar { display: none; }
+        .cr-shell:has([data-chat-surface="true"]) > .cr-mobile-topbar {
+          position: relative; z-index: 5;
+          background: color-mix(in srgb, var(--panel-alt) 65%, transparent);
+          backdrop-filter: blur(18px) saturate(135%); -webkit-backdrop-filter: blur(18px) saturate(135%);
+        }
         .cr-group-avatar:focus-visible, .cr-group-details:focus-visible {
           outline: 2px solid var(--accent); outline-offset: 3px;
         }
@@ -3731,14 +3760,10 @@ export default function ChatApp({ user }) {
               <button onClick={() => setFriendInfo(null)} className="cr-close-btn" style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.4)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", cursor: "pointer", fontSize: 14 }}>✕</button>
             </div>
             <div style={{ padding: "0 20px 20px", marginTop: -30 }}>
-              <AvatarImg avatarImage={friendInfo.avatarImage} avatar={friendInfo.avatar} color={friendInfo.color} size={60} />
+              <AvatarImg avatarImage={friendInfo.avatarImage} avatar={friendInfo.avatar} color={friendInfo.color} size={60} status={friendInfo.status || "offline"} />
               <div style={{ marginTop: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text)" }}>{friendInfo.nickname}</div>
                 {friendInfo.signature && <div style={{ fontSize: 13, color: "var(--text-muted)", fontStyle: "italic", marginTop: 2 }}>{friendInfo.signature}</div>}
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, background: `${getStatus(friendInfo.status).color}22`, border: `1px solid ${getStatus(friendInfo.status).color}`, borderRadius: 20, padding: "2px 8px" }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: getStatus(friendInfo.status).color, display: "inline-block" }} />
-                  <span style={{ fontSize: 11, color: getStatus(friendInfo.status).color, fontWeight: 600 }}>{getStatus(friendInfo.status).label}</span>
-                </div>
                 {friendInfo.statusText && <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 4 }}>{friendInfo.statusText}</div>}
                 {friendInfo.bio && <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 10, lineHeight: 1.6 }}>{friendInfo.bio}</div>}
               </div>
@@ -3994,7 +4019,7 @@ export default function ChatApp({ user }) {
                   {myProfile.nickname}
                 </Link>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {myProfile.signature || myProfile.statusText || getStatus(myProfile.status).label}
+                  {myProfile.statusText || myProfile.signature || ""}
                 </div>
               </div>
               <ChevronRight size={18} color="var(--text-dim)" style={{ flexShrink: 0 }} />
@@ -4041,12 +4066,11 @@ export default function ChatApp({ user }) {
             <>
           {/* Friend request banner */}
           {pendingInCount > 0 && (
-            <button onClick={() => setShowFriendReqs(true)}
-              style={{ margin: "8px 10px 0", display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#dc2626,#b91c1c)", border: "none", borderRadius: "var(--radius-md)", padding: "10px 12px", color: "#fff", cursor: "pointer", width: "calc(100% - 20px)", textAlign: "left" }}>
-              <span style={{ fontSize: 18 }}>🔔</span>
+            <button onClick={() => setShowFriendReqs(true)} className="cr-friend-invite cr-friend-invite-banner"
+              style={{ margin: "8px 10px 0", borderRadius: "var(--radius-md)", padding: "14px 12px", width: "calc(100% - 20px)" }}>
+              <Bell size={18} aria-hidden="true" />
               <div>
-                <div style={{ fontWeight: 700, fontSize: 13 }}>你有 {pendingInCount} 個好友請求</div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>點擊查看並處理</div>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>你有 {pendingInCount} 個好友邀請</div>
               </div>
             </button>
           )}
@@ -4317,7 +4341,7 @@ export default function ChatApp({ user }) {
 
         {isMobile && (
           <ChatMobileTabBar
-            glass={mobileAiActive && aiChatAllowed}
+            glass={(mobileAiActive && aiChatAllowed) || mobileThreadGlass}
             overlayRootRef={shellElRef}
             activeTab={
               mobileActiveKey === 'feed' ? 'feed'

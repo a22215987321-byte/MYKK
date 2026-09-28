@@ -4,7 +4,9 @@ import { auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import PortalPopover from "./PortalPopover";
 import { CHAT_WORLDS, getWorldById, getSavedWorldId, getSavedVariantId, applyWorld } from "../lib/chatWorlds";
-import { getSavedAccounts, setPendingLoginEmail } from "../lib/accountSwitcher";
+import { getSavedAccounts } from "../lib/accountSwitcher";
+import { restoreAccountSession, beginAccountLogin, logoutCurrentAccount } from "../lib/accountSessions";
+import { toast } from "../lib/toast";
 
 // hidden:true 的主題暫時不在選單裡顯示（先隱藏、不是刪除）——如果使用者
 // 之前剛好選到這個主題存在 localStorage 裡，套用邏輯還是正常運作，只是
@@ -148,6 +150,7 @@ export default function ThemeToggle({ mode = "floating", label, onOpenProfile, o
   const [open, setOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [savedAccounts, setSavedAccounts] = useState([]);
+  const [switching, setSwitching] = useState(false);
   const buttonRef = useRef(null);
   const closeMenu = useCallback(() => setOpen(false), []);
   const router = useRouter();
@@ -250,18 +253,24 @@ export default function ThemeToggle({ mode = "floating", label, onOpenProfile, o
     setOpen(false);
   };
 
-  // Not a real multi-session switch — signs out and, for a remembered
-  // account, pre-fills its email on the login screen so the user only has
-  // to type the password (see lib/accountSwitcher.js for why: true
-  // simultaneous-session switching needs a much bigger auth rearchitecture).
-  const switchToAccount = async (targetEmail) => {
-    setPendingLoginEmail(targetEmail || "");
-    setOpen(false);
-    await auth.signOut();
-    router.push("/");
+  const switchToAccount = async (account) => {
+    if (switching) return;
+    setSwitching(true);
+    try {
+      if (!account || !await restoreAccountSession(account.uid)) await beginAccountLogin(account?.email || "");
+      setOpen(false);
+      await router.push("/");
+    } catch { toast("切換失敗，請檢查網路後再試；目前帳號仍保持登入。"); }
+    finally { setSwitching(false); }
   };
-  const addAccount = () => switchToAccount("");
-  const logout = () => switchToAccount("");
+  const addAccount = () => switchToAccount(null);
+  const logout = async () => {
+    if (switching) return;
+    setSwitching(true);
+    try { await logoutCurrentAccount(); setOpen(false); await router.push("/"); }
+    catch { toast("登出失敗，請再試一次。"); }
+    finally { setSwitching(false); }
+  };
 
   const showPaletteGrid = open && theme === "pastel-pearl";
 
@@ -350,7 +359,7 @@ export default function ThemeToggle({ mode = "floating", label, onOpenProfile, o
           {loggedIn && savedAccounts.filter(a => a.uid !== auth.currentUser?.uid).length > 0 && (
             <div style={{ borderBottom: "1px solid var(--border-soft)", padding: "6px 0" }}>
               {savedAccounts.filter(a => a.uid !== auth.currentUser?.uid).map(a => (
-                <button key={a.uid} onClick={() => switchToAccount(a.email)}
+                <button key={a.uid} disabled={switching} onClick={() => switchToAccount(a)}
                   style={{
                     display: "flex", alignItems: "center", gap: 8, width: "100%",
                     padding: "8px 14px", background: "none", border: "none",
@@ -372,7 +381,7 @@ export default function ThemeToggle({ mode = "floating", label, onOpenProfile, o
 
           {loggedIn && (
             <button
-              onClick={addAccount}
+              onClick={addAccount} disabled={switching}
               style={{
                 display: "flex", alignItems: "center", gap: 8, width: "100%",
                 padding: "10px 14px", background: "none", border: "none",
@@ -440,7 +449,7 @@ export default function ThemeToggle({ mode = "floating", label, onOpenProfile, o
 
           {loggedIn && (
             <button
-              onClick={logout}
+              onClick={logout} disabled={switching}
               style={{
                 display: "flex", alignItems: "center", gap: 8, width: "100%",
                 padding: "10px 14px", background: "none", border: "none",

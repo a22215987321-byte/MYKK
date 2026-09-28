@@ -16,6 +16,7 @@ import { ArrowDown, ChevronDown, LogOut, Menu, MessageCircle, MoreHorizontal, Pe
 import { auth, db } from "../lib/firebase";
 import { OWNER_EMAIL } from "../lib/admin";
 import useIsMobile from "../lib/useIsMobile";
+import useOverlayHeight from "../lib/useOverlayHeight";
 import { GUEST_SKILLS, prepareGuestSkillMessage } from "../lib/guestSkills";
 import GuestSkillsSheet, { GuestSkillIcon } from "./GuestSkillsSheet";
 
@@ -92,6 +93,11 @@ export default function GuestChatRoom({ user }) {
   const [skillNotice, setSkillNotice] = useState("");
   const [showScrollDown, setShowScrollDown] = useState(false);
   const rootRef = useRef(null);
+  const mainRef = useRef(null);
+  const headerRef = useRef(null);
+  const composerRef = useRef(null);
+  useOverlayHeight(headerRef, mainRef, "--guest-header-height");
+  useOverlayHeight(composerRef, mainRef, "--guest-footer-height");
   const sidebarRef = useRef(null);
   const messageListRef = useRef(null);
   const isMobile = useIsMobile();
@@ -570,8 +576,32 @@ export default function GuestChatRoom({ user }) {
         </div>
       </aside>
 
-      <section className="guest-main" inert={isMobile && sidebarOpen ? "" : undefined}>
-        <header className="guest-header">
+      <section ref={mainRef} className="guest-main" inert={isMobile && sidebarOpen ? "" : undefined}>
+        <style dangerouslySetInnerHTML={{ __html: `
+          .guest-main { position: relative; padding-top: 0; --guest-header-height: 64px; --guest-footer-height: 108px; }
+          .guest-main > .guest-reading-area { position: absolute; inset: 0; }
+          .guest-main .guest-scroll-latest { bottom: calc(var(--guest-footer-height) + 8px); }
+          .guest-main > .guest-header, .guest-main > .guest-composer-wrap {
+            position: absolute; left: 0; right: 0; z-index: 3;
+            background: rgba(250,250,250,.68); backdrop-filter: blur(18px) saturate(135%); -webkit-backdrop-filter: blur(18px) saturate(135%);
+          }
+          .guest-main > .guest-header { top: 0; }
+          .guest-main > .guest-composer-wrap { bottom: 0; }
+          .guest-main .guest-messages {
+            position: absolute; inset: 0;
+            padding-top: calc(var(--guest-header-height) + 24px);
+            padding-bottom: calc(var(--guest-footer-height) + 24px);
+            scroll-padding-block: calc(var(--guest-header-height) + 16px) calc(var(--guest-footer-height) + 16px);
+          }
+          @media (max-width: 767px) {
+            .guest-main { --guest-footer-height: 166px; }
+            .guest-main > .guest-header { padding-top: env(safe-area-inset-top); height: calc(60px + env(safe-area-inset-top)); }
+            .guest-main .guest-messages.is-empty { padding-top: calc(var(--guest-header-height) + 24px); }
+          }
+          @media (prefers-reduced-transparency: reduce) { .guest-main > .guest-header, .guest-main > .guest-composer-wrap { background: #fafafa; backdrop-filter: none; } }
+          @supports not (backdrop-filter: blur(1px)) { .guest-main > .guest-header, .guest-main > .guest-composer-wrap { background: #fafafa; } }
+        ` }} />
+        <header ref={headerRef} className="guest-header">
           <div className="guest-header-left">
             <button className="guest-sidebar-open" onClick={() => setSidebarOpen(true)} aria-label="開啟側邊欄">
               <Menu size={19} />
@@ -592,7 +622,7 @@ export default function GuestChatRoom({ user }) {
         </header>
 
         <div className="guest-reading-area">
-        <div ref={messageListRef} className={`guest-messages${messages.length === 0 ? " is-empty" : ""}`} onScroll={event => {
+        <div ref={messageListRef} data-chat-scroll="true" className={`guest-messages${messages.length === 0 ? " is-empty" : ""}`} onScroll={event => {
           const list = event.currentTarget;
           setShowScrollDown(list.scrollHeight - list.scrollTop - list.clientHeight > 160);
         }}>
@@ -625,7 +655,7 @@ export default function GuestChatRoom({ user }) {
         {showScrollDown && <button type="button" className="guest-scroll-latest" onClick={scrollToLatest} aria-label="回到最新訊息"><ArrowDown size={18} /></button>}
         </div>
 
-        <div className="guest-composer-wrap">
+        <div ref={composerRef} className="guest-composer-wrap">
           <div className="guest-composer-column">
             {error && <div className="guest-error" role="alert">{error}</div>}
             {skillNotice && <p className="guest-skill-notice" role="status">{skillNotice}</p>}

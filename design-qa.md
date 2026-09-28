@@ -1,4 +1,98 @@
-# EVON minimal document-style chat QA — 2026-09-19
+# EVONCHAT UI revision QA — 2026-09-29
+
+## Release refinements
+
+- Login logo is now centered above the wordmark; the subtitle was removed.
+  Email/guest actions use solid white/pale-blue fills rather than transparent blue.
+- Both desktop invitation entries and their mobile equivalents now share sage
+  background #e5f2e9, ink #365e46 and border #cce1d3. The banner is left-aligned.
+  Both entries still open the request dialog; no invitation data flow changed.
+- Latest checks: 23 suites / 203 tests passed; TypeScript passed; changed-file
+  lint passed with existing Hook warnings only. The previous full production build
+  passed. Per repository guidance, no extra local build for these small refinements.
+- Desktop/mobile DOM tests verify shared colors, left alignment and both click
+  targets. Browser control timed out on the follow-up preview, so existing PNGs
+  predate these final styling changes; do not treat them as final release screenshots.
+- Publication uses the existing GitHub main -> Vercel production integration.
+
+This pass supersedes the historical notes below only for the requested login,
+onboarding, account switcher and member/guest conversation surfaces.
+
+## Reference and scope
+
+- User screenshots 1–5: simplify profile setup; support photo upload; remove the
+  premature install prompt and duplicate conversation-intro avatar; flatten file
+  cards; translucent top/bottom chat chrome; blue, vertically stacked login
+  inspired by screenshot 3; green centered invitation banner; center the enlarged
+  conversation column; preserve custom status text while keeping presence on avatars.
+- The image-to-code workflow guided visual comparison. This is an adaptation of
+  the reference layout with EVONCHAT assets, not an Interpals/Apple sign-in clone.
+- Existing Google, email/password, registration and anonymous entry points remain.
+  No message API, Firestore permissions or message schema was changed.
+
+## Rendered comparisons and fixes
+
+- Login: inspected at 390px, including expanded email form and saved-account
+  controls. Blue canvas, native readable typography, centered EVONCHAT logo and
+  stacked controls replace the split hero. No horizontal overflow (390/390px).
+- Profile setup: one compact card, photo preview and collapsed emoji/color choices.
+  Selected the existing local EVON avatar through the browser file chooser and
+  verified the circular preview and enabled submit after entering a nickname.
+  No installation banner. Tests cover wrong format, >20MiB, emoji fallback and
+  object URL cleanup. Real R2 transfer was not performed in the mock preview.
+- Member chat: inspected mobile 390×844 geometry and full short-screen 390×760
+  screenshot, desktop 1366×768 screenshot and 1920×900 geometry. Transparent file
+  cards have one border and no outer bubble. The introductory 56px avatar is gone;
+  message authors' avatars and the header avatar remain.
+- In the enlarged desktop panel at 1920px, the panel was 1376px wide; message and
+  composer columns both measured 458.667px and x=722.667px. A stable two-sided
+  scrollbar gutter keeps their centers aligned. Narrower panels use a 320px floor.
+- The green invitation banner contains only the centered invitation summary.
+  Custom status text appeared in the sidebar, header and settings friend list;
+  presence remained on the avatar dot (with an accessible label).
+- Glass chrome: member header/composer use 65% panel tint + 18px blur; guest uses
+  68% neutral tint + 18px blur. Message viewports continue behind these layers.
+  Measured padding keeps first/last messages readable and the composer above the
+  mobile bottom navigation. Existing AI glass styling remains intact.
+- Guest 390px: no horizontal overflow; a five-line draft expanded the textarea to
+  132px without moving the footer beyond the viewport or hiding send. No messages
+  or uploads were sent to production.
+- Fixed a newly caught guest SSR style-escaping mismatch (static raw CSS) and a
+  responsive drawer offset: closed drawers now use -100%, and desktop clears the
+  mobile transform. Rechecked drawer right edge at 0px on mobile.
+- Hover/focus-visible and disabled states remain in the affected auth/setup/chat
+  controls. The user's screenshots are the before/reference evidence; local PNGs
+  are in `.tmp/ui-review/` (ignored, test data only).
+
+## Authentication validation and limits
+
+- Firebase named Auth instances retain each member session; updateCurrentUser
+  switches only after a fresh ID token succeeds. No passwords or SDK tokens are
+  added to the app's saved-account metadata list.
+- Explicit logout/forget clears the retained session; account-list eviction also
+  clears its SDK session. Tests cover two UIDs, expiration, network failure,
+  anonymous exclusion and in-flight remember/logout ordering.
+- Old metadata-only accounts require one real sign-in. Revoked/expired sessions
+  still require verification. Actual Google account switching, browser persistence
+  across restarts and R2 upload need an authenticated deployment smoke test;
+  mocked tests do not substitute for that.
+
+## Checks
+
+- Jest: 23 suites / 200 tests passed. Fixed the manually-created JSDOM focus-event
+  fallback in the Skills harness; no Skills application logic changed.
+- TypeScript standalone check: passed. Next build is configured by the existing
+  project to skip types/lint internally, so both were run separately.
+- ESLint: exit 0; existing hooks/export warnings remain, no new lint errors.
+- Final production build after the drawer fix completed successfully (17 static pages). Google Fonts download/optimization warnings were non-fatal.
+- No production deployment was requested in this turn or performed.
+
+Visual result: passed for the inspected local/mock surfaces. Live authentication,
+storage transfer and real iOS Safari testing remain unverified.
+
+---
+
+# EVON minimal document-style chat QA — 2026-09-19 (historical)
 
 Preview: `http://127.0.0.1:3002/` (local production build, not deployed).
 

@@ -8,6 +8,7 @@ function getStatus(status) {
   switch (status) {
     case "online": return { label: "線上", color: "#22c55e" };
     case "away": return { label: "離開", color: "#eab308" };
+    case "busy": return { label: "勿擾", color: "#ef4444" };
     default: return { label: "離線", color: "var(--text-dim)" };
   }
 }
@@ -83,13 +84,15 @@ export default function FriendInfoView({ friend, myUid, myBlocked, messages, myG
       <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 20, display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+            <div style={{ position: "relative", flexShrink: 0 }}>
             {friend.avatarImage
               ? <img src={friend.avatarImage} alt="" style={{ width: 76, height: 76, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
               : <div style={{ width: 76, height: 76, borderRadius: "50%", background: friend.color || "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, flexShrink: 0 }}>{friend.avatar || "😊"}</div>}
+              <span role="img" aria-label={st.label} style={{ position: "absolute", right: 0, bottom: 2, width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--panel)", background: st.color }} />
+            </div>
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)" }}>{friend.nickname}</div>
-              <div style={{ fontSize: 12, color: st.color, marginTop: 2 }}>{st.label}</div>
-              {friend.signature && <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 6 }}>{friend.signature}</div>}
+              {(friend.statusText || friend.signature) && <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 6 }}>{friend.statusText || friend.signature}</div>}
               <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>{handle} · ID: {friend.uid.slice(0, 8)}</div>
               {showProfileLink && <Link href={`/profile/${friend.uid}`}
                 style={{ display: "inline-flex", alignItems: "center", minHeight: 44, color: "var(--accent)", fontSize: 13 }}>

@@ -27,6 +27,10 @@ jest.mock("next/dynamic", () => (loader) => {
 });
 jest.mock("../lib/firebase", () => ({ db: {}, auth: { currentUser: { uid: "test-owner" }, signOut: jest.fn() } }));
 jest.mock("firebase/auth", () => ({ onAuthStateChanged: (_, callback) => { callback({ uid: "test-owner" }); return () => {}; } }));
+jest.mock("../lib/accountSessions", () => ({
+  restoreAccountSession: jest.fn(), beginAccountLogin: jest.fn(),
+  logoutCurrentAccount: () => require("../lib/firebase").auth.signOut(),
+}));
 jest.mock("firebase/firestore", () => ({
   doc: (_, ...parts) => ({ parts, kind: "doc" }),
   collection: (_, ...parts) => ({ parts, kind: "collection" }),
@@ -70,7 +74,7 @@ jest.mock("../components/SharePostModal", () => () => null);
 jest.mock("../components/media-editor/MediaAttachPreview", () => () => null);
 
 const profile = { nickname: "測試用戶", avatar: "😊", friends: ["test-friend"], status: "online" };
-const friend = { nickname: "懶人很長的好友名稱測試", avatar: "😊", status: "away" };
+const friend = { nickname: "懶人很長的好友名稱測試", avatar: "😊", status: "away", statusText: "今天想聽音樂" };
 const group = { id: "group-one", name: "213", avatar: "👥", members: ["test-owner"], createdBy: "test-owner" };
 const post = { id: "post-one", userId: "test-owner", userNickname: "測試用戶", text: "測試動態內容", visibility: "public", likes: [], createdAt: new Date("2026-09-26") };
 const snapshotDoc = (id, data) => ({ id, exists: () => !!data, data: () => data });
@@ -251,7 +255,8 @@ test("private chat merges avatar/status into the mobile header and retains profi
   await click([...container.querySelectorAll(".cr-main button.fb")].find(el => el.textContent.includes(friend.nickname)));
   const header = container.querySelector(".cr-mobile-topbar");
   expect(header.textContent).toContain(friend.nickname);
-  expect(header.textContent).toContain("離開");
+  expect(header.textContent).not.toContain("離開");
+  expect(header.textContent).toContain("今天想聽音樂");
   expect(header.querySelectorAll('[aria-label="查看好友資訊"]')).toHaveLength(1);
   expect(container.querySelector(".cr-chat-header")).toBeNull();
   expect(container.querySelectorAll('[aria-label="新增附件或表情"]')).toHaveLength(1);
@@ -263,6 +268,10 @@ test("private chat merges avatar/status into the mobile header and retains profi
   await act(async () => window.dispatchEvent(new window.Event("resize")));
   expect(container.querySelector('.cr-chat-header [aria-label="查看好友資訊"]')).not.toBeNull();
   expect(container.querySelector('.cr-mobile-topbar [aria-label="查看好友資訊"]')).toBeNull();
+  expect(container.querySelector('.cr-sidebar').style.transform).toBe('');
+  window.innerWidth = 390;
+  await act(async () => window.dispatchEvent(new window.Event("resize")));
+  expect(container.querySelector('.cr-sidebar').style.transform).toBe('translateX(-100%)');
 });
 
 test("cancelled native scrolling restores the drawer without navigating or opening it", async () => {
@@ -276,4 +285,32 @@ test("cancelled native scrolling restores the drawer without navigating or openi
   expect(pushState).not.toHaveBeenCalled();
   expect(container.querySelector(".cr-main").style.transform).toBe("translateX(0px)");
   expect(container.querySelector('[data-conversation="hall"]')).not.toBeNull();
+});
+
+test.each([390, 1440])("friend invitation entries share the sage palette and retain both actions at %ipx", async width => {
+  window.innerWidth = width;
+  const defaultSnapshot = onSnapshot.getMockImplementation();
+  onSnapshot.mockImplementation((ref, callback) => {
+    if (ref.kind === "doc" && ref.parts.join("/") === "users/test-owner") {
+      callback(snapshotDoc("test-owner", { ...profile, pendingIn: ["test-invite"] }));
+      return () => {};
+    }
+    return defaultSnapshot(ref, callback);
+  });
+  await renderChat();
+  if (width < 768) await click([...container.querySelectorAll(".cr-tabbar button")].find(el => el.textContent.startsWith("首頁")));
+  const entries = [...container.querySelectorAll(".cr-friend-invite")];
+  expect(entries).toHaveLength(2);
+  const banner = container.querySelector(".cr-friend-invite-banner");
+  expect(window.getComputedStyle(banner).textAlign).toBe("left");
+  expect(window.getComputedStyle(banner).justifyContent).toBe("flex-start");
+  for (const entry of entries) {
+    const style = window.getComputedStyle(entry);
+    expect(style.backgroundColor).toBe("rgb(229, 242, 233)");
+    expect(style.color).toBe("rgb(54, 94, 70)");
+    await click(entry);
+    expect(container.querySelector(".cr-sheet h3").textContent).toBe("好友邀請 (1)");
+    await click(container.querySelector(".cr-sheet .cr-close-btn"));
+  }
+  expect(banner.textContent).not.toContain("點擊查看");
 });

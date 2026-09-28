@@ -29,7 +29,7 @@ export default function App({ Component, pageProps }) {
       {/* The home page owns its login UI; ChatRoom keeps its inline theme picker. */}
       {router.pathname !== "/" && <ThemeToggle />}
       <Component {...pageProps} />
-      <InstallPrompt />
+      {router.pathname !== "/" && <InstallPrompt />}
       <ToastHost />
       <MessageNotificationHost />
     </>

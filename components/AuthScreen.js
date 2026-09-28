@@ -1,6 +1,6 @@
 // Presentation only: authentication, validation and navigation stay in pages/index.js.
-import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Eye, EyeOff, Mail, UserRound, X, ArrowLeft } from "lucide-react";
 import styles from "./AuthScreen.module.css";
 
 const AVATAR_EMOJIS = ["😊", "👨‍💻", "📚", "🏃", "🎮", "🎨", "🍜", "🌸", "🦊", "🐼", "🎧", "⚡"];
@@ -10,10 +10,7 @@ function Brand() {
   return (
     <div className={styles.brand}>
       <img src="/logo.png?v=3" width="48" height="48" alt="" aria-hidden="true" />
-      <div>
-        <div className={styles.brandName}>EVONCHAT</div>
-        <div className={styles.brandSub}>聊天社交平台</div>
-      </div>
+      <div className={styles.brandName}>EVONCHAT</div>
     </div>
   );
 }
@@ -34,33 +31,42 @@ export default function AuthScreen({
   nickname, setNickname, avatar, setAvatar, color, setColor,
   authError, setAuthError, busy, guestBusy,
   onLogin, onRegister, onGoogleLogin, onGuestLogin,
+  savedAccounts = [], onSavedAccount, onForgetAccount,
 }) {
   const [showPassword, setShowPassword] = useState(false);
+  const [emailExpanded, setEmailExpanded] = useState(Boolean(email));
+  useEffect(() => { if (email) setEmailExpanded(true); }, [email]);
   const isLogin = tab === "login";
+  const showForm = emailExpanded || !isLogin;
   const formBusy = busy || guestBusy;
   // Preserve the existing Enter submission and validation handlers.
   const submit = () => { if (!formBusy) { isLogin ? onLogin() : onRegister(); } };
-  const onEnter = e => { if (e.key === "Enter") { e.preventDefault(); submit(); } };
+  const onEnter = e => { if (e.key === "Enter" && !e.nativeEvent?.isComposing && e.keyCode !== 229) { e.preventDefault(); submit(); } };
   const switchTab = next => { setTab(next); setAuthError(""); };
 
   return (
     <main className={styles.root}>
       <div className={styles.layout}>
-        <section className={styles.hero} aria-label="EVONCHAT 聊天社交平台">
-          <div className={styles.heroContent}>
-            <Brand />
-            <h1 className={styles.headline}>與重要的人<span>保持聯繫</span></h1>
-            <p className={styles.description}>
-              聊天、分享生活，與朋友保持連結<br />讓每一次對話都更有溫度
-            </p>
-          </div>
-        </section>
-
+        <Brand />
         <section className={styles.loginRegion} aria-labelledby="auth-title">
-          <div className={styles.mobileBrand}><Brand /></div>
-          <div className={styles.card} aria-busy={formBusy}>
-            <h2 id="auth-title" className={styles.title}>{isLogin ? "歡迎回來 👋" : "建立你的帳戶 ✨"}</h2>
-            <p className={styles.subtitle}>{isLogin ? "登入你的帳戶，繼續與朋友保持聯繫" : "填好基本資料，馬上開始聊天"}</p>
+          <div className={`${styles.card} ${showForm ? styles.formCard : ""}`} aria-busy={formBusy}>
+            <h1 id="auth-title" className={styles.title}>{isLogin ? "與重要的人，保持聯繫" : "建立你的帳戶"}</h1>
+            {isLogin && savedAccounts.length > 0 && <section className={styles.saved} aria-label="已儲存的帳號">
+              <p>繼續使用已儲存的帳號</p>
+              {savedAccounts.map(account => <div className={styles.savedRow} key={account.uid}>
+                <button type="button" disabled={formBusy} className={styles.savedAccount} onClick={() => onSavedAccount?.(account)}>
+                  {account.avatarImage ? <img src={account.avatarImage} alt="" /> : <UserRound size={24} />}
+                  <span><strong>{account.nickname || account.email}</strong><small>{account.email}</small></span>
+                </button>
+                <button type="button" disabled={formBusy} className={styles.forget} onClick={() => onForgetAccount?.(account)} aria-label={`從此裝置移除 ${account.nickname || account.email}`}><X size={17} /></button>
+              </div>)}
+            </section>}
+            <button type="button" className={styles.google} onClick={onGoogleLogin} disabled={formBusy}>
+              <GoogleMark /><span>使用 Google 繼續</span>
+            </button>
+            {isLogin && !showForm && <button type="button" className={styles.emailButton} disabled={formBusy} onClick={() => setEmailExpanded(true)}><Mail size={21} />使用 Email 登入</button>}
+            {showForm && <>
+            <div className={styles.divider}><span>使用電子郵件</span></div>
 
             {!isLogin && (
               <div className={styles.avatarPicker}>
@@ -112,15 +118,13 @@ export default function AuthScreen({
               </div>
             </div>
 
-            {authError && <div role="alert" className={styles.error}>{authError}</div>}
             <button type="button" className={styles.submit} onClick={submit} disabled={formBusy}>
               {busy && <span className={styles.spinner} aria-hidden="true" />}
               {busy ? "處理中..." : (isLogin ? "登入" : "建立帳號")}
             </button>
-            <div className={styles.divider}><span>或</span></div>
-            <button type="button" className={styles.google} onClick={onGoogleLogin} disabled={formBusy}>
-              <GoogleMark /><span>使用 Google 繼續</span>
-            </button>
+            {isLogin && <button type="button" className={styles.back} disabled={formBusy} onClick={() => setEmailExpanded(false)}><ArrowLeft size={16} />其他登入方式</button>}
+            </>}
+            {authError && <div role="alert" className={styles.error}>{authError}</div>}
             {isLogin && (
               <button type="button" className={styles.guest} onClick={onGuestLogin} disabled={formBusy}>
                 {guestBusy && <span className={styles.spinner} aria-hidden="true" />}
@@ -133,9 +137,10 @@ export default function AuthScreen({
                 {isLogin ? "立即註冊" : "登入"}
               </button>
             </div>
-            <footer className={styles.footer}>© 2026 EVONCHAT. All rights reserved.</footer>
+            <p className={styles.sessionNote}>在此裝置保留登入，方便下次切換。公用裝置使用後請登出。</p>
           </div>
         </section>
+        <footer className={styles.footer}>© 2026 EVONCHAT</footer>
       </div>
     </main>
   );

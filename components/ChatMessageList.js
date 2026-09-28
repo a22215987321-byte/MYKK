@@ -53,7 +53,7 @@ export default function ChatMessageList({ conversationKey, messages, currentUser
           pinnedRef.current = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 64;
         }
       }}>
-      <div ref={contentRef} className={styles.content}>{children}</div>
+      <div ref={contentRef} className={`cr-message-column ${styles.content}`}>{children}</div>
     </div>
   );
 }

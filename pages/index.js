@@ -4,12 +4,16 @@ import ChatRoom from '../components/ChatRoom';
 import GuestChatRoom from '../components/GuestChatRoom';
 import LoadingState from '../components/LoadingState';
 import AuthScreen from '../components/AuthScreen';
+import ProfileSetup from '../components/ProfileSetup';
+import InstallPrompt from '../components/InstallPrompt';
+import { uploadToR2 } from '../lib/uploadToR2';
+import { rememberAccountSession, restoreAccountSession, forgetAccountSession } from '../lib/accountSessions';
 import {
   auth, db, googleProvider, signInWithPopup, signInAnonymously,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
 } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { saveAccount, consumePendingLoginEmail } from '../lib/accountSwitcher';
+import { saveAccount, getSavedAccounts, consumePendingLoginEmail } from '../lib/accountSwitcher';
 import { findOwner, linkOwnerToNewUser } from '../lib/autoFriend';
 import { sendWelcomeDocs } from '../lib/welcomeDocs';
 import { signOut } from 'firebase/auth';
@@ -18,8 +22,6 @@ import { OWNER_EMAIL } from '../lib/admin';
 
 const AUTH_TIMEOUT_MS = 12000;
 
-const AVATAR_EMOJIS = ["😊","👨‍💻","📚","🏃","🎮","🎨","🍜","🌸","🦊","🐼","🎧","⚡"];
-const COLORS = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06b6d4","#84cc16"];
 
 async function ensureGuestProfile(firebaseUser) {
   const profileRef = doc(db, 'guest_users', firebaseUser.uid);
@@ -323,15 +325,29 @@ export default function Home() {
   const [authError, setAuthError] = useState('');
   const [busy, setBusy] = useState(false);
   const [guestBusy, setGuestBusy] = useState(false);
+  const [savedAccounts, setSavedAccounts] = useState([]);
+  const authRevision = useRef(0);
 
   // First-time setup state (for Google users)
   const [setupNickname, setSetupNickname] = useState('');
   const [setupAvatar, setSetupAvatar] = useState('😊');
   const [setupColor, setSetupColor] = useState('var(--accent)');
+  const [setupError, setSetupError] = useState('');
+
+  useEffect(() => {
+    if (step === 'login') {
+      setSavedAccounts(getSavedAccounts());
+      const pendingEmail = consumePendingLoginEmail();
+      if (pendingEmail) setEmail(pendingEmail);
+      setPassword('');
+    }
+  }, [step]);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
+      const revision = ++authRevision.current;
       if (!u) { setUser(null); setStep('login'); return; }
+      setStep('loading');
       setUser(u);
       try {
         if (u.isAnonymous) {
@@ -355,9 +371,11 @@ export default function Home() {
         }
 
         const snap = await getDoc(doc(db, 'users', u.uid));
+        if (revision !== authRevision.current || auth.currentUser?.uid !== u.uid) return;
         if (snap.exists()) {
           const p = snap.data();
-          saveAccount({ uid: u.uid, email: u.email, nickname: p.nickname, avatar: p.avatar, avatarImage: p.avatarImage, color: p.color });
+          const evictedUids = saveAccount({ uid: u.uid, email: u.email, nickname: p.nickname, avatar: p.avatar, avatarImage: p.avatarImage, color: p.color });
+          rememberAccountSession(u, evictedUids).catch(() => {});
           // The splash screen is a once-per-session boot animation, not a
           // per-navigation one — every client-side nav back to "/" (the
           // 返回聊天室 link on /profile or /feed, browser back, etc.) remounts
@@ -373,6 +391,7 @@ export default function Home() {
           setStep('setup');
         }
       } catch (e) {
+        if (revision !== authRevision.current) return;
         console.error('[Home] failed to load user profile', e);
         setAuthErrorMsg('無法連線到伺服器，請檢查網路連線後再試一次');
         setStep('error');
@@ -432,6 +451,8 @@ export default function Home() {
       // 好友關係建立之後才送歡迎文件——先有好友，對方的聊天清單才看得到這個
       // 對話；順序反過來會出現一個不在好友清單裡的未讀對話。
       await sendWelcomeDocs(owner, u.uid);
+      const evictedUids = saveAccount({ uid: u.uid, email: u.email, nickname: nickname.trim(), avatar, avatarImage: '/avatar1.png', color });
+      await rememberAccountSession(u, evictedUids).catch(() => {});
       setStep('chat');
     } catch (e) { setAuthError(getErrorMessage(e.code)); }
     finally { setBusy(false); }
@@ -439,8 +460,27 @@ export default function Home() {
 
   const handleGoogleLogin = async () => {
     setAuthError('');
+    setBusy(true);
     try { await signInWithPopup(auth, googleProvider); }
     catch { setAuthError('Google 登入失敗，請稍後再試'); }
+    finally { setBusy(false); }
+  };
+
+  const handleSavedAccount = async (account) => {
+    setBusy(true); setAuthError('');
+    try {
+      if (!await restoreAccountSession(account.uid)) {
+        setEmail(account.email); setTab('login');
+        setAuthError('這個帳號需要重新驗證一次；登入後可在此裝置快速切換。');
+      }
+    } catch { setAuthError('暫時無法恢復登入，請檢查網路後再試。'); }
+    finally { setBusy(false); }
+  };
+  const handleForgetAccount = async (account) => {
+    setBusy(true);
+    try { await forgetAccountSession(account.uid); setSavedAccounts(getSavedAccounts()); }
+    catch { setAuthError('移除帳號失敗，請再試一次。'); }
+    finally { setBusy(false); }
   };
 
   const handleGuestLogin = async () => {
@@ -456,10 +496,12 @@ export default function Home() {
     }
   };
 
-  const handleSetup = async () => {
+  const handleSetup = async (photoFile, usePhoto = true) => {
     if (!setupNickname.trim() || !user) return;
     setBusy(true);
+    setSetupError('');
     try {
+      const avatarImage = usePhoto ? (photoFile ? await uploadToR2(photoFile) : user.photoURL || '') : '';
       // 跟密碼註冊同樣處理——Google 首次登入也是新帳號。
       const owner = await findOwner(user.email || '');
       const ownerUid = owner?.uid || null;
@@ -468,21 +510,18 @@ export default function Home() {
         bio: '', status: 'online', statusText: '',
         email: user.email || '',
         friends: ownerUid ? [ownerUid] : [], pendingIn: [], pendingOut: [],
-        avatarImage: '/avatar1.png',
+        avatarImage,
         createdAt: serverTimestamp(),
       });
       await linkOwnerToNewUser(ownerUid, user.uid);
       await sendWelcomeDocs(owner, user.uid);
+      const evictedUids = saveAccount({ uid: user.uid, email: user.email, nickname: setupNickname.trim(), avatar: setupAvatar, avatarImage, color: setupColor });
+      await rememberAccountSession(user, evictedUids).catch(() => {});
       setStep('chat');
-    } catch (e) { console.error(e); }
+    } catch (e) { setSetupError('儲存失敗，請檢查網路或選擇另一張圖片後重試。'); }
     finally { setBusy(false); }
   };
 
-  const inputStyle = {
-    width: '100%', background: 'var(--panel-alt)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--text)',
-    fontSize: 16, outline: 'none', boxSizing: 'border-box',
-  };
 
   // ── Loading ──
   if (step === 'loading') {
@@ -509,51 +548,16 @@ export default function Home() {
 
   // ── Chat ──
   if (step === 'chat') {
-    return user?.isAnonymous
-      ? <GuestChatRoom user={user} />
-      : <ChatRoom user={user} />;
+    return <>{user?.isAnonymous
+      ? <GuestChatRoom key={user.uid} user={user} />
+      : <ChatRoom key={user?.uid} user={user} />}<InstallPrompt /></>;
   }
 
   // ── First-time profile setup (Google users) ──
   if (step === 'setup') {
     return (
-      <main style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
-          <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <div aria-hidden="true" style={{ fontSize: 48, marginBottom: 12 }}>👋</div>
-            <h1 style={{ color: 'var(--text)', fontSize: 22, fontWeight: 700, margin: 0 }}>建立你的個人資料</h1>
-            <p style={{ color: 'var(--text-faint)', fontSize: 14, marginTop: 6 }}>讓大家認識你</p>
-          </div>
-          <div style={{ background: 'var(--panel)', borderRadius: 'var(--radius-lg)', padding: 28, border: '1px solid var(--border)', backdropFilter: 'var(--panel-blur)', WebkitBackdropFilter: 'var(--panel-blur)' }}>
-            <div style={{ marginBottom: 18 }}>
-              <span id="setup-avatar-label" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 6, display: 'block' }}>選擇頭像</span>
-              <div role="group" aria-labelledby="setup-avatar-label" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                {AVATAR_EMOJIS.map(e => (
-                  <button key={e} type="button" onClick={() => setSetupAvatar(e)} aria-label={`頭像 ${e}`} aria-pressed={setupAvatar === e} style={{ width: 38, height: 38, borderRadius: '50%', border: setupAvatar === e ? '2px solid var(--accent)' : '2px solid transparent', background: setupColor, cursor: 'pointer', fontSize: 18 }}>{e}</button>
-                ))}
-              </div>
-              <div role="group" aria-label="選擇頭像底色" style={{ display: 'flex', gap: 6 }}>
-                {COLORS.map(c => (
-                  <button key={c} type="button" onClick={() => setSetupColor(c)} aria-label={`底色 ${c}`} aria-pressed={setupColor === c} style={{ width: 24, height: 24, borderRadius: '50%', background: c, border: setupColor === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer' }} />
-                ))}
-              </div>
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <label htmlFor="setup-nickname" style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4, display: 'block' }}>暱稱</label>
-              <input id="setup-nickname" value={setupNickname} onChange={e => setSetupNickname(e.target.value)}
-                placeholder="你的暱稱" onKeyDown={e => e.key === 'Enter' && handleSetup()}
-                style={inputStyle} />
-            </div>
-            <button onClick={handleSetup} disabled={busy || !setupNickname.trim()} style={{
-              width: '100%', background: 'linear-gradient(135deg,var(--accent),var(--accent-2))',
-              border: 'none', borderRadius: 'var(--radius-md)', padding: '12px', color: '#fff',
-              fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: (busy || !setupNickname.trim()) ? 0.6 : 1,
-            }}>
-              {busy ? '儲存中...' : '進入聊天室'}
-            </button>
-          </div>
-        </div>
-      </main>
+      <ProfileSetup nickname={setupNickname} setNickname={setSetupNickname} avatar={setupAvatar} setAvatar={setSetupAvatar}
+        color={setupColor} setColor={setSetupColor} initialPhoto={user?.photoURL} busy={busy} error={setupError} onSubmit={handleSetup} />
     );
   }
 
@@ -575,6 +579,7 @@ export default function Home() {
       onRegister={handleRegister}
       onGoogleLogin={handleGoogleLogin}
       onGuestLogin={handleGuestLogin}
+      savedAccounts={savedAccounts} onSavedAccount={handleSavedAccount} onForgetAccount={handleForgetAccount}
     />
   );
 }
