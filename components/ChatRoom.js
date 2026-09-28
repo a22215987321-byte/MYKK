@@ -13,6 +13,7 @@ import PageNotes from "./PageNotes";
 import ThemeToggle from "./ThemeToggle";
 import NavItem from "./nav/NavItem";
 import { TabBar, TabDragGhost, useTabDragController } from "./nav/TabbedBlock";
+import WorkspaceBlock from "./nav/WorkspaceBlock";
 import ChatMoreMenu from "./ChatMoreMenu";
 import ChatMobileTabBar from "./ChatMobileTabBar";
 import VocabRoom from "./VocabRoom";
@@ -1018,9 +1019,17 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
   const [profileBgType, setProfileBgType] = useState(myProfile.profileBgType || "gradient");
   const [bgUploading,   setBgUploading]   = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarExpanded, setAvatarExpanded] = useState(false);
+  const closeButtonRef = useRef(null);
   const bgFileRef = useRef(null);
   const avatarFileRef = useRef(null);
   const friendList = (myProfile.friends || []).map(fid => friendProfiles[fid]).filter(Boolean);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    closeButtonRef.current?.focus();
+    return () => { if (previousFocus?.isConnected) previousFocus.focus(); };
+  }, []);
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -1038,8 +1047,10 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
-      <div className="cr-modal-full" style={{ background: "var(--panel)", borderRadius: 20, width: 640, maxWidth: "92vw", maxHeight: "88vh", overflow: "auto", border: "1px solid var(--border)" }}>
+    <div className="cr-profile-overlay" onClick={event => { if (event.target === event.currentTarget) onClose(); }}
+      onKeyDown={event => { if (event.key === "Escape" && !event.nativeEvent?.isComposing) { event.stopPropagation(); onClose(); } }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }}>
+      <div className="cr-modal-full" role="dialog" aria-modal="true" aria-label="個人資料設定" style={{ background: "var(--panel)", borderRadius: 20, width: 640, maxWidth: "92vw", maxHeight: "88vh", overflow: "auto", border: "1px solid var(--border)" }}>
         <div style={{
           background: profileBgType === "gradient" ? profileBg : undefined,
           backgroundImage: profileBgType === "image" ? `url(${profileBg})` : undefined,
@@ -1047,7 +1058,7 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
           backgroundPosition: profileBgType === "image" ? "center" : undefined,
           padding: "28px 28px 0", borderRadius: "20px 20px 0 0", position: "relative",
         }}>
-          <button onClick={onClose} className="cr-close-btn" style={{ position: "absolute", top: 14, right: 14, background: "rgba(0,0,0,0.3)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "var(--text-muted)", cursor: "pointer", fontSize: 18 }}>✕</button>
+          <button ref={closeButtonRef} type="button" onClick={onClose} aria-label="關閉個人資料設定" className="cr-close-btn" style={{ position: "absolute", top: 14, right: 14, background: "rgba(0,0,0,0.3)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "var(--text-muted)", cursor: "pointer", fontSize: 18 }}>✕</button>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
             <div style={{ position: "relative" }}>
               <AvatarImg avatarImage={myProfile.avatarImage} avatar={avatar} color={color} size={80} />
@@ -1070,11 +1081,19 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
             <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>頭像圖片</label>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <AvatarImg avatarImage={myProfile.avatarImage} avatar={avatar} color={color} size={48} />
-              <div style={{ display: "flex", gap: 8, flexDirection: "column" }}>
+              <div style={{ display: "flex", gap: 8, flexDirection: "column", minWidth: 0 }}>
+                <div className="cr-profile-avatar-actions">
                 <button onClick={() => avatarFileRef.current?.click()} disabled={avatarUploading}
                   style={{ background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "7px 14px", color: "var(--text-muted)", cursor: avatarUploading ? "default" : "pointer", fontSize: 13 }}>
                   {avatarUploading ? "上傳中..." : "📷 上傳頭像圖片"}
                 </button>
+                <button type="button" className="cr-default-avatar-toggle" aria-expanded={avatarExpanded} aria-controls="profile-default-avatar"
+                  onClick={() => setAvatarExpanded(value => !value)}>
+                  <img src="/avatar1.png" alt="" width={24} height={24} />
+                  <span>預設頭像</span>
+                  <ChevronRight size={16} aria-hidden="true" style={{ transform: avatarExpanded ? "rotate(90deg)" : undefined }} />
+                </button>
+                </div>
                 {myProfile.avatarImage && (
                   <button onClick={() => updateDoc(doc(db, 'users', myProfile.uid), { avatarImage: "" })}
                     style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, textAlign: "left" }}>移除圖片</button>
@@ -1082,14 +1101,10 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
               </div>
               <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAvatarUpload} />
             </div>
-          </div>
-          {/* 頭像設計器。原本是從這個面板再彈出的第二層 modal（點頭像上的 📷
-              才會開），現在直接內嵌成同一塊面板裡的一個區塊——設定頭像這件事
-              不需要再疊一層視窗。AvatarCreator 收到 embedded 之後不會畫自己的
-              遮罩、外殼和標題列。 */}
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8, display: "block" }}>🎨 設計我的頭像</label>
-            <AvatarCreator myProfile={myProfile} embedded />
+            {/* Keep draft avatar choices while collapsed; apply uses the existing save flow. */}
+            <div id="profile-default-avatar" hidden={!avatarExpanded} style={{ marginTop: 12 }}>
+              <AvatarCreator myProfile={myProfile} embedded onClose={() => setAvatarExpanded(false)} />
+            </div>
           </div>
           <div style={{ marginBottom: 18 }}>
             <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 6, display: "block" }}>頭像顏色</label>
@@ -1100,8 +1115,8 @@ function ProfilePage({ myProfile, friendProfiles, onSave, onClose }) {
             </div>
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>暱稱</label>
-            <input value={nickname} onChange={e => setNickname(e.target.value)} style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+            <label htmlFor="profile-nickname" style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>暱稱</label>
+            <input id="profile-nickname" value={nickname} onChange={e => setNickname(e.target.value)} style={{ width: "100%", background: "var(--panel-alt)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "10px 14px", color: "var(--text)", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
           </div>
           <div style={{ marginBottom: 14 }}>
             <label style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4, display: "block" }}>個性簽名（最多 20 字）</label>
@@ -1462,6 +1477,89 @@ function DonateModal({ myProfile, onClose }) {
 // 費用或觸發濫用限制）——先做前端擋，NavItem 保留可見但鎖住，不是整個藏起來。
 const AI_CHAT_OWNER_EMAIL = "a22215987321@gmail.com";
 
+// Each view has its own picker/details; parent-owned drafts survive tab moves.
+function PrivateChatThread({ uid, activeFriendId, activeFriendProfile, myProfile, myGroups,
+  privateMessages, privateInput, setPrivateInput, privateUploading, sendPrivate, sendPrivateMedia, sendPrivateItem,
+  msgFontSize, isMobile, centered, visible, mobileShowInfo, onMobileShowInfo }) {
+  const [localShowInfo, setLocalShowInfo] = useState(false);
+  const showFriendInfo = isMobile ? mobileShowInfo : localShowInfo;
+  const setShowFriendInfo = isMobile ? onMobileShowInfo : setLocalShowInfo;
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(null);
+  useEffect(() => { if (!visible) setEmojiPickerOpen(null); }, [visible]);
+  const privateFileRef = useRef(null);
+  const privateEmojiBtnRef = useRef(null);
+  const chatId = [uid, activeFriendId].sort().join('_');
+  const friendHeaderIdentity = activeFriendProfile && (
+    <button className="cr-friend-identity" onClick={() => setShowFriendInfo(true)}
+      title="查看好友資訊" aria-label="查看好友資訊"
+      style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12, minWidth: 0,
+        background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "var(--text)" }}>
+      <div style={{ position: "relative", flexShrink: 0 }}>
+        <AvatarImg avatarImage={activeFriendProfile.avatarImage} avatar={activeFriendProfile.avatar} color={activeFriendProfile.color} size={isMobile ? 38 : 34} />
+        <span style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: getStatus(activeFriendProfile.status).color, border: "2px solid var(--panel-alt)" }} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: isMobile ? 16 : 14, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeFriendProfile.nickname}</div>
+        <div style={{ fontSize: isMobile ? 12 : 11, lineHeight: 1.4, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {activeFriendProfile.statusText || activeFriendProfile.signature || ""}
+        </div>
+      </div>
+    </button>
+  );
+
+
+  return <ChatThreadSurface centered={centered} mobile={isMobile} conversationKey={activeFriendId} details={showFriendInfo}>
+      {activeFriendId && activeFriendProfile && showFriendInfo && (
+        <FriendInfoView friend={activeFriendProfile} myUid={uid} myBlocked={myProfile?.blocked} messages={privateMessages} myGroups={myGroups} onClose={() => setShowFriendInfo(false)} showProfileLink={isMobile} />
+      )}
+      {activeFriendId && activeFriendProfile && !showFriendInfo && (
+        <>
+          {!isMobile && <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
+            {friendHeaderIdentity}
+            <Link href={`/profile/${activeFriendProfile.uid}`} style={{ marginLeft: "auto", color: "var(--text-faint)", fontSize: 12, textDecoration: "none" }}
+              onMouseEnter={e => e.currentTarget.style.color = "var(--text-muted)"}
+              onMouseLeave={e => e.currentTarget.style.color = "var(--text-faint)"}>
+              ℹ️ 個人檔案
+            </Link>
+          </div>}
+          <ChatMessageList conversationKey={`private:${activeFriendId}`} messages={privateMessages} currentUserId={uid} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-no-image, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "28px 28px" }}>
+            <div style={{ textAlign: "center", marginBottom: 16 }}>
+              <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{activeFriendProfile.nickname}</div>
+              {activeFriendProfile.bio && <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 4, maxWidth: 260, margin: "4px auto 0" }}>{activeFriendProfile.bio}</div>}
+              <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>你們已經是好友了</div>
+            </div>
+            {privateMessages.map((msg, i) => {
+              const isMine = msg.senderId === uid;
+              return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={!isMine && privateMessages[i-1]?.senderId !== msg.senderId} myUid={uid} collectionPath={["private_chats", chatId, "messages", msg.id]} msgFontSize={msgFontSize} prevCreatedAt={privateMessages[i-1]?.createdAt} />;
+            })}
+          </ChatMessageList>
+          <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
+              <input ref={privateFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendPrivateMedia(f); e.target.value = ""; } }} />
+              {visible && <ChatComposerActions anchorRef={privateEmojiBtnRef} isMobile={isMobile} uploading={privateUploading}
+                onOpen={() => setEmojiPickerOpen(null)}
+                onUpload={() => privateFileRef.current?.click()}
+                onEmoji={() => setEmojiPickerOpen('private')} />}
+              <input type="text" value={privateInput} onChange={e => setPrivateInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendPrivate()} placeholder={`傳送訊息給 ${activeFriendProfile.nickname}...`}
+                style={{ flex: 1, minWidth: 0, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
+              <button className="sb" onClick={sendPrivate} disabled={!privateInput.trim()}
+                style={{ background: privateInput.trim() ? "var(--sendbtn-bg, var(--accent))" : "var(--panel)", border: "none", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--sendbtn-width, auto)", height: "var(--sendbtn-height, auto)", boxSizing: "border-box", padding: "9px 16px", color: privateInput.trim() ? "var(--accent-text)" : "var(--text-dim)", cursor: privateInput.trim() ? "pointer" : "default", fontSize: 14, fontWeight: 600, transition: "all 0.15s", flexShrink: 0, whiteSpace: "nowrap" }}>
+                傳送              </button>
+            </div>
+            {visible && emojiPickerOpen === 'private' && (
+              <EmojiStickerPicker isMobile={isMobile} anchorRef={privateEmojiBtnRef} uid={uid}
+                onClose={() => setEmojiPickerOpen(null)}
+                onInsertEmoji={ch => setPrivateInput(v => v + ch)}
+                onSendItem={item => sendPrivateItem(item)} />
+            )}
+            <div style={{ textAlign: "right", fontSize: 11, color: "var(--border)", marginTop: 4 }}>私訊只有你們兩人看得到 · 雙方都可以撤回訊息</div>
+          </div>
+        </>
+      )}
+      {!activeFriendProfile && <div role="status">載入中...</div>}
+  </ChatThreadSurface>;
+}
+
 export default function ChatApp({ user }) {
   const router = useRouter();
   const uid = user.uid;
@@ -1483,13 +1581,16 @@ export default function ChatApp({ user }) {
   const [myProfileError, setMyProfileError] = useState('');
   const [friendProfiles, setFriendProfiles] = useState({});
   const [hallMessages,   setHallMessages]   = useState([]);
-  const [privateMessages,setPrivateMessages]= useState([]);
+  const [privateMessagesByFriend, setPrivateMessagesByFriend] = useState({});
   const [activeFriendId, setActiveFriendId] = useState(null);
   const [hallInput,      setHallInput]      = useState("");
-  const [privateInput,   setPrivateInput]   = useState("");
+  const [privateDrafts, setPrivateDrafts] = useState({});
+  const setPrivateDraft = (friendId, value) => setPrivateDrafts(prev => ({ ...prev,
+    [friendId]: typeof value === "function" ? value(prev[friendId] || "") : value,
+  }));
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(null); // null | 'hall' | 'private' | 'group'
   const [hallUploading,  setHallUploading]  = useState(false);
-  const [privateUploading, setPrivateUploading] = useState(false);
+  const [privateUploads, setPrivateUploads] = useState({});
   const [showProfile,    setShowProfile]    = useState(false);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [showFriendReqs,   setShowFriendReqs]   = useState(false);
@@ -1566,50 +1667,8 @@ export default function ChatApp({ user }) {
   const [maximizedBlock, setMaximizedBlock] = useState(null); // null | "A" | "B"
   const toggleMaximizeBlock = (block) => {
     setMaximizedBlock((prev) => (prev === block ? null : block));
-    setHideTabBarBlock(null);
   };
-  // 滿版（100%）看內容時，內容區第一次往下捲動就把分頁列收起來讓出空間，
-  // 收起來之後不管再怎麼上下捲都不會又跳出來——真的要它回來，捲回最頂端
-  // 或是點別的功能／好友群組都會重置。故意不是「往上捲一點就跳出來」，
-  // 因為滑手機/滑鼠滾很常見的動作是「一路往下看貼文，忽然想往上滑看回上
-  // 一則」，這種情況分頁列突然彈出來反而打斷閱讀。50% 分頁列一律都在，
-  // 不受這個影響。
-  const [hideTabBarBlock, setHideTabBarBlock] = useState(null); // null | "A" | "B"
-  // handleMaximizedContentScroll 掛在 ref callback 裡（見下面
-  // registerBlockScroll），只在 DOM 節點真的掛載那一刻跑一次，不是靠
-  // useEffect 依賴陣列——用一個 ref 存最新的 hideTabBarBlock，讓這個只
-  // 建立一次的監聽器每次都讀得到當下的值，不用因為值變了就整個重新綁定。
-  const hideTabBarBlockRef = useRef(null);
-  hideTabBarBlockRef.current = hideTabBarBlock;
-  const handleMaximizedContentScroll = (block) => (e) => {
-    const scrollTop = e.target.scrollTop;
-    const current = hideTabBarBlockRef.current;
-    if (scrollTop <= 0) {
-      if (current === block) setHideTabBarBlock(null);
-    } else if (current !== block) {
-      setHideTabBarBlock(block);
-    }
-  };
-  // 捲動事件原生不會冒泡，實際捲動的永遠是內容元件自己內部某個
-  // overflow:auto 的子節點，不是這層外層 wrapper 本身——用 capture
-  // phase（第三個參數 true）在事件往下傳遞、抵達真正目標之前先攔截，
-  // 不管是哪一層子節點在捲、也不用內容元件自己配合加 onScroll。
-  //
-  // 一開始用 useRef+useEffect（依賴 [hideTabBarBlock]）綁監聽器，結果
-  // 完全沒作用——桌面版 A/B 兩塊的 JSX 要等使用者登入、myProfile 有值
-  // 之後才會渲染，但這個 useEffect 在那之前（登入畫面/註冊表單那個
-  // render）就先跑過一次了，那時候 ref.current 還是 null，之後
-  // hideTabBarBlock 這個值本身沒再變過（一直是 null），依賴陣列沒觸發
-  // effect 重跑，監聽器就永遠掛在 null 上、真正的 DOM 節點掛載之後也沒
-  // 補綁。改成 ref callback：callback 本身用 useCallback 固定住，React
-  // 保證只在這個特定 DOM 節點「真的」掛載的那一刻才會呼叫它、拿到真正
-  // 的節點，不受元件其他部分的渲染時機影響。
-  const registerBlockScroll = (block) => useCallback((el) => {
-    if (el) el.addEventListener("scroll", handleMaximizedContentScroll(block), true);
-  }, [block]);
-  const blockAScrollRef = registerBlockScroll("A");
-  const blockBScrollRef = registerBlockScroll("B");
-  // 滾動條「滾輪滾動中放大」特效——全站通用一個 capture-phase listener，
+  // WorkspaceBlock manages tab-strip visibility; scrollbar styling stays here.
   // 不用每個捲動區域各自加。哪個元素在捲（e.target）就給它加
   // .is-scrolling，停下來 400ms 後自動移掉（配上面 CSS 的
   // .is-scrolling::-webkit-scrollbar-thumb 規則）。
@@ -1656,13 +1715,13 @@ export default function ChatApp({ user }) {
   const openTab = (key) => {
     // 已經開著就切過去；沒開過的話固定分配：「對話」去左塊（A），側欄那些
     // 功能一律去右塊（B）——不是看哪塊「目前作用中」。
-    const target = keyBlock[key] || (key === "conversations" ? "A" : "B");
+    const target = keyBlock[key] || (key === "conversations" || key.startsWith("private:") ? "A" : "B");
+    setMaximizedBlock(prev => prev ? target : null);
     setBlocks((prev) => {
       const blk = prev[target];
       const tabs = blk.tabs.includes(key) ? blk.tabs : [...blk.tabs, key];
       return { ...prev, [target]: { tabs, active: key } };
     });
-    setHideTabBarBlock(null);
   };
   const closeTab = (block, key) => {
     setBlocks((prev) => {
@@ -1676,7 +1735,7 @@ export default function ChatApp({ user }) {
   };
   const activateTab = (block, key) => {
     setBlocks((prev) => ({ ...prev, [block]: { ...prev[block], active: key } }));
-    setHideTabBarBlock(null);
+    if (key.startsWith("private:")) setActiveFriendId(key.slice(8));
   };
   const moveTabToBlock = (key, fromBlock, toBlock, beforeKey) => {
     if (fromBlock === toBlock) return;
@@ -1723,6 +1782,20 @@ export default function ChatApp({ user }) {
 
   // Mobile / sidebar states
   const isMobile = useIsMobile();
+  useEffect(() => {
+    if (isMobile || !activeFriendId) return;
+    const key = "private:" + activeFriendId;
+    setBlocks(prev => {
+      const block = ["A", "B"].find(b => prev[b].tabs.includes(key)) || "A";
+      const current = prev[block];
+      return { ...prev, [block]: { tabs: current.tabs.includes(key) ? current.tabs : [...current.tabs, key], active: key } };
+    });
+  }, [isMobile, activeFriendId]);
+  const openFriendTab = friendId => {
+    setActiveGroupId(null);
+    setActiveFriendId(friendId);
+    if (!isMobile) openTab("private:" + friendId);
+  };
   const [calendarOpen,   setCalendarOpen]   = useState(false);
   const [mobileView,     setMobileView]     = useState(null); // 'more' | null (content-driven; 'list' 已改用下面的 sidebarOpen 抽屜)
   // 手機版「首頁」分頁底下的兩種子畫面：'list'＝群組＋好友清單（首頁預設）、
@@ -1874,9 +1947,7 @@ export default function ChatApp({ user }) {
   const longPressFiredRef = useRef(false);
   const hallFileRef = useRef(null);
   const hallEmojiBtnRef = useRef(null);
-  const privateEmojiBtnRef = useRef(null);
   const groupEmojiBtnRef = useRef(null);
-  const privateFileRef = useRef(null);
   const groupFileRef = useRef(null);
   const groupAvatarFileRef = useRef(null);
   const localVideoRef = useRef(null);
@@ -1895,7 +1966,7 @@ export default function ChatApp({ user }) {
   const commentsUnsubRef = useRef(null);
   const viewersUnsubRef = useRef(null);
 
-  const chatId = activeFriendId ? [uid, activeFriendId].sort().join('_') : null;
+
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -1973,13 +2044,20 @@ export default function ChatApp({ user }) {
   // 打開聊天室（好友或群組）時把自己的未讀數寫回 0——依賴陣列同時包含
   // privateUnread/myGroups，訊息在聊天室開著的當下持續進來也會立刻歸零，
   // 不會等使用者切走再切回來才清掉。
+  const openPrivateIds = Object.keys(keyBlock).filter(key => key.startsWith("private:")).map(key => key.slice(8));
+  const subscribedPrivateKey = JSON.stringify(isMobile ? (activeFriendId ? [activeFriendId] : []) : openPrivateIds.sort());
+  const visiblePrivateKey = JSON.stringify(isMobile
+    ? (!mobileActiveKey && !mobileView && activeFriendId ? [activeFriendId] : [])
+    : ["A", "B"].filter(block => !effectiveMaximizedBlock || effectiveMaximizedBlock === block)
+      .map(block => blocks[block].active).filter(key => key?.startsWith("private:")).map(key => key.slice(8)));
   useEffect(() => {
-    if (!activeFriendId) return;
-    if (!(privateUnread[activeFriendId] > 0)) return;
-    const cid = [uid, activeFriendId].sort().join('_');
-    setDoc(doc(db, 'private_chats', cid), { unreadCount: { [uid]: 0 } }, { merge: true })
-      .catch(e => console.error('[ChatRoom] clear private unread failed', e));
-  }, [activeFriendId, privateUnread, uid]);
+    for (const friendId of JSON.parse(visiblePrivateKey)) {
+      if (!(privateUnread[friendId] > 0)) continue;
+      const cid = [uid, friendId].sort().join('_');
+      setDoc(doc(db, 'private_chats', cid), { unreadCount: { [uid]: 0 } }, { merge: true })
+        .catch(e => console.error('[ChatRoom] clear private unread failed', e));
+    }
+  }, [visiblePrivateKey, privateUnread, uid]);
 
   useEffect(() => {
     if (!activeGroupId) return;
@@ -2009,7 +2087,6 @@ export default function ChatApp({ user }) {
   // without this, opening a chat would play one ding per historical message
   // instead of only for genuinely new ones that arrive afterward.
   const hallSoundReadyRef = useRef(false);
-  const privateSoundReadyRef = useRef(false);
   const groupSoundReadyRef = useRef(false);
 
   // Plays at most one ding per snapshot batch, only for messages someone
@@ -2029,15 +2106,33 @@ export default function ChatApp({ user }) {
     });
   }, []);
 
+  const privateMessageListeners = useRef(new Map());
   useEffect(() => {
-    if (!activeFriendId) { setPrivateMessages([]); return; }
-    privateSoundReadyRef.current = false;
-    const q = query(collection(db, 'private_chats', chatId, 'messages'), orderBy('createdAt'), limitToLast(50));
-    return onSnapshot(q, snap => {
-      notifyIfIncoming(snap.docChanges(), privateSoundReadyRef);
-      setPrivateMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-  }, [uid, activeFriendId]);
+    const ids = new Set(JSON.parse(subscribedPrivateKey));
+    const listeners = privateMessageListeners.current;
+    for (const [id, unsubscribe] of listeners) {
+      if (!ids.has(id)) { unsubscribe(); listeners.delete(id); }
+    }
+    for (const friendId of ids) {
+      if (listeners.has(friendId)) continue;
+      let ready = false;
+      const cid = [uid, friendId].sort().join('_');
+      const q = query(collection(db, 'private_chats', cid, 'messages'), orderBy('createdAt'), limitToLast(50));
+      listeners.set(friendId, onSnapshot(q, snap => {
+        if (ready && snap.docChanges().some(change => change.type === "added" && change.doc.data().senderId !== uid)) playNotificationSound();
+        ready = true;
+        setPrivateMessagesByFriend(prev => ({ ...prev, [friendId]: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+      }, error => {
+        console.error('[ChatRoom] private messages listener failed', { code: error?.code });
+        setPrivateMessagesByFriend(prev => ({ ...prev, [friendId]: [] }));
+        toast("無法載入好友訊息，請稍後重新開啟對話");
+      }));
+    }
+  }, [subscribedPrivateKey, uid]);
+  useEffect(() => {
+    const listeners = privateMessageListeners.current;
+    return () => { listeners.forEach(unsubscribe => unsubscribe()); listeners.clear(); };
+  }, [uid]);
 
   // Groups listener
   useEffect(() => {
@@ -2222,36 +2317,43 @@ export default function ChatApp({ user }) {
       .catch(e => console.error('[bumpGroupChatSummary] failed', { code: e?.code, message: e?.message }));
   }, [uid, myGroups]);
 
-  const sendPrivate = useCallback(async () => {
-    if (!privateInput.trim() || !activeFriendId || !myProfile) return;
-    const text = privateInput.trim();
-    setPrivateInput("");
-    await addDoc(collection(db, 'private_chats', chatId, 'messages'), {
-      senderId: uid, sender: myProfile.nickname, avatar: myProfile.avatar,
-      senderAvatarImage: myProfile.avatarImage || "",
-      text, createdAt: serverTimestamp(),
-    });
-    bumpPrivateChatSummary(activeFriendId, text.slice(0, 50));
-  }, [privateInput, activeFriendId, myProfile, uid, chatId, bumpPrivateChatSummary]);
+  const sendPrivate = async (friendId) => {
+    const text = (privateDrafts[friendId] || "").trim();
+    if (!text || !friendId || !myProfile) return;
+    const cid = [uid, friendId].sort().join('_');
+    setPrivateDraft(friendId, "");
+    try {
+      await addDoc(collection(db, 'private_chats', cid, 'messages'), {
+        senderId: uid, sender: myProfile.nickname, avatar: myProfile.avatar,
+        senderAvatarImage: myProfile.avatarImage || "",
+        text, createdAt: serverTimestamp(),
+      });
+      bumpPrivateChatSummary(friendId, text.slice(0, 50));
+    } catch {
+      setPrivateDraft(friendId, current => current ? text + "\n" + current : text);
+      toast("傳送失敗，訊息已保留，請重試");
+    }
+  };
 
-  const sendPrivateMedia = useCallback(async (file) => {
-    if (!activeFriendId || !myProfile) return;
-    setPrivateUploading(true);
+  const sendPrivateMedia = useCallback(async (file, friendId) => {
+    if (!friendId || !myProfile) return;
+    const cid = [uid, friendId].sort().join('_');
+    setPrivateUploads(prev => ({ ...prev, [friendId]: true }));
     try {
       const url = await uploadToR2(file);
       const { fields, label } = chatFileFields(file, url);
-      await addDoc(collection(db, 'private_chats', chatId, 'messages'), {
+      await addDoc(collection(db, 'private_chats', cid, 'messages'), {
         senderId: uid, sender: myProfile.nickname, avatar: myProfile.avatar,
         senderAvatarImage: myProfile.avatarImage || "",
         text: "", ...fields, createdAt: serverTimestamp(),
       });
-      bumpPrivateChatSummary(activeFriendId, label);
+      bumpPrivateChatSummary(friendId, label);
     } catch {
       toast("上傳失敗，請重試");
     } finally {
-      setPrivateUploading(false);
+      setPrivateUploads(prev => ({ ...prev, [friendId]: false }));
     }
-  }, [activeFriendId, myProfile, uid, chatId, bumpPrivateChatSummary]);
+  }, [myProfile, uid, bumpPrivateChatSummary]);
 
   const sendGroup = useCallback(async () => {
     if (!groupInput.trim() || !activeGroupId || !myProfile) return;
@@ -2322,15 +2424,16 @@ export default function ChatApp({ user }) {
     }
   }, [myProfile, buildItemMessage]);
 
-  const sendPrivateItem = useCallback(async (item) => {
-    if (!activeFriendId || !myProfile) return;
+  const sendPrivateItem = useCallback(async (item, friendId) => {
+    if (!friendId || !myProfile) return;
+    const cid = [uid, friendId].sort().join('_');
     try {
-      await addDoc(collection(db, 'private_chats', chatId, 'messages'), buildItemMessage(item));
-      bumpPrivateChatSummary(activeFriendId, item.type === "sticker" ? "[貼圖]" : (item.emoji || "[表情]"));
+      await addDoc(collection(db, 'private_chats', cid, 'messages'), buildItemMessage(item));
+      bumpPrivateChatSummary(friendId, item.type === "sticker" ? "[貼圖]" : (item.emoji || "[表情]"));
     } catch (e) {
-      console.error("[sendPrivateItem] failed", { code: e?.code, message: e?.message, item });
+      console.error("[sendPrivateItem] failed", { code: e?.code, message: e?.message });
     }
-  }, [activeFriendId, myProfile, chatId, buildItemMessage, bumpPrivateChatSummary]);
+  }, [myProfile, uid, buildItemMessage, bumpPrivateChatSummary]);
 
   const sendGroupItem = useCallback(async (item) => {
     if (!activeGroupId || !myProfile) return;
@@ -2689,6 +2792,8 @@ export default function ChatApp({ user }) {
   // 分頁列只需要圖示+標籤，跟 topItems 的完整 NavItem 是兩份平行資料——
   // 兩邊的圖示/文字要保持一致，改一邊記得改另一邊。
   const TAB_META = {
+    ...Object.fromEntries(openPrivateIds.map(friendId => ["private:" + friendId,
+      { icon: "💬", label: friendProfiles[friendId]?.nickname || "好友對話" }])),
     feed: { icon: "📰", label: "動態消息" },
     conversations: { icon: "💬", label: "對話" },
     leaderboard: { icon: "🏆", label: "排行榜" },
@@ -2866,9 +2971,6 @@ export default function ChatApp({ user }) {
         <button onClick={() => setShowCreateGroup(true)} title="建立群組" className="cr-nav-icon-btn">+</button>
       </div>
       <div style={{ padding: "0 8px 6px" }}>
-        {myGroups.length === 0 && (
-          <div style={{ textAlign: "center", padding: "16px 12px", color: "var(--text-dim)", fontSize: 13 }}>還沒有群組</div>
-        )}
         {myGroups.map(group => {
           const isActive = activeGroupId === group.id;
           return (
@@ -2912,7 +3014,7 @@ export default function ChatApp({ user }) {
         {myFriends.map(friend => {
           const isActive = activeFriendId === friend.uid;
           return (
-            <button key={friend.uid} onClick={() => { setActiveGroupId(null); setActiveFriendId(friend.uid); openTab("conversations"); }}
+            <button key={friend.uid} onClick={() => { openFriendTab(friend.uid); }}
               onContextMenu={e => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, friend }); }}
               className={`fb ${isActive ? "act" : ""}`}>
               <div style={{ position: "relative", flexShrink: 0 }}>
@@ -2979,56 +3081,19 @@ export default function ChatApp({ user }) {
   // 好友/群組對話串——桌面版「對話」分頁跟手機版共用同一套（手機版原本
   // 就沒有 isMobile 分支，這段邏輯本來就是共用的，只是現在從 .cr-main
   // 搬出來獨立成一個變數）。
-  const conversationsThreadPane = (
+  const renderPrivateThread = (friendId, mobile = false) => (
+    <PrivateChatThread key={friendId} uid={uid} activeFriendId={friendId} activeFriendProfile={friendProfiles[friendId]}
+      myProfile={myProfile} myGroups={myGroups} privateMessages={privateMessagesByFriend[friendId] || []}
+      privateInput={privateDrafts[friendId] || ""} setPrivateInput={value => setPrivateDraft(friendId, value)}
+      privateUploading={Boolean(privateUploads[friendId])} sendPrivate={() => sendPrivate(friendId)}
+      sendPrivateMedia={file => sendPrivateMedia(file, friendId)} sendPrivateItem={item => sendPrivateItem(item, friendId)}
+      msgFontSize={msgFontSize} isMobile={mobile} centered={!mobile && Boolean(effectiveMaximizedBlock)}
+      visible={mobile || (blocks[keyBlock['private:' + friendId]]?.active === 'private:' + friendId && (!effectiveMaximizedBlock || keyBlock['private:' + friendId] === effectiveMaximizedBlock))}
+      mobileShowInfo={showFriendInfo} onMobileShowInfo={setShowFriendInfo} />
+  );
+  const conversationsThreadPane = isMobile && activeFriendId ? renderPrivateThread(activeFriendId, true) : (
     <ChatThreadSurface centered={!isMobile && Boolean(effectiveMaximizedBlock)} mobile={isMobile}
-      conversationKey={activeFriendId || activeGroupId || 'hall'} details={showFriendInfo || showGroupInfo}>
-      {activeFriendId && activeFriendProfile && showFriendInfo && (
-        <FriendInfoView friend={activeFriendProfile} myUid={uid} myBlocked={myProfile?.blocked} messages={privateMessages} myGroups={myGroups} onClose={() => setShowFriendInfo(false)} showProfileLink={isMobile} />
-      )}
-      {activeFriendId && activeFriendProfile && !showFriendInfo && (
-        <>
-          {!isMobile && <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
-            {friendHeaderIdentity}
-            <Link href={`/profile/${activeFriendProfile.uid}`} style={{ marginLeft: "auto", color: "var(--text-faint)", fontSize: 12, textDecoration: "none" }}
-              onMouseEnter={e => e.currentTarget.style.color = "var(--text-muted)"}
-              onMouseLeave={e => e.currentTarget.style.color = "var(--text-faint)"}>
-              ℹ️ 個人檔案
-            </Link>
-          </div>}
-          <ChatMessageList conversationKey={`private:${activeFriendId}`} messages={privateMessages} currentUserId={uid} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 2, backgroundImage: "var(--chat-world-no-image, radial-gradient(circle at 1px 1px, var(--panel) 1px, transparent 0))", backgroundSize: "28px 28px" }}>
-            <div style={{ textAlign: "center", marginBottom: 16 }}>
-              <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>{activeFriendProfile.nickname}</div>
-              {activeFriendProfile.bio && <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 4, maxWidth: 260, margin: "4px auto 0" }}>{activeFriendProfile.bio}</div>}
-              <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>你們已經是好友了</div>
-            </div>
-            {privateMessages.map((msg, i) => {
-              const isMine = msg.senderId === uid;
-              return <MessageBubble key={msg.id} msg={msg} isMine={isMine} showSender={!isMine && privateMessages[i-1]?.senderId !== msg.senderId} myUid={uid} collectionPath={["private_chats", chatId, "messages", msg.id]} msgFontSize={msgFontSize} prevCreatedAt={privateMessages[i-1]?.createdAt} />;
-            })}
-          </ChatMessageList>
-          <div className="cr-input-bar" style={{ padding: "10px 14px 14px", borderTop: "var(--toolbar-inner-divider, 1px solid var(--panel))", flexShrink: 0, position: "relative", boxSizing: "border-box" }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", height: "var(--inputbar-field-h, auto)" }}>
-              <input ref={privateFileRef} type="file" accept={CHAT_FILE_ACCEPT} style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) { const bad = rejectChatFile(f); if (bad) toast(bad); else sendPrivateMedia(f); e.target.value = ""; } }} />
-              <ChatComposerActions anchorRef={privateEmojiBtnRef} isMobile={isMobile} uploading={privateUploading}
-                onOpen={() => setEmojiPickerOpen(null)}
-                onUpload={() => privateFileRef.current?.click()}
-                onEmoji={() => setEmojiPickerOpen('private')} />
-              <input type="text" value={privateInput} onChange={e => setPrivateInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendPrivate()} placeholder={`傳送訊息給 ${activeFriendProfile.nickname}...`}
-                style={{ flex: 1, minWidth: 0, height: "var(--inputbar-field-h, auto)", boxSizing: "border-box", background: "var(--inputfield-bg, var(--panel))", border: "1px solid var(--border)", borderRadius: "var(--search-radius, var(--radius-md))", padding: "9px 14px", color: "var(--text)", fontSize: 16, outline: "none" }} />
-              <button className="sb" onClick={sendPrivate} disabled={!privateInput.trim()}
-                style={{ background: privateInput.trim() ? "var(--sendbtn-bg, var(--accent))" : "var(--panel)", border: "none", borderRadius: "var(--toolbar-btn-radius, var(--radius-md))", width: "var(--sendbtn-width, auto)", height: "var(--sendbtn-height, auto)", boxSizing: "border-box", padding: "9px 16px", color: privateInput.trim() ? "var(--accent-text)" : "var(--text-dim)", cursor: privateInput.trim() ? "pointer" : "default", fontSize: 14, fontWeight: 600, transition: "all 0.15s", flexShrink: 0, whiteSpace: "nowrap" }}>
-                傳送              </button>
-            </div>
-            {emojiPickerOpen === 'private' && (
-              <EmojiStickerPicker isMobile={isMobile} anchorRef={privateEmojiBtnRef} uid={uid}
-                onClose={() => setEmojiPickerOpen(null)}
-                onInsertEmoji={ch => setPrivateInput(v => v + ch)}
-                onSendItem={item => sendPrivateItem(item)} />
-            )}
-            <div style={{ textAlign: "right", fontSize: 11, color: "var(--border)", marginTop: 4 }}>私訊只有你們兩人看得到 · 雙方都可以撤回訊息</div>
-          </div>
-        </>
-      )}
+      conversationKey={activeGroupId || 'hall'} details={showGroupInfo}>
       {activeGroupId && activeGroup && showGroupInfo && (
         <GroupInfoView group={activeGroup} messages={groupMessages} myUid={uid} onClose={() => setShowGroupInfo(false)} onOpenProfile={(m) => { setShowGroupInfo(false); setViewProfileUid(m); }} />
       )}
@@ -3072,13 +3137,13 @@ export default function ChatApp({ user }) {
           </div>
         </>
       )}
-      {activeFriendId && !activeFriendProfile && (
+      {isMobile && activeFriendId && !activeFriendProfile && (
         <div role="status" aria-live="polite" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-faint)" }}>載入中...</div>
       )}
       {/* 沒有選中任何好友/群組時，「對話」分頁預設顯示公共大廳——跟右邊
           固定欄（好友/群組清單）分開：清單負責瀏覽選人，選了誰、或什麼
           都沒選，這裡負責顯示對應的聊天內容。 */}
-      {!activeFriendId && !activeGroupId && (
+      {(!isMobile || !activeFriendId) && !activeGroupId && (
         <>
           {!isMobile && <div className="cr-chat-header" style={{ height: 56, borderBottom: "1px solid var(--panel)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, flexShrink: 0 }}>
             <span style={{ fontSize: 20 }}>💬</span>
@@ -3137,6 +3202,7 @@ export default function ChatApp({ user }) {
   // isMobile 分支），只有「對話」是例外——手機版的清單/對話串不是從這裡
   // 讀，是它自己原本就有、沒動過的那份 JSX。 */
   const CONTENT_REGISTRY = {
+    ...Object.fromEntries(openPrivateIds.map(friendId => ["private:" + friendId, renderPrivateThread(friendId)])),
     feed: (
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {viewProfileUid ? (
@@ -3393,6 +3459,16 @@ export default function ChatApp({ user }) {
           background: var(--border); border: none; border-radius: var(--radius-sm); padding: 3px 8px;
           color: var(--text-muted); cursor: pointer; font-size: 14px;
         }
+        .cr-profile-avatar-actions { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+        .cr-default-avatar-toggle {
+          display: flex; align-items: center; gap: 6px; width: auto; min-height: 38px;
+          padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+          background: var(--panel-alt); color: var(--text); text-align: left;
+          font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+        }
+        .cr-default-avatar-toggle img { border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+        .cr-default-avatar-toggle:hover { background: var(--panel-hover); }
+        .cr-default-avatar-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         .cr-friend-invite {
           display: flex; align-items: center; background: #e5f2e9; color: #365e46;
           border: 1px solid #cce1d3; cursor: pointer; box-sizing: border-box;
@@ -3744,7 +3820,7 @@ export default function ChatApp({ user }) {
             ℹ️ 個人資料
           </button>
           <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
-          <button onClick={() => { setActiveFriendId(contextMenu.friend.uid); setActiveGroupId(null); openTab("conversations"); setContextMenu(null); }}
+          <button onClick={() => { openFriendTab(contextMenu.friend.uid); setContextMenu(null); }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 14px", color: "var(--text)", background: "none", border: "none", textAlign: "left", fontSize: 13, cursor: "pointer" }}
             onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
             onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
@@ -3768,7 +3844,7 @@ export default function ChatApp({ user }) {
                 {friendInfo.bio && <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 10, lineHeight: 1.6 }}>{friendInfo.bio}</div>}
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button onClick={() => { setActiveFriendId(friendInfo.uid); setActiveGroupId(null); openTab("conversations"); setFriendInfo(null); }}
+                <button onClick={() => { openFriendTab(friendInfo.uid); setFriendInfo(null); }}
                   style={{ flex: 1, background: "var(--accent)", border: "none", borderRadius: "var(--radius-md)", padding: "9px 0", color: "var(--accent-text)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   💬 傳送訊息                </button>
                 <Link href={`/profile/${friendInfo.uid}`} onClick={() => setFriendInfo(null)}
@@ -4217,62 +4293,22 @@ export default function ChatApp({ user }) {
               // 會指到那一塊，另一塊直接 display:none——沒有另外用寬度百分比
               // 計算，剩下唯一還顯示的那塊靠 flex:1 自動撐滿整列。
               <>
-                <div style={{
-                  flex: 1, minWidth: 0, display: effectiveMaximizedBlock === "B" ? "none" : "flex", flexDirection: "column",
-                  overflow: "hidden",
-                  border: "var(--col-border, none)",
-                  borderRadius: "var(--col-radius, 0px)",
-                  boxShadow: "var(--col-shadow, none)",
-                  backdropFilter: "var(--col-blur, none)", WebkitBackdropFilter: "var(--col-blur, none)",
-                  background: "var(--force-panel-bg, var(--chat-world-transparent, var(--panel-alt)))",
-                  backgroundImage: "var(--chat-world-transparent, var(--panel-gradient-img, none))",
-                }}>
-                  <div style={{
-                    flexShrink: 0, overflow: "hidden",
-                    maxHeight: (effectiveMaximizedBlock === "A" && hideTabBarBlock === "A") ? 0 : 200,
-                    transition: "max-height 0.22s ease",
-                  }}>
-                    <TabBar block="A" tabs={blocks.A.tabs} active={blocks.A.active} meta={TAB_META}
-                      onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />
-                  </div>
-                  <div ref={blockAScrollRef} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                    {blocks.A.tabs.length === 0 ? (
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>把分頁拖過來這裡，或從左側好友清單點一個對話</div>
-                    ) : blocks.A.tabs.map(key => (
-                      <div key={key} style={{ flex: 1, minHeight: 0, display: key === blocks.A.active ? "flex" : "none", flexDirection: "column" }}>
+                {["A", "B"].map(block => (
+                  <WorkspaceBlock key={block} block={block}
+                    maximized={effectiveMaximizedBlock === block}
+                    hidden={Boolean(effectiveMaximizedBlock && effectiveMaximizedBlock !== block)}
+                    active={blocks[block].active}
+                    tabBar={<TabBar block={block} tabs={blocks[block].tabs} active={blocks[block].active} meta={TAB_META}
+                      onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />}>
+                    {blocks[block].tabs.length === 0 ? (
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>從側欄開啟對話或功能，或把分頁拖到這裡</div>
+                    ) : blocks[block].tabs.map(key => (
+                      <div key={key} data-workspace-pane={key} style={{ flex: 1, minHeight: 0, display: key === blocks[block].active ? "flex" : "none", flexDirection: "column" }}>
                         {CONTENT_REGISTRY[key]}
                       </div>
                     ))}
-                  </div>
-                </div>
-                <div style={{
-                  flex: 1, minWidth: 0, display: effectiveMaximizedBlock === "A" ? "none" : "flex", flexDirection: "column",
-                  overflow: "hidden",
-                  border: "var(--col-border, none)",
-                  borderRadius: "var(--col-radius, 0px)",
-                  boxShadow: "var(--col-shadow, none)",
-                  backdropFilter: "var(--col-blur, none)", WebkitBackdropFilter: "var(--col-blur, none)",
-                  background: "var(--force-panel-bg, var(--chat-world-transparent, var(--panel-alt)))",
-                  backgroundImage: "var(--chat-world-transparent, var(--panel-gradient-img, none))",
-                }}>
-                  <div style={{
-                    flexShrink: 0, overflow: "hidden",
-                    maxHeight: (effectiveMaximizedBlock === "B" && hideTabBarBlock === "B") ? 0 : 200,
-                    transition: "max-height 0.22s ease",
-                  }}>
-                    <TabBar block="B" tabs={blocks.B.tabs} active={blocks.B.active} meta={TAB_META}
-                      onActivate={activateTab} onClose={closeTab} onDoubleClickTab={toggleMaximizeBlock} controller={tabDrag} />
-                  </div>
-                  <div ref={blockBScrollRef} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                    {blocks.B.tabs.length === 0 ? (
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13, textAlign: "center", padding: 24 }}>從左側點一個功能開始，或把分頁拖過來這裡</div>
-                    ) : blocks.B.tabs.map(key => (
-                      <div key={key} style={{ flex: 1, minHeight: 0, display: key === blocks.B.active ? "flex" : "none", flexDirection: "column" }}>
-                        {CONTENT_REGISTRY[key]}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  </WorkspaceBlock>
+                ))}
               </>
             )
           }
@@ -4308,7 +4344,6 @@ export default function ChatApp({ user }) {
             完全脫鉤）。GitHub 熱門現在只是普通分頁，不再需要「開著就把
             整個右欄藏起來」那個特例，右欄一律顯示。 */}
         <div className={`cr-cal${calendarOpen ? " cr-cal-open" : ""}`}
-          onClickCapture={() => setHideTabBarBlock(null)}
           style={{
           width: `var(--cal-w-override, ${calWidth}px)`, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden",
           border: "var(--col-border, none)",

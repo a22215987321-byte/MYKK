@@ -5,7 +5,8 @@ import { JSDOM } from "jsdom";
 import ChatRoom from "../components/ChatRoom";
 import Feed from "../components/Feed";
 import { auth } from "../lib/firebase";
-import { onSnapshot, getDoc } from "firebase/firestore";
+import { onSnapshot, getDoc, updateDoc, addDoc, setDoc } from "firebase/firestore";
+import { uploadToR2 } from "../lib/uploadToR2";
 import { useRouter } from "next/router";
 
 jest.mock("next/router", () => {
@@ -36,13 +37,16 @@ jest.mock("firebase/firestore", () => ({
   collection: (_, ...parts) => ({ parts, kind: "collection" }),
   query: ref => ref, where: () => ({}), orderBy: () => ({}), limit: () => ({}), limitToLast: () => ({}),
   onSnapshot: jest.fn(), getDoc: jest.fn(), getDocs: async () => ({ docs: [] }),
-  updateDoc: async () => {}, setDoc: async () => {},
+  updateDoc: jest.fn(async () => {}), setDoc: jest.fn(async () => {}), addDoc: jest.fn(async () => ({ id: "sent" })), increment: () => ({}),
   serverTimestamp: () => ({}), arrayUnion: () => ({}), arrayRemove: () => ({}),
 }));
+jest.mock("../lib/uploadToR2", () => ({ uploadToR2: jest.fn(async () => "https://example.test/photo.png") }));
 jest.mock("../components/doc-convert", () => ({ DocConvertRoomLazy: () => null }));
 jest.mock("../components/UpgradeMembership", () => ({ __esModule: true, default: () => null, UpgradeHighlights: () => null }));
 jest.mock("../components/CalendarMemo", () => function MockCalendar() { return <div>日曆測試內容</div>; });
-jest.mock("../components/AvatarCreator", () => () => null);
+jest.mock("../components/AvatarCreator", () => function MockAvatarCreator({ onClose }) {
+  return <div data-testid="avatar-creator"><button>男生</button><button>女生</button><button onClick={onClose}>儲存頭像</button></div>;
+});
 jest.mock("../components/PageNotes", () => () => null);
 jest.mock("../components/ChatMoreMenu", () => () => null);
 jest.mock("../components/VocabRoom", () => () => null);
@@ -63,8 +67,8 @@ jest.mock("../components/EnglishMcqPractice", () => () => null);
 jest.mock("../components/IeltsBand4", () => () => null);
 jest.mock("../components/ImageEditorRoom", () => () => null);
 jest.mock("../components/AiCompanionCreator", () => () => null);
-jest.mock("../components/EmojiStickerPicker", () => function MockEmojiPicker({ onInsertEmoji }) {
-  return <button onClick={() => onInsertEmoji("😊")}>測試表情</button>;
+jest.mock("../components/EmojiStickerPicker", () => function MockEmojiPicker({ onInsertEmoji, onSendItem }) {
+  return <><button onClick={() => onInsertEmoji("😊")}>測試表情</button><button onClick={() => onSendItem({ id: "test-sticker", type: "sticker", src: "/test.png" })}>測試貼圖</button></>;
 });
 jest.mock("../components/FloatingAiChat", () => () => null);
 jest.mock("../components/FloatingAudioPlayer", () => () => null);
@@ -313,4 +317,210 @@ test.each([390, 1440])("friend invitation entries share the sage palette and ret
     await click(container.querySelector(".cr-sheet .cr-close-btn"));
   }
   expect(banner.textContent).not.toContain("點擊查看");
+});
+
+test.each([390, 1440])("profile avatar options start collapsed and backdrop dismissal does not save at %ipx", async width => {
+  window.innerWidth = width;
+  useRouter().query = { view: "editProfile" };
+  await renderChat();
+  const dialog = container.querySelector('[role="dialog"][aria-label="個人資料設定"]');
+  const toggle = dialog.querySelector('[aria-controls="profile-default-avatar"]');
+  const options = dialog.querySelector('#profile-default-avatar');
+  expect(toggle.parentElement.className).toBe('cr-profile-avatar-actions');
+  expect(toggle.previousElementSibling.textContent).toContain('上傳頭像圖片');
+  expect(toggle.textContent).toBe("預設頭像");
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  expect(options.hidden).toBe(true);
+  await click(toggle);
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(options.hidden).toBe(false);
+  await click(options.querySelector('button'));
+  expect(container.contains(dialog)).toBe(true);
+  await click([...options.querySelectorAll('button')].find(button => button.textContent === '儲存頭像'));
+  expect(options.hidden).toBe(true);
+  expect(container.contains(dialog)).toBe(true);
+  await act(async () => Simulate.change(dialog.querySelector('#profile-nickname'), { target: { value: '未儲存的暱稱' } }));
+  updateDoc.mockClear();
+  await click(dialog);
+  expect(container.contains(dialog)).toBe(true);
+  await click(container.querySelector('.cr-profile-overlay'));
+  expect(container.querySelector('[role="dialog"][aria-label="個人資料設定"]')).toBeNull();
+  expect(updateDoc).not.toHaveBeenCalled();
+});
+
+test("profile settings can close with Escape and still save explicitly", async () => {
+  useRouter().query = { view: "editProfile" };
+  await renderChat();
+  const dialog = container.querySelector('[role="dialog"][aria-label="個人資料設定"]');
+  updateDoc.mockClear();
+  await act(async () => Simulate.keyDown(dialog, { key: 'Escape' }));
+  expect(container.contains(dialog)).toBe(false);
+  expect(updateDoc).not.toHaveBeenCalled();
+  await click(container.querySelector('.cr-mobile-topbar [aria-label="設定選單"]'));
+  await click([...document.querySelectorAll('button')].find(button => button.textContent.trim() === '👤 個人資料設定'));
+  const reopened = container.querySelector('[role="dialog"][aria-label="個人資料設定"]');
+  await act(async () => Simulate.change(reopened.querySelector('#profile-nickname'), { target: { value: '已儲存的暱稱' } }));
+  await click([...reopened.querySelectorAll('button')].find(button => button.textContent === '儲存設定'));
+  expect(updateDoc).toHaveBeenCalledWith(expect.objectContaining({ parts: ['users', 'test-owner'] }), expect.objectContaining({ nickname: '已儲存的暱稱' }));
+  expect(container.contains(reopened)).toBe(false);
+});
+
+test("empty groups keep the heading and create action without the old placeholder", async () => {
+  window.innerWidth = 1440;
+  const defaultSnapshot = onSnapshot.getMockImplementation();
+  onSnapshot.mockImplementation((ref, callback) => {
+    if (ref.kind === 'collection' && ref.parts.join('/') === 'groups') {
+      callback({ docs: [], docChanges: () => [], empty: true, size: 0 });
+      return () => {};
+    }
+    return defaultSnapshot(ref, callback);
+  });
+  await renderChat();
+  expect(container.textContent).toContain('群組 0');
+  expect(container.textContent).not.toContain('還沒有群組');
+  await click(container.querySelector('[title="建立群組"]'));
+  expect(container.textContent).toContain('群組名稱');
+});
+
+async function renderTwoFriends() {
+  window.innerWidth = 1440;
+  const second = { ...friend, nickname: '第二位好友' };
+  const originalSnapshot = onSnapshot.getMockImplementation();
+  const listeners = new Map();
+  const unsubscribers = new Map();
+  onSnapshot.mockImplementation((ref, callback) => {
+    const path = ref.parts.join('/');
+    if (path === 'users/test-owner') {
+      callback(snapshotDoc('test-owner', { ...profile, friends: ['test-friend', 'second-friend'] }));
+      return () => {};
+    }
+    if (path.startsWith('private_chats/')) {
+      listeners.set(path, callback);
+      if (ref.kind === 'doc') callback(snapshotDoc(ref.parts[1], { unreadCount: { 'test-owner': 2 } }));
+      else callback({ docs: [snapshotDoc('message', { senderId: ref.parts[1].split('_')[0], text: `專屬訊息 ${ref.parts[1]}` })], docChanges: () => [] });
+      const unsubscribe = jest.fn();
+      unsubscribers.set(path, unsubscribe);
+      return unsubscribe;
+    }
+    return originalSnapshot(ref, callback);
+  });
+  getDoc.mockImplementation(async ref => snapshotDoc(ref.parts.at(-1), ref.parts[1] === 'second-friend' ? second : ref.parts[1] === 'test-friend' ? friend : profile));
+  await renderChat();
+  return { listeners, unsubscribers };
+}
+const friendButton = name => [...container.querySelectorAll('.cr-cal button.fb')].find(el => el.textContent.includes(name));
+const privatePane = id => container.querySelector(`[data-workspace-pane="private:${id}"]`);
+const draftInput = id => privatePane(id).querySelector('.cr-input-bar input[type="text"]');
+async function typeDraft(id, value) { await act(async () => Simulate.change(draftInput(id), { target: { value } })); }
+
+test('multiple friend tabs isolate messages, drafts, sends and subscriptions without replacing the hall', async () => {
+  const { unsubscribers } = await renderTwoFriends();
+  await click(friendButton(friend.nickname));
+  await typeDraft('test-friend', '給第一位好友');
+  await click(friendButton('第二位好友'));
+  await typeDraft('second-friend', '給第二位好友');
+  expect(privatePane('test-friend').textContent).toContain('專屬訊息 test-friend_test-owner');
+  expect(privatePane('test-friend').textContent).not.toContain('專屬訊息 second-friend');
+  expect(container.querySelector('[data-workspace-pane="conversations"] [data-conversation="hall"]')).not.toBeNull();
+  await click(friendButton(friend.nickname));
+  expect(container.querySelectorAll(`[data-workspace-tabs] button[title="${friend.nickname}"]`)).toHaveLength(1);
+  expect(draftInput('test-friend').value).toBe('給第一位好友');
+  expect(draftInput('second-friend').value).toBe('給第二位好友');
+  await click(privatePane('test-friend').querySelector('.sb'));
+  expect(addDoc).toHaveBeenLastCalledWith(expect.objectContaining({ parts: ['private_chats', 'test-friend_test-owner', 'messages'] }), expect.objectContaining({ text: '給第一位好友' }));
+  expect(draftInput('test-friend').value).toBe('');
+  expect(draftInput('second-friend').value).toBe('給第二位好友');
+  await click(container.querySelector(`[aria-label="關閉${friend.nickname}"]`));
+  expect(privatePane('test-friend')).toBeNull();
+  expect(draftInput('second-friend').value).toBe('給第二位好友');
+  expect(unsubscribers.get('private_chats/test-friend_test-owner/messages')).toHaveBeenCalledTimes(1);
+  expect(unsubscribers.get('private_chats/second-friend_test-owner/messages')).not.toHaveBeenCalled();
+});
+
+test('moving a friend tab to the second block preserves its draft and marks only visible chats read', async () => {
+  const { listeners } = await renderTwoFriends();
+  await click(friendButton(friend.nickname));
+  await typeDraft('test-friend', '移動後保留');
+  await click(friendButton('第二位好友'));
+  setDoc.mockClear();
+  await act(async () => listeners.get('private_chats/test-friend_test-owner')(snapshotDoc('summary', { unreadCount: { 'test-owner': 3 } })));
+  expect(setDoc.mock.calls.some(([ref]) => ref.parts[1] === 'test-friend_test-owner')).toBe(false);
+  const tab = container.querySelector(`[data-workspace-tabs="A"] button[title="${friend.nickname}"]`);
+  const target = container.querySelector('[data-workspace-tabs="B"] .cr-blocktabs');
+  target.getBoundingClientRect = () => ({ left: 400, right: 700, top: 0, bottom: 60, width: 300, height: 60 });
+  await act(async () => { Simulate.mouseDown(tab, { button: 0, clientX: 50, clientY: 20, stopPropagation() {} }); await new Promise(resolve => setTimeout(resolve, 520)); });
+  await act(async () => document.dispatchEvent(new window.MouseEvent('mousemove', { clientX: 600, clientY: 30 })));
+  await act(async () => document.dispatchEvent(new window.MouseEvent('mouseup', { clientX: 600, clientY: 30 })));
+  expect(privatePane('test-friend').closest('[data-workspace-block]').dataset.workspaceBlock).toBe('B');
+  expect(privatePane('second-friend').style.display).toBe('flex');
+  expect(draftInput('test-friend').value).toBe('移動後保留');
+  expect(setDoc.mock.calls.some(([ref]) => ref.parts[1] === 'test-friend_test-owner')).toBe(true);
+  await click(privatePane('test-friend').querySelector('.sb'));
+  expect(addDoc).toHaveBeenLastCalledWith(expect.objectContaining({ parts: ['private_chats', 'test-friend_test-owner', 'messages'] }), expect.objectContaining({ text: '移動後保留' }));
+});
+
+test('in-flight attachments and stickers stay addressed to their original friend after another tab opens', async () => {
+  await renderTwoFriends();
+  await click(friendButton(friend.nickname));
+  let finishUpload;
+  uploadToR2.mockImplementationOnce(() => new Promise(resolve => { finishUpload = resolve; }));
+  await act(async () => Simulate.change(privatePane('test-friend').querySelector('input[type="file"]'), { target: { files: [{ name: 'photo.png', type: 'image/png', size: 100 }], value: 'photo.png' } }));
+  await click(friendButton('第二位好友'));
+  await act(async () => finishUpload('https://example.test/photo.png'));
+  expect(addDoc).toHaveBeenLastCalledWith(expect.objectContaining({ parts: ['private_chats', 'test-friend_test-owner', 'messages'] }), expect.objectContaining({ imageUrl: 'https://example.test/photo.png' }));
+  await click(friendButton(friend.nickname));
+  await click(privatePane('test-friend').querySelector('[aria-label="新增附件或表情"]'));
+  await click([...document.querySelectorAll('button')].find(el => el.textContent.includes('表情／貼圖')));
+  await click([...privatePane('test-friend').querySelectorAll('button')].find(el => el.textContent === '測試貼圖'));
+  expect(addDoc).toHaveBeenLastCalledWith(expect.objectContaining({ parts: ['private_chats', 'test-friend_test-owner', 'messages'] }), expect.objectContaining({ stickerId: 'test-sticker' }));
+  await click(friendButton('第二位好友'));
+  expect(container.textContent).not.toContain('測試貼圖');
+});
+
+test('maximized hall tabs start hidden, reveal on upward wheel anywhere, hide downward, and restore in split view', async () => {
+  window.innerWidth = 1440;
+  await renderChat();
+  const tab = container.querySelector('[data-workspace-tabs="A"] button[title="對話"]');
+  const tabs = container.querySelector('[data-workspace-tabs="A"]');
+  const hall = container.querySelector('[data-conversation="hall"]');
+  expect(tabs.hidden).toBe(false);
+  await act(async () => Simulate.doubleClick(tab));
+  expect(tabs.hidden).toBe(true);
+  const composer = container.querySelector('[data-workspace-pane="conversations"] input[type="text"]');
+  await act(async () => Simulate.wheel(composer, { deltaY: -30, deltaX: 0 }));
+  expect(tabs.hidden).toBe(true);
+  await act(async () => Simulate.touchStart(hall, { touches: [{ clientY: 200 }] }));
+  await act(async () => Simulate.touchMove(hall, { touches: [{ clientY: 240 }] }));
+  expect(tabs.hidden).toBe(false);
+  await act(async () => Simulate.touchMove(hall, { touches: [{ clientY: 180 }] }));
+  expect(tabs.hidden).toBe(true);
+  await act(async () => Simulate.touchEnd(hall));
+  hall.scrollTop = 400;
+  await act(async () => Simulate.scroll(hall));
+  expect(tabs.hidden).toBe(true);
+  await act(async () => Simulate.wheel(hall, { deltaY: -30, deltaX: 0 }));
+  expect(tabs.hidden).toBe(false);
+  hall.scrollTop = 600; // resizing/pinning must not undo the reveal
+  await act(async () => Simulate.scroll(hall));
+  expect(tabs.hidden).toBe(false);
+  await act(async () => Simulate.wheel(hall, { deltaY: 30, deltaX: 0 }));
+  expect(tabs.hidden).toBe(true);
+  await act(async () => Simulate.focus(container.querySelector('[aria-label="顯示分頁列"]')));
+  expect(tabs.hidden).toBe(false);
+  await act(async () => Simulate.doubleClick(tab));
+  expect(tabs.hidden).toBe(false);
+  await act(async () => Simulate.wheel(hall, { deltaY: 30, deltaX: 0 }));
+  expect(tabs.hidden).toBe(false);
+});
+
+test('failed private sends restore only that friend draft', async () => {
+  await renderTwoFriends();
+  await click(friendButton(friend.nickname));
+  await typeDraft('test-friend', '保留失敗訊息');
+  await click(friendButton('第二位好友'));
+  await typeDraft('second-friend', '另一個草稿');
+  addDoc.mockRejectedValueOnce(new Error('test network failure'));
+  await click(privatePane('test-friend').querySelector('.sb'));
+  expect(draftInput('test-friend').value).toBe('保留失敗訊息');
+  expect(draftInput('second-friend').value).toBe('另一個草稿');
 });
