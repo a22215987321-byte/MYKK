@@ -19,6 +19,7 @@ import { useMediaAttachments } from "../lib/useMediaAttachments";
 import MediaAttachPreview from "./media-editor/MediaAttachPreview";
 import { getNotificationVolume, setNotificationVolume, playNotificationSound } from "../lib/notificationSound";
 import PortalPopover from "./PortalPopover";
+import styles from "./ProfileView.module.css";
 import { MediaBookmarkMenu } from "./Feed";
 import {
   doc, onSnapshot, collection, query, where, orderBy, getDocs, addDoc,
@@ -38,6 +39,12 @@ function formatJoinDate(ts) {
   if (!ts) return "";
   const d = ts.toDate ? ts.toDate() : new Date(ts);
   return d.toLocaleDateString("zh-TW", { year: "numeric", month: "long" });
+}
+
+function formatCompactJoinDate(ts) {
+  if (!ts) return "—";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 const VISIBILITY_OPTS = [
@@ -1621,9 +1628,9 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
             anchor to their pane, standalone profiles anchor to the viewport. */}
         <header data-profile-back style={{ position: embedded ? "absolute" : "fixed", top: embedded ? 10 : "max(10px, env(safe-area-inset-top))", left: 10, zIndex: 50, pointerEvents: "none" }}>
           {embedded ? (
-            <button onClick={onClose} aria-label="返回動態消息" style={backBtnStyle}>←</button>
+            <button className={styles.backControl} onClick={onClose} aria-label="返回動態消息" style={backBtnStyle}>←</button>
           ) : (
-            <Link href="/" aria-label="返回聊天室" style={backBtnStyle}>←</Link>
+            <Link className={styles.backControl} href="/" aria-label="返回聊天室" style={backBtnStyle}>←</Link>
           )}
         </header>
 
@@ -1662,13 +1669,13 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
         </div>
 
         {/* Avatar + actions row */}
-        <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px" }}>
-          <div className="pp-avatar-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: -52, marginBottom: 12 }}>
+        <div className={styles.headerContent} style={{ maxWidth: 600, margin: "0 auto", padding: "0 16px" }}>
+          <div className={`pp-avatar-row ${styles.avatarRow}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: -52, marginBottom: 12 }}>
             <ProfileAvatar profile={profile} isOwner={isOwner} status={st} onRequestChange={() => avatarFileRef.current?.click()} />
             {isOwner && <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={openCrop("avatar")} />}
 
             {isOwner ? (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+              <div className={styles.actions} data-profile-actions style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
                 <Link href="/?view=editProfile" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 16px", color: "var(--text)", textDecoration: "none", fontSize: 14, fontWeight: 700, display: "inline-block" }}
                   onMouseEnter={e => e.currentTarget.style.background = "var(--border)"}
                   onMouseLeave={e => e.currentTarget.style.background = "var(--panel)"}>
@@ -1685,7 +1692,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
                 </button>
               </div>
             ) : friendState === "blocked" ? (
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+              <div className={styles.actions} data-profile-actions style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
                 <span style={{ fontSize: 13, color: "var(--text-faint)" }}>已封鎖</span>
                 <button onClick={unblockUser}
                   style={{ background: "none", border: "1px solid var(--border)", borderRadius: 20, padding: "7px 14px", color: "var(--text-muted)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
@@ -1693,23 +1700,23 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
                 </button>
               </div>
             ) : (
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, position: "relative" }}>
+              <div className={styles.actions} data-profile-actions style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, position: "relative" }}>
                 {friendState === "none" && (
                   <button onClick={sendFriendRequest}
                     style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "8px 16px", color: "var(--text)", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
-                    ➕ 加好友
+                    <span className={styles.actionIcon} aria-hidden="true">➕</span>加好友
                   </button>
                 )}
                 {friendState === "requestSent" && (
                   <button disabled
                     style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "8px 16px", color: "var(--text-dim)", cursor: "default", fontSize: 14, fontWeight: 700 }}>
-                    ⏳ 已送出邀請
+                    <span className={styles.actionIcon} aria-hidden="true">⏳</span>已送出邀請
                   </button>
                 )}
                 {friendState === "requestReceived" && (
                   <button onClick={acceptFriendRequest}
                     style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 16px", color: "var(--accent-text)", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
-                    ✅ 接受好友邀請
+                    <span className={styles.actionIcon} aria-hidden="true">✅</span>接受好友邀請
                   </button>
                 )}
                 <button onClick={toggleSubscribe}
@@ -1720,22 +1727,22 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
                     color: isSubscribed ? "var(--text-muted)" : "var(--accent-text)",
                     cursor: "pointer", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 6,
                   }}>
-                  {isSubscribed ? "🔔 已訂閱" : "🔔 訂閱"}
+                  <span className={styles.actionIcon} aria-hidden="true">🔔</span>{isSubscribed ? "已訂閱" : "訂閱"}
                   {(profile.subscribers || []).length > 0 && (
                     <span style={{ opacity: 0.75, fontWeight: 600 }}>{(profile.subscribers || []).length}</span>
                   )}
                 </button>
                 <button onClick={() => toast("社群功能即將推出")}
                   style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 20, padding: "8px 16px", color: "var(--text)", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
-                  🤝 加入社群
+                  <span className={styles.actionIcon} aria-hidden="true">🤝</span>加入社群
                 </button>
                 <Link href={`/?chat=${uid}`} style={{ background: "var(--accent)", border: "none", borderRadius: 20, padding: "8px 18px", color: "var(--accent-text)", textDecoration: "none", fontSize: 14, fontWeight: 700, transition: "background 0.15s", display: "inline-block" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#2563eb"}
                   onMouseLeave={e => e.currentTarget.style.background = "var(--accent)"}>
-                  💬 傳訊息
+                  <span className={styles.actionIcon} aria-hidden="true">💬</span>傳訊息
                 </Link>
                 <div style={{ position: "relative" }}>
-                  <button onClick={() => setMoreMenuOpen(v => !v)} aria-label="更多選項"
+                  <button className={styles.moreTrigger} onClick={() => setMoreMenuOpen(v => !v)} aria-label="更多選項"
                     style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "50%", width: 36, height: 36, color: "var(--text-faint)", cursor: "pointer", fontSize: 18 }}>
                     ⋯
                   </button>
@@ -1762,7 +1769,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
           {/* Name + status */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", lineHeight: 1.2 }}>{profile.nickname}</h1>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--text)", lineHeight: 1.2 }}>{profile.nickname}</h1>
               {profile.status === "offline" ? (
                 <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 600 }}>
                   {profile.lastActiveAt ? `最後上線於 ${formatDate(profile.lastActiveAt)}` : "離線"}
@@ -1773,6 +1780,7 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
                 </span>
               )}
             </div>
+            {profile.statusText && <p className={styles.statusText} data-profile-status>{profile.statusText}</p>}
             {profile.signature && (
               <div style={{ fontSize: 13, color: "var(--text-faint)", marginTop: 2, fontStyle: "italic" }}>「{profile.signature}」</div>
             )}
@@ -1799,42 +1807,39 @@ export default function ProfileView({ uid, embedded = false, onClose, onOpenProf
             <div style={{ fontSize: 15, color: "var(--text-subtle)", marginBottom: 12, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{profile.bio}</div>
           )}
 
-          {profile.statusText && (
-            <div style={{ marginBottom: 12 }}>
-              <span style={{ fontSize: 13, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>💬 {profile.statusText}</span>
-            </div>
-          )}
-
           {/* Stat card — joined-date + friend/post/like counts share one row
               instead of a plain text line, matching the rest of the app's
               bordered-card visual language (var(--card-shadow) etc). */}
-          <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "var(--panel)", boxShadow: "var(--card-shadow)", marginBottom: 16, overflow: "hidden" }}>
-            <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">📅</span>
+          <div className={styles.stats} data-profile-stats style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "var(--panel)", boxShadow: "var(--card-shadow)", marginBottom: 16, overflow: "hidden" }}>
+            <div className={styles.stat}>
+              <span className={styles.statIcon} aria-hidden="true">📅</span>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>加入於</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{profile.createdAt ? formatJoinDate(profile.createdAt) : "—"}</div>
+                <div className={styles.statLabel}>加入於</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <span className={styles.fullDate}>{profile.createdAt ? formatJoinDate(profile.createdAt) : "—"}</span>
+                  <span className={styles.shortDate}>{formatCompactJoinDate(profile.createdAt)}</span>
+                </div>
               </div>
             </div>
-            <div className="pp-stat-clickable" onClick={() => setTab("videos")} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">🎬</span>
+            <div className={`pp-stat-clickable ${styles.stat}`} onClick={() => setTab("videos")}>
+              <span className={styles.statIcon} aria-hidden="true">🎬</span>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{videoPosts.length}</div>
-                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>影片</div>
+                <div className={styles.statLabel}>影片</div>
               </div>
             </div>
-            <div className="pp-stat-clickable" onClick={() => setTab("posts")} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px", borderRight: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">📄</span>
+            <div className={`pp-stat-clickable ${styles.stat}`} onClick={() => setTab("posts")}>
+              <span className={styles.statIcon} aria-hidden="true">📄</span>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{visiblePosts.length}</div>
-                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>貼文</div>
+                <div className={styles.statLabel}>貼文</div>
               </div>
             </div>
-            <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "12px 10px" }}>
-              <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true">♡</span>
+            <div className={styles.stat}>
+              <span className={styles.statIcon} aria-hidden="true">♡</span>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text)" }}>{totalLikes}</div>
-                <div style={{ fontSize: 11, color: "var(--text-faint)" }}>獲讚總數</div>
+                <div className={styles.statLabel}>獲讚總數</div>
               </div>
             </div>
           </div>

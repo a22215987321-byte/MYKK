@@ -55,7 +55,9 @@ jest.mock("../components/SpanishCourseRoom", () => () => null);
 jest.mock("../components/CustomVocabRoom", () => () => null);
 jest.mock("../components/DictionaryRoom", () => () => null);
 jest.mock("../components/GithubTrendingRoom", () => () => null);
-jest.mock("../components/ProfileView", () => () => null);
+jest.mock("../components/ProfileView", () => function MockProfile({ onClose }) {
+  return <section data-testid="embedded-profile"><button onClick={onClose} aria-label="返回動態消息">返回</button></section>;
+});
 jest.mock("../components/VideoHub", () => () => null);
 jest.mock("../components/ChannelProfileView", () => () => null);
 jest.mock("../components/SpanishPronunciation", () => () => null);
@@ -150,6 +152,18 @@ test("embedded feed uses the topbar title without the old subtitle and keeps fil
   expect(container.textContent).not.toContain("測試動態內容");
   await click([...container.querySelectorAll("button")].find(el => el.textContent === "熱門"));
   expect(container.querySelector('button[aria-pressed="true"]').textContent).toBe("熱門");
+});
+
+test("mobile embedded profile removes the global calendar/settings bar and restores it on return", async () => {
+  await renderChat();
+  const author = [...container.querySelectorAll('.cr-main button')].find(el => el.textContent.startsWith('測試用戶'));
+  await click(author);
+  expect(container.querySelector('[data-testid="embedded-profile"]')).not.toBeNull();
+  expect(container.querySelector('.cr-mobile-topbar')).toBeNull();
+  expect(container.querySelector('.cr-tabbar')).not.toBeNull();
+  await click(container.querySelector('[aria-label="返回動態消息"]'));
+  expect(container.querySelector('.cr-mobile-topbar').textContent).toContain('動態消息');
+  expect(container.querySelector('[aria-label="開啟日曆"]')).not.toBeNull();
 });
 
 test("mobile group has just one identity row with the same info/avatar/calendar/settings controls, with logout inside settings", async () => {

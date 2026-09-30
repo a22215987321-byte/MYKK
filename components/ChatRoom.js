@@ -2655,6 +2655,7 @@ export default function ChatApp({ user }) {
   const inTool = inMoreTool || mobileActiveKey === "imageEditor";
   const inThread = !!activeFriendId || !!activeGroupId;
   const mobileAiActive = isMobile && mobileView === null && !inThread && mobileActiveKey === "aiChat";
+  const mobileProfileActive = isMobile && mobileView === null && !inThread && mobileActiveKey === "feed" && !!viewProfileUid;
   const mobileThreadGlass = isMobile && mobileView === null && !showFriendInfo && !showGroupInfo
     && (inThread || (!mobileActiveKey && mobileHomeSubview === 'hall'));
 
@@ -3893,8 +3894,8 @@ export default function ChatApp({ user }) {
 
         {/* One mobile identity row with calendar/settings only on the right.
             Logout remains available inside the shared settings menu. */}
-        {/* AI room has its own responsive toolbar; do not stack the global bar above it. */}
-        {!mobileAiActive && <header className="cr-mobile-topbar">
+        {/* AI and profile views provide their own controls; avoid a duplicate global bar. */}
+        {!mobileAiActive && !mobileProfileActive && <header className="cr-mobile-topbar">
           {mobileView === null ? (
             <button onClick={() => {
               if (inTool) { setMobileView('more'); }
