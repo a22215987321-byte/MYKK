@@ -21,6 +21,13 @@ const nextConfig = {
       { source: "/chat", destination: "/", permanent: true },
     ];
   },
+  async rewrites() {
+    // Preserve static assets first, then let the embedded client route itself.
+    return { afterFiles: [
+      { source: "/apps/typewords", destination: "/apps/typewords/index.html" },
+      { source: "/apps/typewords/:path*", destination: "/apps/typewords/index.html" },
+    ] };
+  },
   async headers() {
     return [
       {

@@ -1,0 +1,3 @@
+# Preserve the exact upstream/source and published-asset bytes used by source hashes.
+vendor/typewords/** -text
+public/apps/typewords/** -text

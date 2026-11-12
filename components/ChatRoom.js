@@ -41,6 +41,7 @@ import EnglishPronunciation from "./EnglishPronunciation";
 import EnglishMcqPractice from "./EnglishMcqPractice";
 import IeltsBand4 from "./IeltsBand4";
 import ImageEditorRoom from "./ImageEditorRoom";
+const TypeWordsRoom = dynamic(() => import("./TypeWordsRoom"), { ssr: false });
 // react-markdown/remark-gfm (used to render AI 回覆的 markdown 格式) 加了
 // ~40KB 到打包後的 JS——大部分使用者一次 session 不一定會點開「AI 助手」，
 // 跟 DocConvertRoomLazy 用一樣的手法延遲載入，不要讓每個人一開網站就先背
@@ -1813,7 +1814,7 @@ export default function ChatApp({ user }) {
   const sidebarLayout = useSidebarLayout("cr-sidebar-v1", "cr-order-top-v3", [
     "leaderboard", "calendar", "projectFiles", "videoHub", "audio",
     "upgrade", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion",
-    "englishPron", "ieltsBand4", "englishMcq", "vocab",
+    "typeWords", "englishPron", "ieltsBand4", "englishMcq", "vocab",
     "spanish", "spanishCourse", "spanishPron", "spanishGrammar", "spanishVerbs", "spanishMcq",
     "customVocab", "dict", "githubTrending",
   ]);
@@ -2651,10 +2652,11 @@ export default function ChatApp({ user }) {
   // has its own tab bar entry — reaching it should highlight "圖片編輯", not "更多".
   const inMoreTool = ["leaderboard", "cinema", "vocab", "spanish", "spanishCourse",
     "customVocab", "dict", "spanishPron", "spanishGrammar", "spanishVerbs",
-    "englishPron", "ieltsBand4", "aiChat", "docConvert", "aiCompanion", "upgrade"].includes(mobileActiveKey);
+    "typeWords", "englishPron", "ieltsBand4", "aiChat", "docConvert", "aiCompanion", "upgrade"].includes(mobileActiveKey);
   const inTool = inMoreTool || mobileActiveKey === "imageEditor";
   const inThread = !!activeFriendId || !!activeGroupId;
   const mobileAiActive = isMobile && mobileView === null && !inThread && mobileActiveKey === "aiChat";
+  const mobileTypeWordsActive = isMobile && mobileView === null && !inThread && mobileActiveKey === "typeWords";
   const mobileProfileActive = isMobile && mobileView === null && !inThread && mobileActiveKey === "feed" && !!viewProfileUid;
   const mobileThreadGlass = isMobile && mobileView === null && !showFriendInfo && !showGroupInfo
     && (inThread || (!mobileActiveKey && mobileHomeSubview === 'hall'));
@@ -2807,6 +2809,7 @@ export default function ChatApp({ user }) {
     aiChat: { icon: "🤖", label: "AI 助手" },
     docConvert: { icon: "🔄", label: "文檔轉換" },
     aiCompanion: { icon: "💞", label: "AI 夥伴" },
+    typeWords: { icon: "⌨️", label: "TypeWords" },
     englishPron: { icon: "🔤", label: "英語發音" },
     ieltsBand4: { icon: "🎯", label: "IELTS 4.0" },
     englishMcq: { icon: "📝", label: "英文選擇題" },
@@ -2829,7 +2832,7 @@ export default function ChatApp({ user }) {
   // 不能改），加進來只會產生一組沒人讀的 showAudio/setShowAudio。音頻功能
   // 目前是桌面版限定，手機版要另外處理。
   const MORE_MENU_KEYS = ["leaderboard", "cinema", "imageEditor", "aiChat", "docConvert", "aiCompanion", "upgrade",
-    "englishPron", "ieltsBand4", "englishMcq", "vocab", "spanish", "spanishCourse", "spanishPron", "spanishGrammar",
+    "typeWords", "englishPron", "ieltsBand4", "englishMcq", "vocab", "spanish", "spanishCourse", "spanishPron", "spanishGrammar",
     "spanishVerbs", "spanishMcq", "customVocab", "dict", "githubTrending"];
   const moreMenuState = {};
   const moreMenuSetters = {};
@@ -2893,6 +2896,10 @@ export default function ChatApp({ user }) {
     aiCompanion: (
       <NavItem icon="💞" iconImg="/icons/aiCompanion.png" iconBg="linear-gradient(135deg,#db2777,#9333ea)" label="AI 夥伴" sublabel={myProfile?.hasAiCompanion ? "語音陪伴" : "付費解鎖"}
         active={isTabActive("aiCompanion")} onClick={() => openTab("aiCompanion")} />
+    ),
+    typeWords: (
+      <NavItem compact icon="⌨️" iconBg="var(--accent-active)" label="TypeWords" sublabel="單字・文章打字練習"
+        active={isTabActive("typeWords")} onClick={() => openTab("typeWords")} />
     ),
     englishPron: (
       <NavItem compact icon="🔤" iconImg="/icons/englishPron.png" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音"
@@ -3415,6 +3422,11 @@ export default function ChatApp({ user }) {
     spanishGrammar: <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishGrammar onNav={() => closeTab(keyBlock.spanishGrammar, "spanishGrammar")} /></div>,
     spanishVerbs: <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}><SpanishVerbConjugator onNav={() => closeTab(keyBlock.spanishVerbs, "spanishVerbs")} /></div>,
     spanishMcq: <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><SpanishMcqPractice onNav={() => closeTab(keyBlock.spanishMcq, "spanishMcq")} /></div>,
+    typeWords: <TypeWordsRoom
+      active={!showOffice && (isMobile
+        ? mobileTypeWordsActive
+        : isTabActive("typeWords") && (!effectiveMaximizedBlock || effectiveMaximizedBlock === keyBlock.typeWords))}
+      onClose={isMobile ? () => { resetAllViews(); setMobileView("more"); } : undefined} />,
     englishPron: <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}><EnglishPronunciation user={user} db={db} onNav={() => closeTab(keyBlock.englishPron, "englishPron")} /></div>,
     customVocab: <CustomVocabRoom user={myProfile || user} db={db} />,
     dict: <DictionaryRoom />,
@@ -3895,7 +3907,7 @@ export default function ChatApp({ user }) {
         {/* One mobile identity row with calendar/settings only on the right.
             Logout remains available inside the shared settings menu. */}
         {/* AI and profile views provide their own controls; avoid a duplicate global bar. */}
-        {!mobileAiActive && !mobileProfileActive && <header className="cr-mobile-topbar">
+        {!mobileAiActive && !mobileProfileActive && !mobileTypeWordsActive && <header className="cr-mobile-topbar">
           {mobileView === null ? (
             <button onClick={() => {
               if (inTool) { setMobileView('more'); }
@@ -4375,7 +4387,7 @@ export default function ChatApp({ user }) {
           )}
         </div>
 
-        {isMobile && (
+        {isMobile && !mobileTypeWordsActive && (
           <ChatMobileTabBar
             glass={(mobileAiActive && aiChatAllowed) || mobileThreadGlass}
             overlayRootRef={shellElRef}
