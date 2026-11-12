@@ -1,0 +1,11 @@
+.git
+.next
+.swc
+node_modules
+.env*
+.tmp
+__tests__
+docs
+vendor/typewords
+*.zip
+!public/apps/typewords/typewords-source.zip

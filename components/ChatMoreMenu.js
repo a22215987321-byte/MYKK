@@ -43,6 +43,10 @@ export default function ChatMoreMenu({ state, setters, onOpen }) {
         <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", letterSpacing: "0.06em", textTransform: "uppercase" }}>🇬🇧 英語學習</span>
       </div>
       <div style={{ padding: "0 10px 6px" }}>
+        <NavItem icon="⌨️" iconBg="var(--accent-active)" label="TypeWords" sublabel="單字・文章打字練習" mobileTouch
+          active={state.showTypeWords} onClick={() => onOpen(setters.setShowTypeWords)} />
+      </div>
+      <div style={{ padding: "0 10px 6px" }}>
         <NavItem icon="🔤" iconBg="linear-gradient(135deg,#1e3a5f,#3b82f6)" label="英語發音" sublabel="音標・母音・子音" mobileTouch
           active={state.showEnglishPron} onClick={() => onOpen(setters.setShowEnglishPron)} />
       </div>
